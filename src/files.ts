@@ -1,0 +1,61 @@
+// Small file helpers: read a file that may not be there, write one without
+// ever leaving half of it behind, and split a JSONL file into lines.
+
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof Error && Reflect.get(error, 'code') === 'ENOENT';
+}
+
+/** The file's text, or null when it does not exist. */
+export async function readOptional(file: string): Promise<string | null> {
+  try {
+    return await readFile(file, 'utf8');
+  } catch (error) {
+    if (isNotFound(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/** The file parsed as JSON, or undefined when it is missing or not JSON. */
+export async function readJsonOrUndefined(file: string): Promise<unknown> {
+  const text = await readOptional(file);
+  if (text === null) {
+    return undefined;
+  }
+  try {
+    const value: unknown = JSON.parse(text);
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Writes to a temp file in the same folder, then renames it over the target,
+ * so readers see the old file or the new one and never half of either.
+ */
+export async function writeFileAtomic(target: string, content: string): Promise<void> {
+  const dir = path.dirname(target);
+  await mkdir(dir, { recursive: true });
+  const scratch = path.join(dir, `.${path.basename(target)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(scratch, content);
+    await rename(scratch, target);
+  } catch (error) {
+    await rm(scratch, { force: true });
+    throw error;
+  }
+}
+
+/** Every complete line of a file. A last line still being written is left out. */
+export async function readAllLines(file: string): Promise<string[]> {
+  const text = await readFile(file, 'utf8');
+  const lines = text.split('\n');
+  lines.pop();
+  return lines;
+}

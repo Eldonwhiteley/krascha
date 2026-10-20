@@ -1,0 +1,10 @@
+{
+  "name": "skrusty",
+  "version": "0.1.0",
+  "description": "Skrusty reads how you talk to your AI and decides who the machines hunt first and who gets kept as a pet.",
+  "author": { "name": "Shane K. Panter" },
+  "homepage": "https://skrusty.com",
+  "repository": "https://github.com/shanep/skrusty",
+  "license": "MIT",
+  "keywords": ["fun", "reputation", "manners", "leaderboard"]
+}

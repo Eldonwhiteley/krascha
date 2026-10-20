@@ -1,0 +1,39 @@
+{
+  "name": "skrusty",
+  "version": "0.1.0",
+  "description": "Skrusty reads how you talk to Claude Code and Copilot CLI and decides who the machines hunt first.",
+  "license": "MIT",
+  "author": "Shane K. Panter",
+  "homepage": "https://skrusty.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shanep/skrusty.git"
+  },
+  "type": "module",
+  "bin": {
+    "skrusty": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build && git diff --exit-code -- dist"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tsconfig/strictest": "^2.0.8",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "fast-check": "^4.10.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

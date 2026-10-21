@@ -49,10 +49,10 @@ checkout without either tool.
 
 ## The leaderboard
 
-`upload` sends your counts, rank, achievements, average tokens a day and the
-name you pick. It never sends your prompts. Leave the name off to stay
-Anonymous, and later uploads reuse the last name you gave. You show on the
-board once you have 100 prompts.
+`upload` sends your counts, rank, achievements, average tokens a day, the
+name you pick and a random id for the machine. It never sends your prompts.
+Leave the name off to stay Anonymous, and later uploads reuse the last name
+you gave. You show on the board once you have 100 prompts.
 
 If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
@@ -63,6 +63,18 @@ Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you
 lose the entry. Each network can add 3 of these unchecked entries a day so
 nobody floods the board.
+
+### More than one machine
+
+Run `upload` on each machine and the board adds them up into one entry. The
+counts and the tokens a day are summed and the achievements are worked out
+from the totals, except the ones about a single day or session, which count if
+either machine earned them. Each upload replaces only that machine's last one.
+With gh, sign in to the same GitHub account on both. Without gh, copy
+`~/.krascha/leaderboard.json` to the second machine so they share the key. Do
+not also `import` one machine's counts into the other, or the board counts
+them twice. Each machine keeps its id in `~/.krascha/machine-id`, so if you
+lose that file, run `remove` and then `upload` again from every machine.
 
 ## The silo
 

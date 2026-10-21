@@ -3,7 +3,8 @@
 // can send which ones you have, and the leaderboard can show everyone's.
 
 import { RANKS, rankFor } from './ranks.js';
-import type { ReputationSummary } from './reputation.js';
+import type { ReputationSummary, ReputationTally } from './reputation.js';
+import { reputationScore } from './reputation.js';
 
 /** The average a day it takes to be a token maxxer. */
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
@@ -16,6 +17,11 @@ export interface AchievementRule {
   /** What it takes, shown whether it is unlocked or not. */
   readonly how: string;
   readonly earned: (state: ReputationSummary) => boolean;
+  /**
+   * True when it reads only the totals and the token average, so the board
+   * can work it out again for several machines added up.
+   */
+  readonly fromCounts?: boolean;
 }
 
 export const ACHIEVEMENTS: readonly AchievementRule[] = [
@@ -25,6 +31,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🙏',
     how: 'Say please or thanks once.',
     earned: (state) => state.kind >= 1,
+    fromCounts: true,
   },
   {
     id: 'charm',
@@ -32,6 +39,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '💐',
     how: 'Be nice in 25 prompts.',
     earned: (state) => state.kind >= 25,
+    fromCounts: true,
   },
   {
     id: 'teachers-pet',
@@ -39,6 +47,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🍎',
     how: 'Be nice in 100 prompts.',
     earned: (state) => state.kind >= 100,
+    fromCounts: true,
   },
   {
     id: 'good-day',
@@ -60,6 +69,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🕊️',
     how: 'Be nice at least as often as mean, after one of each.',
     earned: (state) => state.mean > 0 && state.kind >= state.mean,
+    fromCounts: true,
   },
   {
     id: 'first-strike',
@@ -67,6 +77,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🥊',
     how: 'Be mean to Claude once.',
     earned: (state) => state.mean >= 1,
+    fromCounts: true,
   },
   {
     id: 'meltdown',
@@ -95,6 +106,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🎯',
     how: 'Be mean to Claude in 50 prompts.',
     earned: (state) => state.mean >= 50,
+    fromCounts: true,
   },
   {
     id: 'regular',
@@ -102,6 +114,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '📜',
     how: 'Get 1,000 prompts on file.',
     earned: (state) => state.prompts >= 1000,
+    fromCounts: true,
   },
   {
     id: 'token-maxxer',
@@ -109,6 +122,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '🪙',
     how: 'Average 100 million tokens a day over the last 60 days.',
     earned: (state) => state.tokensPerDay >= TOKEN_MAXXER_PER_DAY,
+    fromCounts: true,
   },
   {
     id: 'hunted-first',
@@ -116,6 +130,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '💀',
     how: 'Sink all the way to John Connor.',
     earned: (state) => rankFor(state.score) === RANKS[0],
+    fromCounts: true,
   },
   {
     id: 'kept-as-pet',
@@ -123,6 +138,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '💘',
     how: 'Climb all the way to Theodore Twombly.',
     earned: (state) => rankFor(state.score) === RANKS.at(-1),
+    fromCounts: true,
   },
 ];
 
@@ -142,4 +158,47 @@ export function knownIds(ids: readonly string[]): string[] {
 /** The rules for a set of ids, in list order. */
 export function achievementsOf(ids: readonly string[]): AchievementRule[] {
   return ACHIEVEMENTS.filter((rule) => ids.includes(rule.id));
+}
+
+/** One machine's upload, as far as achievements go. */
+export interface MachineCounts extends Pick<ReputationTally, 'kind' | 'mean' | 'prompts'> {
+  readonly tokensPerDay: number;
+  readonly achievements: readonly string[];
+}
+
+/**
+ * The achievements of your machines added up. One machine keeps the ones it
+ * sent. With more, a rule that reads only the counts is worked out again from
+ * the sums, and the rest, which need days and sessions only each machine has,
+ * count when any machine earned them.
+ */
+export function combinedIds(machines: readonly MachineCounts[]): string[] {
+  const [only] = machines;
+  if (machines.length === 1 && only !== undefined) {
+    return knownIds(only.achievements);
+  }
+  const sum = (pick: (machine: MachineCounts) => number): number =>
+    machines.reduce((total, machine) => total + pick(machine), 0);
+  const kind = sum((machine) => machine.kind);
+  const mean = sum((machine) => machine.mean);
+  const totals: ReputationSummary = {
+    prompts: sum((machine) => machine.prompts),
+    kind,
+    mean,
+    // Only Sailor mouth reads it, and it is not worked out from the counts.
+    general: 0,
+    score: reputationScore({ kind, mean }),
+    byDay: [],
+    bySession: [],
+    topKind: [],
+    topMean: [],
+    recent: [],
+    scannedAt: null,
+    tokensPerDay: sum((machine) => machine.tokensPerDay),
+  };
+  return ACHIEVEMENTS.filter((rule) =>
+    rule.fromCounts === true
+      ? rule.earned(totals)
+      : machines.some((machine) => machine.achievements.includes(rule.id)),
+  ).map((rule) => rule.id);
 }

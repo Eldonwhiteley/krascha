@@ -146,6 +146,8 @@ describe('leaderboard worker', () => {
       { ...MEAN, tokensPerDay: 2.5 },
       { ...MEAN, tokensPerDay: '100' },
       { ...MEAN, tokensPerDay: MAX_TOKENS_PER_DAY + 1 },
+      { ...MEAN, machine: 'short' },
+      { ...MEAN, machine: 7 },
     ];
     const statuses = await Promise.all(
       bad.map(async (body) => await w.status('POST', '/api/scores', 'token-ann', body)),
@@ -171,6 +173,7 @@ describe('leaderboard worker', () => {
         tokensPerDay: 0,
       },
       place: 1,
+      machines: 1,
     });
   });
 
@@ -210,6 +213,59 @@ describe('leaderboard worker', () => {
     expect(again.entry.id).toBe('entry-1');
     expect(again.entry.name).toBe('Ann the Nice');
     expect(await w.board()).toMatchObject({ total: 1 });
+  });
+
+  it('adds up an account’s machines and replaces each machine’s last upload', async () => {
+    const w = world();
+    const laptop = 'l'.repeat(43);
+    const desktop = 'd'.repeat(43);
+    const first = await w.upload('token-ann', {
+      ...MEAN,
+      machine: laptop,
+      achievements: ['first-strike', 'meltdown', 'hunted-first'],
+      tokensPerDay: 60_000_000,
+    });
+    expect(first.machines).toBe(1);
+    expect(first.entry.achievements).toStrictEqual(['first-strike', 'meltdown', 'hunted-first']);
+    const both = await w.upload('token-ann', {
+      ...KIND,
+      name: 'Ann',
+      machine: desktop,
+      achievements: ['manners', 'charm', 'saint', 'first-strike', 'kept-as-pet'],
+      tokensPerDay: 50_000_000,
+    });
+    expect(both.machines).toBe(2);
+    expect(both.entry).toMatchObject({
+      id: 'entry-1',
+      kind: 82,
+      mean: 31,
+      prompts: 700,
+      score: reputationScore({ kind: 82, mean: 31 }),
+      tokensPerDay: 110_000_000,
+    });
+    // Counts are worked out again from the sums, and days and sessions come from either machine.
+    expect(both.entry.achievements).toStrictEqual([
+      'manners',
+      'charm',
+      'saint',
+      'diplomat',
+      'first-strike',
+      'meltdown',
+      'token-maxxer',
+    ]);
+    const again = await w.upload('token-ann', { ...MEAN, prompts: 500, machine: laptop });
+    expect(again).toMatchObject({ machines: 2, entry: { prompts: 800 } });
+    expect(await w.board()).toMatchObject({ total: 1 });
+  });
+
+  it('lets an upload without a machine replace them all, and the next machine replace it', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, machine: 'l'.repeat(43) });
+    await w.upload('token-ann', { ...MEAN, machine: 'd'.repeat(43) });
+    const old = await w.upload('token-ann', KIND);
+    expect(old).toMatchObject({ machines: 1, entry: { prompts: 300 } });
+    const next = await w.upload('token-ann', { ...MEAN, machine: 'l'.repeat(43) });
+    expect(next).toMatchObject({ machines: 1, entry: { prompts: 400 } });
   });
 
   it('lists the most wanted and the pets, with your own place', async () => {
@@ -259,6 +315,9 @@ describe('leaderboard worker', () => {
     expect(await w.status('DELETE', '/api/scores', 'token-ann')).toBe(204);
     const board = await w.board();
     expect(board.pets.map((entry) => entry.name)).toStrictEqual(['Bob']);
+    // Coming back starts from this upload's machine alone.
+    const back = await w.upload('token-ann', { ...MEAN, machine: 'l'.repeat(43) });
+    expect(back).toMatchObject({ machines: 1, entry: { prompts: 400 } });
   });
 
   it('takes uploads with a made-up key, unverified, and ties them together', async () => {

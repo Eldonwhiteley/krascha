@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { Credential, FetchFunction } from '../leaderboard/client.js';
 import { fetchBoard, removeEntry, uploadScore } from '../leaderboard/client.js';
 import type { SavedEntry } from '../leaderboard/saved.js';
-import { loadSaved, saveSaved } from '../leaderboard/saved.js';
+import { loadMachine, loadSaved, saveSaved } from '../leaderboard/saved.js';
 import { scanInto } from '../reputation/scan.js';
 import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
@@ -36,7 +36,7 @@ export interface CliIo {
   readonly fetch: FetchFunction;
   /** The token from `gh auth token`, or null when gh is missing or signed out. */
   readonly githubToken: () => Promise<string | null>;
-  /** A fresh random key for uploading without GitHub. */
+  /** A fresh random key for uploading without GitHub, also used for this machine's id. */
   readonly newKey: () => string;
   /** True when stdout is a terminal that takes color. */
   readonly color: boolean;
@@ -162,7 +162,9 @@ function uploaded(standing: Standing, verified: boolean, prompts: number): strin
     standing.place === null
       ? `You show on the board once you have ${String(MIN_PROMPTS)} prompts. You have ${String(prompts)}.`
       : `You are number ${String(standing.place)} on Krascha's List, counting from the most wanted.`;
-  return `Uploaded as ${standing.entry.name} (${how}). ${where}\n`;
+  const machines = standing.machines ?? 1;
+  const added = machines > 1 ? ` That adds up your ${String(machines)} machines.` : '';
+  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}\n`;
 }
 
 async function upload(io: CliIo, args: readonly string[]): Promise<number> {
@@ -182,6 +184,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
   const key = credential.kind === 'key' ? credential.key : saved.key;
   // The key is saved before the upload, so an answer lost on the way back does not orphan the entry.
   await saveSaved(dir, { ...saved, key });
+  const machine = await loadMachine(dir, io.newKey);
   const { summary } = await refresh(io);
   const standing = await uploadScore(io.fetch, boardUrl(io), credential, {
     name,
@@ -190,6 +193,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     prompts: summary.prompts,
     achievements: unlockedIds(summary),
     tokensPerDay: summary.tokensPerDay,
+    machine,
   });
   await saveSaved(dir, { entryId: standing.entry.id, name, auth: credential.kind, key });
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));

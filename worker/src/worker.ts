@@ -96,17 +96,25 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
   if (!isScoreUpload(body)) {
     return fail(
       400,
-      'The upload needs a short name, whole, non-negative counts, a sane token average and a short list of achievements.',
+      'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements and a machine id that looks like a Krascha key.',
     );
   }
   // Only these fields are kept, whatever else the body holds.
-  const { name, kind, mean, prompts, achievements = [], tokensPerDay = 0 } = body;
+  const { name, kind, mean, prompts, achievements = [], tokensPerDay = 0, machine } = body;
   const now = deps.now();
   // The address is only hashed with the day, for the cap on new unverified entries.
   const address = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const saved = await saveScore(env.DB, {
     owner,
-    upload: { name, kind, mean, prompts, achievements, tokensPerDay },
+    upload: {
+      name,
+      kind,
+      mean,
+      prompts,
+      achievements,
+      tokensPerDay,
+      ...(machine === undefined ? {} : { machine }),
+    },
     now,
     newId: deps.newId,
     origin: await sha256(`${utcDay(now)} ${address}`),

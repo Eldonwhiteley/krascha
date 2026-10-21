@@ -5,7 +5,7 @@ import path from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 
 import type { FetchFunction } from '../leaderboard/client.js';
-import { SAVED_FILE } from '../leaderboard/saved.js';
+import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
@@ -40,7 +40,7 @@ interface Sent {
 }
 
 /** A board server that takes any upload and puts it in first place. */
-function fakeBoard(sent: Sent[], verified: boolean): FetchFunction {
+function fakeBoard(sent: Sent[], verified: boolean, machines?: number): FetchFunction {
   return async (_url, init) => {
     const headers = new Headers(init.headers);
     const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
@@ -61,7 +61,9 @@ function fakeBoard(sent: Sent[], verified: boolean): FetchFunction {
       prompts: 3,
       uploadedAt: 1,
     };
-    return Response.json({ entry, place: null });
+    return Response.json(
+      machines === undefined ? { entry, place: null } : { entry, place: null, machines },
+    );
   };
 }
 
@@ -186,7 +188,7 @@ describe('krascha', () => {
       {
         method: 'POST',
         authorization: 'Bearer gho_abc',
-        body: { name: 'Sarah Connor', prompts: 3 },
+        body: { name: 'Sarah Connor', prompts: 3, machine: 'k'.repeat(43) },
       },
     ]);
     const saved: unknown = JSON.parse(
@@ -198,6 +200,22 @@ describe('krascha', () => {
       auth: 'github',
       key: null,
     });
+  });
+
+  it('sends the same machine id every time and says when machines add up', async () => {
+    const home = await makeHome();
+    const sent: Sent[] = [];
+    const machine = 'm'.repeat(43);
+    await mkdir(path.join(home.root, '.krascha'), { recursive: true });
+    await writeFile(path.join(home.root, '.krascha', MACHINE_FILE), `${machine}\n`);
+    home.use({ fetch: fakeBoard(sent, true, 2), githubToken: () => Promise.resolve('gho_abc') });
+    const { out } = await home.run('upload', 'Kyle');
+    expect(out).toContain('That adds up your 2 machines.');
+    expect(await home.run('upload')).toMatchObject({ code: 0 });
+    expect(sent.map((call) => Reflect.get(Object(call.body), 'machine'))).toStrictEqual([
+      machine,
+      machine,
+    ]);
   });
 
   it('uploads with a key when gh is signed out, and keeps using it', async () => {

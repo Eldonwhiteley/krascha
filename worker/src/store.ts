@@ -1,8 +1,10 @@
-// The leaderboard's tables in Cloudflare D1: a row per owner, and a count of
-// the unverified entries each network started today. The D1 types here are the few calls this file makes, so the Worker needs no
+// The leaderboard's tables in Cloudflare D1: a row per owner, each of the
+// owner's machines that row adds up, and a count of the unverified entries
+// each network started today. The D1 types here are the few calls this file makes, so the Worker needs no
 // Cloudflare type package.
 
-import { knownIds } from '../../src/shared/achievements.js';
+import type { MachineCounts } from '../../src/shared/achievements.js';
+import { combinedIds, knownIds } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
   ANONYMOUS,
@@ -141,8 +143,9 @@ export type SaveResult =
   | { readonly ok: false; readonly reason: 'limit' | 'new-entries' };
 
 /**
- * Saves an upload over the owner's last one. The score is worked out here
- * from the counts, so a client cannot send a score that does not match them.
+ * Saves an upload over the last one from the same machine and adds up the
+ * owner's machines. The score is worked out here from the counts, so a client
+ * cannot send a score that does not match them.
  */
 export interface Save {
   readonly owner: Owner;
@@ -174,6 +177,61 @@ async function claimNewEntry(database: D1Database, origin: string, day: string):
   return true;
 }
 
+function machineOf(row: Row): MachineCounts {
+  return {
+    kind: number_(row, 'kind'),
+    mean: number_(row, 'mean'),
+    prompts: number_(row, 'prompts'),
+    tokensPerDay: number_(row, 'tokens_per_day'),
+    achievements: text(row, 'achievements').split(','),
+  };
+}
+
+/**
+ * Keeps the upload as its machine's last one and returns all the owner's
+ * machines. An upload with no machine id is from an older build that sends
+ * everything it knows, so it replaces the other machines, and the first one
+ * with an id replaces it.
+ */
+async function saveMachine(
+  database: D1Database,
+  owner: Owner,
+  upload: ScoreUpload,
+): Promise<MachineCounts[]> {
+  const machine = upload.machine ?? '';
+  await database
+    .prepare(
+      machine === ''
+        ? 'DELETE FROM machines WHERE owner = ?'
+        : "DELETE FROM machines WHERE owner = ? AND machine = ''",
+    )
+    .bind(owner.id)
+    .run();
+  await database
+    .prepare(
+      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, tokens_per_day)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (owner, machine) DO UPDATE SET
+         kind = excluded.kind, mean = excluded.mean, prompts = excluded.prompts,
+         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day`,
+    )
+    .bind(
+      owner.id,
+      machine,
+      upload.kind,
+      upload.mean,
+      upload.prompts,
+      knownIds(upload.achievements ?? []).join(','),
+      upload.tokensPerDay ?? 0,
+    )
+    .run();
+  const { results } = await database
+    .prepare('SELECT kind, mean, prompts, achievements, tokens_per_day FROM machines WHERE owner = ?')
+    .bind(owner.id)
+    .all();
+  return results.map((row) => machineOf(row));
+}
+
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
   const { owner, upload, now, newId } = save;
   const day = utcDay(now);
@@ -190,7 +248,11 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     return { ok: false, reason: 'new-entries' };
   }
   const entryId = found === null ? newId() : text(found, 'entry_id');
-  const score = reputationScore(upload);
+  const machines = await saveMachine(database, owner, upload);
+  const sum = (pick: (machine: MachineCounts) => number): number =>
+    machines.reduce((total, machine) => total + pick(machine), 0);
+  const kind = sum((machine) => machine.kind);
+  const mean = sum((machine) => machine.mean);
   await database
     .prepare(
       `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day)
@@ -206,15 +268,15 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       owner.verified ? 1 : 0,
       entryId,
       cleanName(upload.name),
-      upload.kind,
-      upload.mean,
-      upload.prompts,
-      score,
+      kind,
+      mean,
+      sum((machine) => machine.prompts),
+      reputationScore({ kind, mean }),
       now,
       day,
       uploadsToday + 1,
-      knownIds(upload.achievements ?? []).join(','),
-      upload.tokensPerDay ?? 0,
+      combinedIds(machines).join(','),
+      sum((machine) => machine.tokensPerDay),
     )
     .run();
   const row = await database
@@ -224,9 +286,13 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   if (row === null) {
     throw new Error('the saved score could not be read back');
   }
-  return { ok: true, standing: await standingOf(database, row) };
+  return {
+    ok: true,
+    standing: { ...(await standingOf(database, row)), machines: machines.length },
+  };
 }
 
 export async function removeScore(database: D1Database, owner: Owner): Promise<void> {
+  await database.prepare('DELETE FROM machines WHERE owner = ?').bind(owner.id).run();
   await database.prepare('DELETE FROM scores WHERE owner = ?').bind(owner.id).run();
 }

@@ -1,7 +1,8 @@
 // The global Reputation leaderboard, shared by the Cloudflare Worker that
 // serves it and the CLI that uploads to it and shows it.
-// An upload carries a display name, three counts, your average tokens a day
-// and the ids of the achievements you have unlocked, nothing else.
+// An upload carries a display name, three counts, your average tokens a day,
+// the ids of the achievements you have unlocked and a random id for the
+// machine they came from, nothing else.
 
 /** The Cloudflare Worker that serves the board. */
 export const LEADERBOARD_URL = 'https://krascha.com';
@@ -37,6 +38,11 @@ export interface ScoreUpload {
   readonly achievements?: readonly string[];
   /** Average tokens a day over the last 60 days. Missing from builds older than tokens on the board. */
   readonly tokensPerDay?: number;
+  /**
+   * A random id for the machine the counts come from, so uploads from your
+   * machines add up. Missing from older builds, whose upload replaces them all.
+   */
+  readonly machine?: string;
 }
 
 /** One person on the board. The id is random, not their GitHub id. */
@@ -61,6 +67,8 @@ export interface BoardEntry {
 export interface Standing {
   readonly entry: BoardEntry;
   readonly place: number | null;
+  /** How many machines the entry adds up. Only in the answer to an upload, and missing from older servers. */
+  readonly machines?: number;
 }
 
 export interface Board {
@@ -109,7 +117,9 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     isCount(value['prompts']) &&
     value['kind'] + value['mean'] <= value['prompts'] &&
     (value['achievements'] === undefined || isIdList(value['achievements'], MAX_ACHIEVEMENTS)) &&
-    isTokens(value['tokensPerDay'], MAX_TOKENS_PER_DAY)
+    isTokens(value['tokensPerDay'], MAX_TOKENS_PER_DAY) &&
+    (value['machine'] === undefined ||
+      (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine'])))
   );
 }
 
@@ -134,7 +144,8 @@ export function isStanding(value: unknown): value is Standing {
   return (
     isRecord(value) &&
     isBoardEntry(value['entry']) &&
-    (value['place'] === null || isCount(value['place']))
+    (value['place'] === null || isCount(value['place'])) &&
+    (value['machines'] === undefined || isCount(value['machines']))
   );
 }
 

@@ -1,12 +1,15 @@
 // What Krascha remembers about your leaderboard entry, in his data folder:
 // the entry's random id, the name you last chose, how your uploads prove they
-// are yours, and the key he made up if you upload without GitHub.
+// are yours, and the key he made up if you upload without GitHub. This
+// machine's id sits in a file of its own.
 
 import path from 'node:path';
 
-import { readJsonOrUndefined, writeFileAtomic } from '../files.js';
+import { readJsonOrUndefined, readOptional, writeFileAtomic } from '../files.js';
+import { KEY_PATTERN } from '../shared/leaderboard.js';
 
 export const SAVED_FILE = 'leaderboard.json';
+export const MACHINE_FILE = 'machine-id';
 
 export interface SavedEntry {
   /** Null until the first upload, and again after removing it. */
@@ -41,4 +44,20 @@ export async function loadSaved(storageDir: string): Promise<SavedEntry> {
 
 export async function saveSaved(storageDir: string, saved: SavedEntry): Promise<void> {
   await writeFileAtomic(path.join(storageDir, SAVED_FILE), `${JSON.stringify(saved, null, 2)}\n`);
+}
+
+/**
+ * This machine's random id, made the first time, so its uploads add to your
+ * other machines' instead of replacing them. It is kept out of SAVED_FILE so
+ * copying that file to another machine shares the key but not the id.
+ */
+export async function loadMachine(storageDir: string, newId: () => string): Promise<string> {
+  const file = path.join(storageDir, MACHINE_FILE);
+  const known = (await readOptional(file))?.trim();
+  if (known !== undefined && KEY_PATTERN.test(known)) {
+    return known;
+  }
+  const id = newId();
+  await writeFileAtomic(file, `${id}\n`);
+  return id;
 }

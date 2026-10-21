@@ -38,6 +38,8 @@ export interface Match<E extends Term> {
   readonly token: Token;
   /** Index of the first token. */
   readonly first: number;
+  /** Index of the token after the match. */
+  readonly next: number;
 }
 
 export type Forms<E extends Term> = ReadonlyMap<string, readonly Form<E>[]>;
@@ -121,8 +123,8 @@ export function findMatches<E extends Term>(forms: Forms<E>, tokens: readonly To
   for (const [index, token] of tokens.entries()) {
     const form = index < next ? undefined : formAt(forms, tokens, index, token.word);
     if (form !== undefined) {
-      matches.push({ entry: form.entry, token, first: index });
       next = index + form.words.length;
+      matches.push({ entry: form.entry, token, first: index, next });
     }
   }
   return matches;
@@ -134,6 +136,15 @@ function isAimed(
   spoken: ReadonlySet<number>,
 ): boolean {
   if (spoken.has(match.token.sentence) || match.entry.kind === 'aimed') {
+    return true;
+  }
+  // A swear followed by "me" ("fuck me") counts as aimed too.
+  const after = tokens[match.next];
+  if (
+    match.entry.kind === 'swear' &&
+    after?.word === 'me' &&
+    after.sentence === match.token.sentence
+  ) {
     return true;
   }
   const before = tokens[match.first - 1]?.word ?? '';

@@ -6,7 +6,7 @@
 
 /**
  * swear: profanity or frustration, aimed at Claude only when the sentence
- * also says "you". insult: name-calling, aimed at Claude unless it follows
+ * also says "you" or the swear is followed by "me". insult: name-calling, aimed at Claude unless it follows
  * "the", "that" and so on. aimed: phrases that only make sense said to Claude.
  */
 type TermKind = 'swear' | 'insult' | 'aimed';
@@ -120,6 +120,11 @@ export const LEXICON: readonly LexiconEntry[] = [
   { term: 'imbecile', kind: 'insult', forms: ['imbecile'] },
   { term: 'dimwit', kind: 'insult', forms: ['dimwit', 'halfwit', 'nitwit'] },
   { term: 'piece of shit', kind: 'insult', forms: ['piece of shit'] },
+  {
+    term: 'limp biscuit',
+    kind: 'insult',
+    forms: ['limp biscuit', 'limp biscuits', 'limp bisket', 'limp biscut', 'limp bizkit'],
+  },
   {
     term: 'hurry up',
     kind: 'aimed',

@@ -96,6 +96,15 @@ describe('detectFrustration targets', () => {
     expect(target('YOU broke it, shit')).toBe('agent');
   });
 
+  it('calls a swear aimed when me comes right after it', () => {
+    expect(target('fuck me!')).toBe('agent');
+    expect(target('well damn me')).toBe('agent');
+    expect(target('what the hell me')).toBe('agent');
+    expect(target('fuck. me too')).toBe('general');
+    expect(target('give me a fucking break')).toBe('general');
+    expect(target('fuck it, show me')).toBe('general');
+  });
+
   it('splits sentences on . ! ? ; and new lines', () => {
     for (const mark of ['.', '!', '?', ';', '\n']) {
       expect(target(`you are here${mark} this is shit`)).toBe('general');
@@ -124,6 +133,18 @@ describe('detectFrustration targets', () => {
     expect(target('you are the idiot')).toBe('agent');
   });
 
+  it('calls a limp biscuit an insult', () => {
+    expect(
+      detectFrustration('what in the goddamn fucking hell?? Fix it you limp bisket'),
+    ).toStrictEqual({
+      terms: ['damn', 'fuck', 'limp biscuit'],
+      target: 'agent',
+      excerpt: 'what in the goddamn fucking hell?? Fix it you limp bisket',
+    });
+    expect(target('fix it limp biscuit')).toBe('agent');
+    expect(target('that limp biscuit wrote this')).toBe('general');
+  });
+
   it('calls a mix aimed when any hit is aimed', () => {
     expect(target('this is shit. fix it idiot')).toBe('agent');
     expect(target('the idiot wrote shit')).toBe('general');
@@ -132,8 +153,8 @@ describe('detectFrustration targets', () => {
 
 describe('detectFrustration terms', () => {
   it('knows every form and its kind', () => {
-    expect(LEXICON).toHaveLength(31);
-    expect(ALL_FORMS).toHaveLength(90);
+    expect(LEXICON).toHaveLength(32);
+    expect(ALL_FORMS).toHaveLength(95);
     for (const entry of LEXICON) {
       for (const form of entry.forms) {
         const found = detectFrustration(form);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ACHIEVEMENTS } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
   isBoard,
@@ -183,7 +184,7 @@ describe('leaderboard worker', () => {
     const page = await w.call('GET', '/');
     const html = await page.text();
     expect(html).toContain('aria-label="Achievements: First strike, Meltdown"');
-    expect(html).toContain('<span title="Meltdown">🌋</span>');
+    expect(html).toContain('<span title="Meltdown: Be mean to Claude 5 times in one day.">🌋</span>');
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.achievements).toStrictEqual([]);
   });
@@ -304,6 +305,15 @@ describe('leaderboard worker', () => {
     await w.upload('token-ann', MEAN);
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<span class="verified" title="Checked with GitHub">✓</span>');
+  });
+
+  it('explains every achievement on the page, earned or not', async () => {
+    const w = world();
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<h2 id="legend">🏆 Achievements</h2>');
+    for (const rule of ACHIEVEMENTS) {
+      expect(page).toContain(`${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd>`);
+    }
   });
 
   it('serves a public page with names escaped', async () => {

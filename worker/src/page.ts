@@ -1,7 +1,7 @@
 // The public leaderboard page, rendered on the server so it needs no script:
 // who the machines hunt first, and who they keep as pets.
 
-import { achievementsOf } from '../../src/shared/achievements.js';
+import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 
@@ -40,7 +40,7 @@ function trophies(ids: readonly string[]): string {
   }
   const label = `Achievements: ${earned.map((rule) => rule.name).join(', ')}`;
   const icons = earned.map(
-    (rule) => `<span title="${escapeHtml(rule.name)}">${escapeHtml(rule.icon)}</span>`,
+    (rule) => `<span title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
   );
   return `<span class="trophies" role="img" aria-label="${escapeHtml(label)}">${icons.join('')}</span>`;
 }
@@ -63,6 +63,20 @@ function rows(entries: readonly BoardEntry[], empty: string): string {
       </li>`,
   );
   return `<ol>${items.join('')}</ol>`;
+}
+
+/** Every trophy, earned by anyone or not, so the icons next to names mean something. */
+function legend(): string {
+  const items = ACHIEVEMENTS.map(
+    (rule) => `
+        <div><dt><span aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd></div>`,
+  );
+  return `<section class="legend" aria-labelledby="legend">
+    <h2 id="legend">🏆 Achievements</h2>
+    <p class="sub">What the icons next to a name mean.</p>
+    <dl>${items.join('')}
+    </dl>
+  </section>`;
 }
 
 const STYLE = `
@@ -98,6 +112,10 @@ li:first-child { border-top: 0; }
 .wanted .score { color: var(--red); }
 .pets .score { color: var(--green); }
 .empty { color: var(--muted); }
+section.legend { margin-top: 16px; }
+dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+dt { font-weight: 600; }
+dd { margin: 0; color: var(--muted); font-size: 0.85em; }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 1px solid var(--line);
@@ -133,6 +151,7 @@ export function renderPage(board: Board, now: number): string {
       ${rows(board.pets, 'Nobody yet. Somebody say please.')}
     </section>
   </div>
+  ${legend()}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.

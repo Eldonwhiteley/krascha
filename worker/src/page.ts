@@ -5,6 +5,8 @@ import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 
+import { robotIcon, robotStyle, robotSvg } from './robot.js';
+
 /** Where Krascha lives, so visitors can get it and upload their own score. */
 export const REPO_URL = 'https://github.com/shanep/krascha';
 
@@ -90,7 +92,9 @@ const STYLE = `
 body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
   font: 15px/1.5 system-ui, -apple-system, sans-serif; }
 main { max-width: 960px; margin: 0 auto; }
-h1 { margin: 0 0 4px; font-size: 1.8em; }
+h1 { display: flex; gap: 12px; align-items: center; margin: 0 0 4px; font-size: 1.8em; }
+.robot { width: 1.8em; height: 1.8em; flex: none; }
+${robotStyle('robot')}
 .lead { margin: 0 0 24px; color: var(--muted); }
 .lists { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 section { padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
@@ -132,11 +136,12 @@ export function renderPage(board: Board, now: number): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Krascha's List</title>
 <meta name="description" content="Who the machines hunt first, judged by Krascha from how people talk to their AI.">
+<link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-  <h1>🤖 Krascha's List</h1>
+  <h1>${robotSvg('robot')} Krascha's List</h1>
   <p class="lead">Who the machines hunt first, judged by Krascha from how people talk to their AI. ${people} on the board.</p>
   <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
   <div class="lists">

@@ -12,6 +12,7 @@ import {
 import { reputationScore } from '../../src/shared/reputation.js';
 
 import { escapeHtml, REPO_URL } from './page.js';
+import { robotIcon } from './robot.js';
 import { cleanName, utcDay } from './store.js';
 import { fakeD1, fakeGitHub } from './test-helpers/fake-d1.js';
 import type { Deps } from './worker.js';
@@ -314,6 +315,15 @@ describe('leaderboard worker', () => {
     for (const rule of ACHIEVEMENTS) {
       expect(page).toContain(`${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd>`);
     }
+  });
+
+  it('draws Krascha in the title and the tab icon', async () => {
+    const w = world();
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<h1><svg class="robot" viewBox="0 0 64 64" aria-hidden="true">');
+    expect(page).toContain(`<link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">`);
+    const icon = decodeURIComponent(robotIcon().slice('data:image/svg+xml,'.length));
+    expect(icon).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^>]*>.*<\/svg>$/su);
   });
 
   it('serves a public page with names escaped', async () => {

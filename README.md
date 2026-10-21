@@ -136,4 +136,6 @@ it again on macOS and Linux.
 
 The leaderboard is a Cloudflare Worker with a D1 database in `worker/`.
 `node scripts/deploy-worker.mjs` creates the database on the first run,
-applies the migrations and deploys it.
+applies the migrations and deploys it. The deploy workflow runs it after every
+push to master that passes CI, using the `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` repo secrets.

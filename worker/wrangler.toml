@@ -1,13 +1,13 @@
 # The Cloudflare Worker behind Skrusty's List, the global leaderboard, served
-# at krasha.com. Deploy with node scripts/deploy-worker.mjs, which creates
+# at krascha.com. Deploy with node scripts/deploy-worker.mjs, which creates
 # the database the first time.
 name = "skrusty"
 main = "src/worker.ts"
 compatibility_date = "2025-09-01"
 workers_dev = true
 
-# krasha.com must be a zone in the same Cloudflare account.
-routes = [{ pattern = "krasha.com", custom_domain = true }]
+# krascha.com must be a zone in the same Cloudflare account.
+routes = [{ pattern = "krascha.com", custom_domain = true }]
 
 [[d1_databases]]
 binding = "DB"

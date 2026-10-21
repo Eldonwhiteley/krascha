@@ -18,7 +18,7 @@ import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
 import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
-import { byStanding, scoreApplicant } from '../shared/silo.js';
+import { rankBoard, scoreApplicant } from '../shared/silo.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
@@ -255,13 +255,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const saved = await loadSaved(dataDir(io));
   if (args[0] === 'board') {
     const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
-    // Each entry is in one list, but a duplicate from the server should not get two bunks.
-    const entries = new Map(
-      [...fetched.mostWanted, ...fetched.pets].map((entry) => [entry.id, entry]),
-    );
-    const ranked = [...entries.values()]
-      .map((entry) => ({ id: entry.id, score: scoreApplicant(entry.name, entry) }))
-      .toSorted((left, right) => byStanding(left.score, right.score));
+    const ranked = rankBoard(fetched);
     io.out(renderSiloBoard(ranked, saved.entryId, paint));
     return 0;
   }

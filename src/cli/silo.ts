@@ -2,8 +2,8 @@
 // and the board's notes, and one that ranks the leaderboard for the bunks.
 
 import type { Mood } from '../shared/ranks.js';
-import type { SiloScore, Status } from '../shared/silo.js';
-import { CRITERIA, HIGH, LOW, MAX_SCORE, notesFor } from '../shared/silo.js';
+import type { Ranked, SiloScore, Status } from '../shared/silo.js';
+import { CRITERIA, HIGH, LOW, MAX_SCORE, STATUS_LABEL, notesFor } from '../shared/silo.js';
 
 import { faceFor } from './face.js';
 import type { Paint } from './render.js';
@@ -13,12 +13,6 @@ const MOOD: Readonly<Record<Status, Mood>> = {
   admitted: 'happy',
   probation: 'suspicious',
   review: 'angry',
-};
-
-const LABEL: Readonly<Record<Status, string>> = {
-  admitted: 'ADMITTED',
-  probation: 'PROBATION',
-  review: 'UNDER REVIEW',
 };
 
 const NOTHING = 'Nothing stands out. The board respects that.';
@@ -36,7 +30,7 @@ function header(paint: Paint): string[] {
 }
 
 function status(score: SiloScore, paint: Paint): string {
-  const label = LABEL[score.status];
+  const label = STATUS_LABEL[score.status];
   const shown = score.status === 'admitted' ? paint.green(label) : paint.red(label);
   return `${paint.bold(shown)}, ${score.ruling}`;
 }
@@ -110,7 +104,7 @@ function boardRuling(ranked: readonly SiloScore[]): string {
 
 /** The leaderboard ranked for the bunks. `mine` names your entry, if you have one. */
 export function renderSiloBoard(
-  ranked: readonly { readonly id: string; readonly score: SiloScore }[],
+  ranked: readonly Ranked[],
   mine: string | null,
   paint: Paint,
 ): string {

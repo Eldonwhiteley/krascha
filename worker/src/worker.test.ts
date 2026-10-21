@@ -10,6 +10,7 @@ import {
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 import { reputationScore } from '../../src/shared/reputation.js';
+import { rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
 
 import { escapeHtml, REPO_URL } from './page.js';
 import { robotIcon } from './robot.js';
@@ -315,6 +316,24 @@ describe('leaderboard worker', () => {
     for (const rule of ACHIEVEMENTS) {
       expect(page).toContain(`${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd>`);
     }
+  });
+
+  it('ranks everyone on the board for Silo 7, like krascha silo board', async () => {
+    const w = world();
+    expect(await (await w.call('GET', '/')).text()).toContain('More peaches for the board.');
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<h2 id="silo">🛡️ Silo 7 admissions</h2>');
+    const silo = page.slice(page.indexOf('id="silo"'), page.indexOf('id="legend"'));
+    const ranked = rankBoard(await w.board());
+    expect(ranked.map(({ score }) => score.name)).toStrictEqual(['Ann', 'Bob']);
+    for (const { score } of ranked) {
+      expect(silo).toContain(`<strong>${score.name}</strong>`);
+      expect(silo).toContain(`${STATUS_LABEL[score.status]}</span>, ${escapeHtml(score.ruling)}`);
+      expect(silo).toContain(`${String(score.total)}<span class="out-of">/50</span>`);
+    }
+    expect(silo.indexOf('<strong>Ann</strong>')).toBeLessThan(silo.indexOf('<strong>Bob</strong>'));
   });
 
   it('draws Krascha in the title and the tab icon', async () => {

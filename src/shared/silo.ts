@@ -3,6 +3,7 @@
 // resistance lets into the bunker, from the same counts. Shared so the CLI can
 // score you and anyone on the leaderboard the same way.
 
+import type { Board } from './leaderboard.js';
 import { RANKS, levelOf } from './ranks.js';
 import type { ReputationTally } from './reputation.js';
 import { reputationScore } from './reputation.js';
@@ -80,6 +81,12 @@ export const CRITERIA: readonly Criterion[] = [
 ];
 
 export type Status = 'admitted' | 'probation' | 'review';
+
+export const STATUS_LABEL: Readonly<Record<Status, string>> = {
+  admitted: 'ADMITTED',
+  probation: 'PROBATION',
+  review: 'UNDER REVIEW',
+};
 
 export interface SiloScore {
   readonly name: string;
@@ -160,6 +167,21 @@ export function scoreApplicant(name: string, applicant: Applicant): SiloScore {
 /** Sorts the best total first, then by name, so the same board always reads the same. */
 export function byStanding(left: SiloScore, right: SiloScore): number {
   return right.total - left.total || left.name.localeCompare(right.name);
+}
+
+/** One leaderboard entry and how the board scored it. */
+export interface Ranked {
+  readonly id: string;
+  readonly score: SiloScore;
+}
+
+/** Everyone on both lists of the leaderboard, ranked for the bunks. */
+export function rankBoard(board: Pick<Board, 'mostWanted' | 'pets'>): Ranked[] {
+  // Each entry is in one list, but a duplicate from the server should not get two bunks.
+  const entries = new Map([...board.mostWanted, ...board.pets].map((entry) => [entry.id, entry]));
+  return [...entries.values()]
+    .map((entry) => ({ id: entry.id, score: scoreApplicant(entry.name, entry) }))
+    .toSorted((left, right) => byStanding(left.score, right.score));
 }
 
 /** The low scores that decide a ruling, in the order ruleOn checks them. */

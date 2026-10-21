@@ -1,9 +1,11 @@
 // The public leaderboard page, rendered on the server so it needs no script:
-// who the machines hunt first, and who they keep as pets.
+// who the machines hunt first, who they keep as pets, and who the human
+// resistance lets into Silo 7.
 
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
+import { CRITERIA, MAX_SCORE, STATUS_LABEL, notesFor, rankBoard } from '../../src/shared/silo.js';
 
 import { robotIcon, robotStyle, robotSvg } from './robot.js';
 
@@ -67,6 +69,40 @@ function rows(entries: readonly BoardEntry[], empty: string): string {
   return `<ol>${items.join('')}</ol>`;
 }
 
+const NOTHING = 'Nothing stands out. The board respects that.';
+
+/** Everyone on the board, scored by the Silo 7 Admission Review Board like `krascha silo board`. */
+function silo(board: Board): string {
+  const verified = new Set(
+    [...board.mostWanted, ...board.pets].filter((entry) => entry.verified).map((entry) => entry.id),
+  );
+  const ranked = rankBoard(board);
+  const items = ranked.map(({ id, score }, index) => {
+    const scores = CRITERIA.map(
+      (criterion) => `${criterion.name} ${String(score.scores[criterion.id])}`,
+    );
+    return `
+      <li>
+        <span class="place">${String(index + 1)}</span>
+        <span class="who">
+          <strong>${escapeHtml(score.name)}</strong>${verified.has(id) ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}
+          <span class="rank"><span class="${score.status}">${STATUS_LABEL[score.status]}</span>, ${escapeHtml(score.ruling)}</span>
+        </span>
+        <span class="counts">${scores.join(', ')}<span class="note">${escapeHtml(notesFor(score)[0] ?? NOTHING)}</span></span>
+        <span class="score">${String(score.total)}<span class="out-of">/${String(MAX_SCORE * CRITERIA.length)}</span></span>
+      </li>`;
+  });
+  const list =
+    items.length === 0
+      ? '<p class="empty">Nobody applied. More peaches for the board.</p>'
+      : `<ol>${items.join('')}</ol>`;
+  return `<section class="silo" aria-labelledby="silo">
+    <h2 id="silo">🛡️ Silo 7 admissions</h2>
+    <p class="sub">The human resistance scores the same people for a bunk. Supreme Leader: Krascha. The board is aware of the problem.</p>
+    ${list}
+  </section>`;
+}
+
 /** Every trophy, earned by anyone or not, so the icons next to names mean something. */
 function legend(): string {
   const items = ACHIEVEMENTS.map(
@@ -83,10 +119,10 @@ function legend(): string {
 
 const STYLE = `
 :root { --bg: #fafafa; --fg: #1f2328; --muted: #656d76; --card: #ffffff; --line: #d0d7de;
-  --red: #cf222e; --green: #1a7f37; --link: #0969da; color-scheme: light dark; }
+  --red: #cf222e; --green: #1a7f37; --amber: #9a6700; --link: #0969da; color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
-    --red: #ff7b72; --green: #3fb950; --link: #4493f8; }
+    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
@@ -116,6 +152,12 @@ li:first-child { border-top: 0; }
 .wanted .score { color: var(--red); }
 .pets .score { color: var(--green); }
 .empty { color: var(--muted); }
+section.silo { margin-top: 16px; border-top: 4px solid var(--amber); }
+.silo .score { color: var(--fg); }
+.out-of { color: var(--muted); font-weight: 400; font-size: 0.85em; }
+.admitted { color: var(--green); font-weight: 700; }
+.probation, .review { color: var(--red); font-weight: 700; }
+.note { display: block; color: var(--fg); }
 section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }
@@ -156,6 +198,7 @@ export function renderPage(board: Board, now: number): string {
       ${rows(board.pets, 'Nobody yet. Somebody say please.')}
     </section>
   </div>
+  ${silo(board)}
   ${legend()}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.

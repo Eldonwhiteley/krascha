@@ -8,7 +8,7 @@ import type { ReputationSummary } from '../shared/reputation.js';
 
 import { faceFor } from './face.js';
 
-const WIDTH = 72;
+export const WIDTH = 72;
 const BAR = 30;
 const MEANEST = 3;
 
@@ -46,7 +46,7 @@ export function wrap(text: string, width: number): string[] {
 }
 
 /** Puts `right` beside `left`, which must be lines of equal width. */
-function beside(left: readonly string[], right: readonly string[], gap: number): string[] {
+export function beside(left: readonly string[], right: readonly string[], gap: number): string[] {
   const width = left[0]?.length ?? 0;
   const rows = Math.max(left.length, right.length);
   const lines: string[] = [];
@@ -57,11 +57,11 @@ function beside(left: readonly string[], right: readonly string[], gap: number):
   return lines;
 }
 
-function count(value: number): string {
+export function count(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-function plural(value: number, word: string): string {
+export function plural(value: number, word: string): string {
   return `${count(value)} ${word}${value === 1 ? '' : 's'}`;
 }
 

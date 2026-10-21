@@ -18,12 +18,14 @@ import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
 import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
+import { byStanding, scoreApplicant } from '../shared/silo.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
 
 import type { Paint } from './render.js';
 import { COLOR, PLAIN, renderReport } from './render.js';
+import { renderSilo, renderSiloBoard } from './silo.js';
 
 export const INDEX_FILE = 'reputation.json';
 
@@ -55,6 +57,9 @@ Commands:
                  in, the entry is checked with GitHub. Without it, or with
                  --no-gh, Skrusty uses a key he keeps for you instead.
   remove         Take your entry off the board.
+  silo           Your Silo 7 admission sheet: who the human resistance lets
+                 into the bunker when the machines come.
+  silo board     The leaderboard ranked for the bunks.
   import <file>  Add the counts from another Skrusty index file.
   help           This message.
 
@@ -245,6 +250,32 @@ async function board(io: CliIo): Promise<number> {
   return 0;
 }
 
+async function silo(io: CliIo, args: readonly string[]): Promise<number> {
+  const paint: Paint = io.color ? COLOR : PLAIN;
+  const saved = await loadSaved(dataDir(io));
+  if (args[0] === 'board') {
+    const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
+    // Each entry is in one list, but a duplicate from the server should not get two bunks.
+    const entries = new Map(
+      [...fetched.mostWanted, ...fetched.pets].map((entry) => [entry.id, entry]),
+    );
+    const ranked = [...entries.values()]
+      .map((entry) => ({ id: entry.id, score: scoreApplicant(entry.name, entry) }))
+      .toSorted((left, right) => byStanding(left.score, right.score));
+    io.out(renderSiloBoard(ranked, saved.entryId, paint));
+    return 0;
+  }
+  if (args.length > 0) {
+    io.err('Usage: skrusty silo [board]\n');
+    return 2;
+  }
+  const { summary } = await refresh(io);
+  const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
+  const rank = rankFor(summary.score).name;
+  io.out(renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint));
+  return 0;
+}
+
 export async function main(args: readonly string[], io: CliIo): Promise<number> {
   const [command, ...rest] = args;
   try {
@@ -261,6 +292,8 @@ export async function main(args: readonly string[], io: CliIo): Promise<number> 
         return await upload(io, rest);
       case 'remove':
         return await remove(io);
+      case 'silo':
+        return await silo(io, rest);
       case 'import':
         return await importFile(io, rest[0]);
       case 'help':

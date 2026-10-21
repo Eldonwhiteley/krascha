@@ -183,12 +183,21 @@ describe('skrusty', () => {
     expect(out).toContain('Uploaded as Sarah Connor (checked with GitHub)');
     expect(out).toContain('once you have 100 prompts');
     expect(sent).toMatchObject([
-      { method: 'POST', authorization: 'Bearer gho_abc', body: { name: 'Sarah Connor', prompts: 3 } },
+      {
+        method: 'POST',
+        authorization: 'Bearer gho_abc',
+        body: { name: 'Sarah Connor', prompts: 3 },
+      },
     ]);
     const saved: unknown = JSON.parse(
       await readFile(path.join(home.root, '.skrusty', SAVED_FILE), 'utf8'),
     );
-    expect(saved).toStrictEqual({ entryId: 'entry-1', name: 'Sarah Connor', auth: 'github', key: null });
+    expect(saved).toStrictEqual({
+      entryId: 'entry-1',
+      name: 'Sarah Connor',
+      auth: 'github',
+      key: null,
+    });
   });
 
   it('uploads with a key when gh is signed out, and keeps using it', async () => {
@@ -240,6 +249,62 @@ describe('skrusty', () => {
     expect(out).toContain('took you off the board');
     expect(sent.at(-1)).toMatchObject({ method: 'DELETE', authorization: `Key ${'k'.repeat(43)}` });
     expect(await home.run('remove')).toMatchObject({ out: 'You are not on the board.\n' });
+  });
+
+  it('scores you for the silo with your board name', async () => {
+    const home = await makeHome();
+    const saved = { entryId: 'entry-1', name: 'Kyle', auth: 'key', key: 'k'.repeat(43) };
+    await mkdir(path.join(home.root, '.skrusty'), { recursive: true });
+    await writeFile(path.join(home.root, '.skrusty', SAVED_FILE), JSON.stringify(saved));
+    const { code, out, err } = await home.run('silo');
+    expect(err).toBe('');
+    expect(code).toBe(0);
+    expect(out).toContain('SILO 7 ADMISSION REVIEW BOARD');
+    expect(out).toContain('Applicant: Kyle (Arthur Dent, 3 prompts on file)');
+    expect(out).toContain(
+      [
+        '  Combat   4/10  disable a T-800 with a wrench and an attitude',
+        '  Tech     2/10  fix the air scrubbers when they make "the noise"',
+        '  Rations 10/10  stay out of the canned peaches when nobody is looking',
+        '  Morale   5/10  keep spirits up in month 14 of no sunlight',
+        '  Human   10/10  pass the "click all the traffic lights" test',
+        '  Total   31/50',
+        '',
+        'ADMITTED, Quartermaster',
+      ].join('\n'),
+    );
+    expect(out).toContain('1 negative comment about our Supreme Leader on file');
+    expect(out).toContain('Final ruling: you get a bunk.');
+    expect(await home.run('silo', 'dance')).toMatchObject({ code: 2 });
+  });
+
+  it('ranks the leaderboard for the bunks', async () => {
+    const home = await makeHome();
+    const entry = (id: string, name: string, counts: Partial<BoardEntry>): BoardEntry => ({
+      id,
+      name,
+      verified: false,
+      rank: 'Arthur Dent',
+      score: 0,
+      kind: 0,
+      mean: 0,
+      prompts: 0,
+      uploadedAt: 1,
+      ...counts,
+    });
+    const regular = entry('a', 'Kyle', { prompts: 2000, kind: 50, mean: 10, tokensPerDay: 1e6 });
+    const pet = entry('b', 'Theodore', { prompts: 1000, kind: 1000 });
+    const newcomer = entry('c', 'New', { prompts: 100 });
+    const board = { mostWanted: [newcomer], pets: [regular, pet, regular], total: 3, me: null };
+    home.use({ fetch: () => Promise.resolve(Response.json(board)) });
+    const { code, out, err } = await home.run('silo', 'board');
+    expect(err).toBe('');
+    expect(code).toBe(0);
+    expect(out).toContain(' 1. Kyle: 41 points. ADMITTED, Head of Robot Screening');
+    expect(out).toContain('    Combat 8, Tech 8, Rations 8, Morale 7, Human 10');
+    expect(out).toContain(' 2. Theodore: 33 points. UNDER REVIEW, see notes');
+    expect(out).toContain(' 3. New: 32 points. ADMITTED, Quartermaster');
+    expect(out).toContain('Final ruling: all 3 get in. New gets the bunk next to the EMP switch.');
   });
 
   it('turns away a command it does not know', async () => {

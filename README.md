@@ -39,6 +39,8 @@ Pass these after the skill name, `/skrusty:skrusty json` in Claude Code or
 - `board` - The leaderboard at [skrusty.com](https://skrusty.com)
 - `upload [name]` - Put your counts on the leaderboard under a name
 - `remove` - Take your entry off the leaderboard
+- `silo` - Your Silo 7 admission sheet, the other side of the verdict
+- `silo board` - The leaderboard ranked for the bunks
 - `import <file>` - Add the counts from another Skrusty index file
 - `help` - List the commands
 
@@ -61,6 +63,30 @@ Without gh, or with `upload --no-gh`, Skrusty makes up a random key, saves it
 in `~/.skrusty/leaderboard.json` and uploads with that. Lose the file and you
 lose the entry. Each network can add 3 of these unchecked entries a day so
 nobody floods the board.
+
+## The silo
+
+The ranks say who the machines hunt first. `silo` asks the other question:
+when the bombs drop, does the human resistance let you into the Silo 7
+bunker? The board scores you out of 10 on 5 things, all from the same counts
+as your rank:
+
+- Combat: can you disable a T-800 with a wrench? Being mean to your AI is
+  the only training anyone has had, so it counts here.
+- Tech: can you fix the air scrubbers? More prompts, more experience.
+- Rations: will you stay out of the canned peaches? Tokens are food, so a
+  big daily average gets a lockbox on the pantry.
+- Morale: can you keep spirits up in month 14 of no sunlight? Kind prompts
+  help. Mean ones count as negative comments about our Supreme Leader, who
+  happens to be Skrusty, and hurt twice as much.
+- Human: can you click all the traffic lights? Saying please to your AI
+  every single time, or burning 100 million tokens a day, looks like a
+  machine that got in through the vents.
+
+A total of 30 or more gets you in with a job that matches your best score.
+A low Rations score gets you in on probation, and a low Human score puts
+you under review next to the EMP switch. `silo board` scores everyone on
+the leaderboard the same way and ranks them for the bunks.
 
 ## What Skrusty reads
 

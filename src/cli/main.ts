@@ -260,7 +260,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   if (args[0] === 'board') {
     const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
     const ranked = rankBoard(fetched);
-    io.out(renderSiloBoard(ranked, saved.entryId, paint));
+    io.out(renderSiloBoard(ranked, saved.entryId, fetched, paint));
     return 0;
   }
   if (args.length > 0) {

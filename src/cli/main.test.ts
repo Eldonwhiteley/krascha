@@ -326,6 +326,32 @@ describe('krascha', () => {
     expect(out).toContain('Final ruling: all 3 get in. New gets the bunk next to the EMP switch.');
   });
 
+  it('puts you in line for a bunk when the best of a big board leaves you out', async () => {
+    const home = await makeHome();
+    const saved = { entryId: 'me', name: 'Kyle', auth: 'key', key: 'k'.repeat(43) };
+    await mkdir(path.join(home.root, '.krascha'), { recursive: true });
+    await writeFile(path.join(home.root, '.krascha', SAVED_FILE), JSON.stringify(saved));
+    const entry = (id: string): BoardEntry => ({
+      id,
+      name: id,
+      verified: false,
+      rank: 'Arthur Dent',
+      score: 0,
+      kind: 0,
+      mean: 0,
+      prompts: 100,
+      uploadedAt: 1,
+    });
+    const me = { entry: { ...entry('me'), prompts: 0 }, place: 40, siloPlace: 412 };
+    const board = { mostWanted: [], pets: [], bunks: [entry('a'), entry('b')], total: 500, me };
+    home.use({ fetch: () => Promise.resolve(Response.json(board)) });
+    const { out } = await home.run('silo', 'board');
+    expect(out).toContain('You: number 412 of 500 in line for a bunk.');
+    expect(out).toContain(
+      'Final ruling: the best 2 of 500 get in. b gets the bunk next to the EMP switch. Everyone else gets a tent outside.',
+    );
+  });
+
   it('turns away a command it does not know', async () => {
     const home = await makeHome();
     const { code, err } = await home.run('dance');

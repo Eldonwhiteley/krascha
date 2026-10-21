@@ -2,6 +2,7 @@
 // the board's notes and how to do better, and one that ranks the leaderboard
 // for the bunks.
 
+import { MIN_PROMPTS } from '../shared/leaderboard.js';
 import type { Mood } from '../shared/ranks.js';
 import type { Ranked, SiloScore, Status } from '../shared/silo.js';
 import { CRITERIA, HIGH, LOW, MAX_SCORE, STATUS_LABEL, notesFor, tipsFor } from '../shared/silo.js';
@@ -97,21 +98,48 @@ export function renderSilo(score: SiloScore, rank: string, prompts: number, pain
   return `${lines.join('\n')}\n`;
 }
 
-function boardRuling(ranked: readonly SiloScore[]): string {
+function boardRuling(ranked: readonly SiloScore[], total: number): string {
   const last = ranked.at(-1);
   if (last === undefined) {
     return 'Nobody applied. More peaches for the board.';
   }
+  const emp = `${last.name} gets the bunk next to the EMP switch.`;
+  if (total > ranked.length) {
+    return `the best ${count(ranked.length)} of ${count(total)} get in. ${emp} Everyone else gets a tent outside.`;
+  }
   if (ranked.length === 1) {
     return `${last.name} gets in, and gets the bunk next to the EMP switch.`;
   }
-  return `all ${count(ranked.length)} get in. ${last.name} gets the bunk next to the EMP switch.`;
+  return `all ${count(ranked.length)} get in. ${emp}`;
+}
+
+/** Where you are in line, when the list above does not show you. */
+function yourPlace(line: Line, shown: boolean): string[] {
+  if (shown || line.me === null) {
+    return [];
+  }
+  const place = line.me.siloPlace;
+  if (place === undefined) {
+    return [];
+  }
+  return place === null
+    ? [`You: not in line until you have ${count(MIN_PROMPTS)} prompts.`, '']
+    : [`You: number ${String(place)} of ${count(line.total)} in line for a bunk.`, ''];
+}
+
+/** What the server says about the whole line and your own place in it. */
+export interface Line {
+  /** Everyone on the board. */
+  readonly total: number;
+  /** Your entry, when you have one. */
+  readonly me: { readonly siloPlace?: number | null } | null;
 }
 
 /** The leaderboard ranked for the bunks. `mine` names your entry, if you have one. */
 export function renderSiloBoard(
   ranked: readonly Ranked[],
   mine: string | null,
+  line: Line,
   paint: Paint,
 ): string {
   const lines = [...beside(faceFor('suspicious'), header(paint), 4), ''];
@@ -128,7 +156,8 @@ export function renderSiloBoard(
     );
   });
   lines.push(
-    `Final ruling: ${boardRuling(ranked.map((row) => row.score))}`,
+    ...yourPlace(line, ranked.some(({ id }) => id === mine)),
+    `Final ruling: ${boardRuling(ranked.map((row) => row.score), line.total)}`,
     '',
     paint.dim('Krascha remembers.'),
   );

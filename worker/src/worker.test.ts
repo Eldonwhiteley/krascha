@@ -45,6 +45,8 @@ interface World {
   readonly upload: (token: string, body: unknown) => Promise<Standing>;
   readonly setNow: (at: number) => void;
   readonly githubCalls: () => number;
+  /** Runs SQL straight on the database, the way a migration would. */
+  readonly sql: (query: string) => Promise<void>;
 }
 
 function world(): World {
@@ -110,6 +112,9 @@ function world(): World {
       now = at;
     },
     githubCalls: () => githubCalls,
+    sql: async (query): Promise<void> => {
+      await env.DB.prepare(query).run();
+    },
   };
 }
 
@@ -120,7 +125,13 @@ const MIDDLE = { name: '', kind: 5, mean: 3, prompts: 200 };
 describe('leaderboard worker', () => {
   it('starts with an empty board', async () => {
     const w = world();
-    expect(await w.board()).toStrictEqual({ mostWanted: [], pets: [], total: 0, me: null });
+    expect(await w.board()).toStrictEqual({
+      mostWanted: [],
+      pets: [],
+      bunks: [],
+      total: 0,
+      me: null,
+    });
   });
 
   it('turns away uploads without a GitHub token GitHub accepts', async () => {
@@ -173,6 +184,7 @@ describe('leaderboard worker', () => {
         tokensPerDay: 0,
       },
       place: 1,
+      siloPlace: 1,
       machines: 1,
     });
   });
@@ -278,9 +290,26 @@ describe('leaderboard worker', () => {
     expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann', 'Anonymous']);
     expect(board.pets.map((entry) => entry.name)).toStrictEqual(['Bob']);
     expect(board.total).toBe(3);
-    expect(board.me).toStrictEqual({ entry: cat.entry, place: 2 });
+    expect(board.me).toStrictEqual({ entry: cat.entry, place: 2, siloPlace: 2 });
     expect(await w.board(ann.entry.id)).toMatchObject({ me: { place: 1 } });
     expect(await w.board('nobody')).toMatchObject({ me: null });
+  });
+
+  it('lines everyone up for a bunk, a score of 0 too, and rescores rows a migration reset', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', MEAN);
+    w.setNow(START + 1);
+    await w.upload('token-bob', KIND);
+    w.setNow(START + 2);
+    await w.upload('token-cat', { name: 'Zero', kind: 0, mean: 0, prompts: 5000 });
+    const board = await w.board(ann.entry.id);
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann']);
+    expect(board.pets.map((entry) => entry.name)).toStrictEqual(['Bob']);
+    expect(board.bunks?.map((entry) => entry.name)).toStrictEqual(['Ann', 'Zero', 'Bob']);
+    expect(rankBoard(board).map(({ score }) => score.total)).toStrictEqual([38, 36, 32]);
+    expect(board.me).toMatchObject({ place: 1, siloPlace: 1 });
+    await w.sql('UPDATE scores SET silo = NULL');
+    expect((await w.board()).bunks).toStrictEqual(board.bunks);
   });
 
   it('leaves short histories off the board but still tells their owner', async () => {

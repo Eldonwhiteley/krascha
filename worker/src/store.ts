@@ -15,6 +15,8 @@ import {
 } from '../../src/shared/leaderboard.js';
 import { rankFor } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
+import type { Applicant } from '../../src/shared/silo.js';
+import { scoreApplicant } from '../../src/shared/silo.js';
 
 export type Row = Readonly<Record<string, unknown>>;
 
@@ -87,17 +89,45 @@ export function cleanName(name: string): string {
     .trim();
 }
 
-/** The most wanted have scores below 0 and the pets above it, so nobody is on both lists. */
-async function list(database: D1Database, side: 'wanted' | 'pets'): Promise<BoardEntry[]> {
-  const where = side === 'wanted' ? 'score < 0' : 'score > 0';
-  const order = side === 'wanted' ? 'ASC' : 'DESC';
+const LISTS = {
+  // The most wanted have scores below 0 and the pets above it, so nobody is on both lists.
+  wanted: 'score < 0 ORDER BY score ASC',
+  pets: 'score > 0 ORDER BY score DESC',
+  // Anyone can get a bunk, whatever their score.
+  bunks: 'silo IS NOT NULL ORDER BY silo DESC',
+} as const;
+
+async function list(database: D1Database, which: keyof typeof LISTS): Promise<BoardEntry[]> {
   const { results } = await database
     .prepare(
-      `SELECT ${COLUMNS} FROM scores WHERE ${LISTED} AND ${where} ORDER BY score ${order}, uploaded_at ASC LIMIT ?`,
+      `SELECT ${COLUMNS} FROM scores WHERE ${LISTED} AND ${LISTS[which]}, uploaded_at ASC LIMIT ?`,
     )
     .bind(BOARD_SIZE)
     .all();
   return results.map((row) => entryOf(row));
+}
+
+/** The Silo 7 total out of 50 the board gives an entry. The name does not count. */
+function siloTotal(applicant: Applicant): number {
+  return scoreApplicant('', applicant).total;
+}
+
+/** Rows scored per read, so a big rescore spreads over a few requests. */
+const SILO_BATCH = 200;
+
+/** Works out the Silo 7 total for rows that have none, after a migration added or reset it. */
+async function fillSilo(database: D1Database): Promise<void> {
+  const { results } = await database
+    .prepare(`SELECT ${COLUMNS} FROM scores WHERE silo IS NULL LIMIT ?`)
+    .bind(SILO_BATCH)
+    .all();
+  for (const row of results) {
+    const entry = entryOf(row);
+    await database
+      .prepare('UPDATE scores SET silo = ? WHERE entry_id = ?')
+      .bind(siloTotal(entry), entry.id)
+      .run();
+  }
 }
 
 async function total(database: D1Database): Promise<number> {
@@ -105,25 +135,43 @@ async function total(database: D1Database): Promise<number> {
   return row === null ? 0 : number_(row, 'n');
 }
 
-/** An entry and its place counted from the most wanted, or null when it is not listed. */
+/** One more than the listed entries that come before, by `where`. */
+async function placeOf(
+  database: D1Database,
+  where: string,
+  ...values: readonly number[]
+): Promise<number> {
+  const ahead = await database
+    .prepare(`SELECT COUNT(*) AS n FROM scores WHERE ${LISTED} AND (${where})`)
+    .bind(...values)
+    .first();
+  return (ahead === null ? 0 : number_(ahead, 'n')) + 1;
+}
+
+/**
+ * An entry, its place counted from the most wanted and its place in line for
+ * a bunk, both null when it is not listed.
+ */
 async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   const entry = entryOf(row);
   if (entry.prompts < MIN_PROMPTS) {
-    return { entry, place: null };
+    return { entry, place: null, siloPlace: null };
   }
-  const ahead = await database
-    .prepare(
-      `SELECT COUNT(*) AS n FROM scores WHERE ${LISTED} AND (score < ? OR (score = ? AND uploaded_at < ?))`,
-    )
-    .bind(entry.score, entry.score, entry.uploadedAt)
-    .first();
-  return { entry, place: (ahead === null ? 0 : number_(ahead, 'n')) + 1 };
+  const { score, uploadedAt } = entry;
+  const silo = siloTotal(entry);
+  const [place, siloPlace] = await Promise.all([
+    placeOf(database, 'score < ? OR (score = ? AND uploaded_at < ?)', score, score, uploadedAt),
+    placeOf(database, 'silo > ? OR (silo = ? AND uploaded_at < ?)', silo, silo, uploadedAt),
+  ]);
+  return { entry, place, siloPlace };
 }
 
 export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
-  const [mostWanted, pets, count] = await Promise.all([
+  await fillSilo(database);
+  const [mostWanted, pets, bunks, count] = await Promise.all([
     list(database, 'wanted'),
     list(database, 'pets'),
+    list(database, 'bunks'),
     total(database),
   ]);
   const mine =
@@ -133,6 +181,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
   return {
     mostWanted,
     pets,
+    bunks,
     total: count,
     me: mine === null ? null : await standingOf(database, mine),
   };
@@ -253,15 +302,18 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     machines.reduce((total, machine) => total + pick(machine), 0);
   const kind = sum((machine) => machine.kind);
   const mean = sum((machine) => machine.mean);
+  const prompts = sum((machine) => machine.prompts);
+  const tokensPerDay = sum((machine) => machine.tokensPerDay);
   await database
     .prepare(
-      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner) DO UPDATE SET
          name = excluded.name, kind = excluded.kind, mean = excluded.mean,
          prompts = excluded.prompts, score = excluded.score, uploaded_at = excluded.uploaded_at,
          upload_day = excluded.upload_day, uploads_today = excluded.uploads_today,
-         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day`,
+         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
+         silo = excluded.silo`,
     )
     .bind(
       owner.id,
@@ -270,13 +322,14 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       cleanName(upload.name),
       kind,
       mean,
-      sum((machine) => machine.prompts),
+      prompts,
       reputationScore({ kind, mean }),
       now,
       day,
       uploadsToday + 1,
       combinedIds(machines).join(','),
-      sum((machine) => machine.tokensPerDay),
+      tokensPerDay,
+      siloTotal({ kind, mean, prompts, tokensPerDay }),
     )
     .run();
   const row = await database

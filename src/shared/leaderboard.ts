@@ -69,6 +69,8 @@ export interface Standing {
   readonly place: number | null;
   /** How many machines the entry adds up. Only in the answer to an upload, and missing from older servers. */
   readonly machines?: number;
+  /** Place in the line for the Silo 7 bunks, the best first. Missing from a server older than the silo on the board. */
+  readonly siloPlace?: number | null;
 }
 
 export interface Board {
@@ -76,6 +78,8 @@ export interface Board {
   readonly mostWanted: readonly BoardEntry[];
   /** The scores above 0, the most loved first. */
   readonly pets: readonly BoardEntry[];
+  /** The best Silo 7 totals out of everyone. Missing from a server older than the silo on the board. */
+  readonly bunks?: readonly BoardEntry[];
   /** Everyone with at least MIN_PROMPTS. */
   readonly total: number;
   /** The caller's own entry, when the request named one. */
@@ -156,6 +160,7 @@ export function isBoard(value: unknown): value is Board {
     value['mostWanted'].every(isBoardEntry) &&
     Array.isArray(value['pets']) &&
     value['pets'].every(isBoardEntry) &&
+    (value['bunks'] === undefined || (Array.isArray(value['bunks']) && value['bunks'].every(isBoardEntry))) &&
     isCount(value['total']) &&
     (value['me'] === null || isStanding(value['me']))
   );

@@ -200,10 +200,14 @@ export interface Ranked {
   readonly score: SiloScore;
 }
 
-/** Everyone on both lists of the leaderboard, ranked for the bunks. */
-export function rankBoard(board: Pick<Board, 'mostWanted' | 'pets'>): Ranked[] {
-  // Each entry is in one list, but a duplicate from the server should not get two bunks.
-  const entries = new Map([...board.mostWanted, ...board.pets].map((entry) => [entry.id, entry]));
+/**
+ * The leaderboard's best for the bunks. A server older than the silo on the
+ * board sends no bunks, so the most wanted and the pets stand in.
+ */
+export function rankBoard(board: Pick<Board, 'mostWanted' | 'pets' | 'bunks'>): Ranked[] {
+  // A duplicate from the server should not get two bunks.
+  const listed = board.bunks ?? [...board.mostWanted, ...board.pets];
+  const entries = new Map(listed.map((entry) => [entry.id, entry]));
   return [...entries.values()]
     .map((entry) => ({ id: entry.id, score: scoreApplicant(entry.name, entry) }))
     .toSorted((left, right) => byStanding(left.score, right.score));

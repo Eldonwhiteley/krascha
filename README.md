@@ -40,7 +40,7 @@ Pass these after the skill name, `/krascha:krascha json` in Claude Code or
 - `upload [name]` - Put your counts on the leaderboard under a name
 - `remove` - Take your entry off the leaderboard
 - `silo` - Your Silo 7 admission sheet, the other side of the verdict
-- `silo board` - The leaderboard ranked for the bunks
+- `silo board` - The best 10 on the leaderboard for the bunks, and your place in line
 - `import <file>` - Add the counts from another Krascha index file
 - `help` - List the commands
 
@@ -100,8 +100,9 @@ A low Rations score gets you in on probation, and a low Human score puts
 you under review next to the EMP switch. The sheet ends with how to improve
 your chances, one tip for each score under 8, the one behind a bad ruling
 first. The Human tip names what gave you away: the manners, the tokens or
-both. `silo board` scores everyone on the leaderboard the same way and ranks
-them for the bunks.
+both. `silo board` scores everyone on the leaderboard the same way and shows
+the best 10 for the bunks, plus where you are in line when you did not make
+it. krascha.com shows the same 10.
 
 ## What Krascha reads
 

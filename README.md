@@ -10,8 +10,8 @@ prompts you typed into both.
 ## Install in Claude Code
 
 ```
-/plugin marketplace add shanep/skrusty
-/plugin install skrusty@skrusty
+claude plugin marketplace add shanep/claude-plugins
+claude plugin install skrusty@shanep
 ```
 
 Then ask Skrusty for his verdict:
@@ -93,8 +93,7 @@ From hunted first to kept as a pet:
 
 ## Development
 
-You need Node 22 or newer. If `npm install` fails with an `edgesOut` error,
-use `npm install --legacy-peer-deps`.
+You need Node 22 or newer.
 
 ```
 npm install
@@ -106,6 +105,8 @@ npm run build
 `dist/cli.js` is committed since neither Claude Code nor Copilot CLI builds a
 plugin or installs its dependencies. Run `npm run build` and commit the result
 whenever you change anything under `src`. `npm run check` fails if you forget.
+The pre-commit hook runs it along with `claude plugin validate`, and CI runs
+it again on macOS and Linux.
 
 The leaderboard is a Cloudflare Worker with a D1 database in `worker/`.
 `node scripts/deploy-worker.mjs` creates the database on the first run,

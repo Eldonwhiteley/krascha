@@ -180,10 +180,12 @@ function silo(board: Board): string {
     <h2 id="silo">🛡️ Silo 7 admissions</h2>
     <p class="sub">The human resistance scores everyone on the board for a bunk${ranked.length > 1 ? `, and these are the best ${String(ranked.length)}` : ''}. Supreme Leader: Krascha. The board is aware of the problem.</p>
     ${list}
-    <h3>How to improve your chances</h3>
-    <p class="sub">${String(ADMIT_TOTAL)} of ${most} gets you a bunk with no conditions. A Human of ${String(LOW)} or less means a second Voight-Kampff test, and Rations of ${String(LOW)} or less gets the pantry a lockbox.</p>
-    <ul class="tips">${tips.join('')}
-    </ul>
+    <details class="chances">
+      <summary><h3>How to improve your chances</h3></summary>
+      <p class="sub">${String(ADMIT_TOTAL)} of ${most} gets you a bunk with no conditions. A Human of ${String(LOW)} or less means a second Voight-Kampff test, and Rations of ${String(LOW)} or less gets the pantry a lockbox.</p>
+      <ul class="tips">${tips.join('')}
+      </ul>
+    </details>
   </section>`;
 }
 
@@ -258,7 +260,11 @@ section.silo { margin-top: 16px; border-top: 4px solid var(--amber); }
 .admitted { color: var(--green); font-weight: 700; }
 .probation, .review { color: var(--red); font-weight: 700; }
 .note { display: block; color: var(--fg); }
-h3 { margin: 16px 0 2px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 1em; }
+.chances { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.chances summary { cursor: pointer; }
+.chances summary:hover h3 { color: var(--link); }
+h3 { display: inline; margin: 0; font-size: 1em; }
+.chances .sub { margin-top: 6px; }
 .tips { margin: 0; padding-left: 1.2em; }
 .tips li { display: list-item; padding: 2px 0; border-top: 0; }
 section.legend { margin-top: 16px; }

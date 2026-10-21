@@ -496,7 +496,10 @@ describe('leaderboard worker', () => {
       expect(silo).toContain(`${String(score.total)}<span class="out-of">/50</span>`);
     }
     expect(silo.indexOf('<strong>Ann</strong>')).toBeLessThan(silo.indexOf('<strong>Bob</strong>'));
-    expect(silo).toContain('<h3>How to improve your chances</h3>');
+    // The tips start folded away, so the board itself stays easy to read.
+    expect(silo).toContain(
+      '<details class="chances">\n      <summary><h3>How to improve your chances</h3></summary>',
+    );
     for (const criterion of CRITERIA) {
       expect(silo).toContain(
         `<strong>${criterion.name}:</strong> ${escapeHtml(criterion.tip)}</li>`,

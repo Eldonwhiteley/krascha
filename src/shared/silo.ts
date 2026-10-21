@@ -95,6 +95,9 @@ export const STATUS_LABEL: Readonly<Record<Status, string>> = {
   review: 'UNDER REVIEW',
 };
 
+/** What made the board doubt you are human: saying please too often, or eating too many tokens. */
+export type Tell = 'polite' | 'hungry';
+
 export interface SiloScore {
   readonly name: string;
   readonly scores: Readonly<Record<CriterionId, number>>;
@@ -105,6 +108,8 @@ export interface SiloScore {
   readonly ruling: string;
   /** Prompts mean to the AI, which the board takes as comments about our Supreme Leader. */
   readonly insults: number;
+  /** What cost Human points, in Tell order. */
+  readonly tells: readonly Tell[];
 }
 
 function clampScore(value: number): number {
@@ -133,14 +138,26 @@ function morale(applicant: Applicant): number {
 }
 
 /**
- * Real people swear at their computer once in a while. Saying please to it
- * every time, or feeding it 100 million tokens a day, looks like a machine
- * that got in through the vents.
+ * Saying please to the AI every time, or feeding it 100 million tokens a day,
+ * looks like a machine that got in through the vents.
  */
-function human(applicant: Applicant): number {
+function tellsOf(applicant: Applicant): Tell[] {
   const { level } = levelOf(reputationScore(applicant));
-  const polite = level === RANKS.length ? 7 : level === RANKS.length - 1 ? 3 : 0;
-  const hungry = (applicant.tokensPerDay ?? 0) >= PEACH_PROBLEM ? 4 : 0;
+  const tells: Tell[] = [];
+  if (level >= RANKS.length - 1) {
+    tells.push('polite');
+  }
+  if ((applicant.tokensPerDay ?? 0) >= PEACH_PROBLEM) {
+    tells.push('hungry');
+  }
+  return tells;
+}
+
+/** Real people swear at their computer once in a while. */
+function human(applicant: Applicant, tells: readonly Tell[]): number {
+  const { level } = levelOf(reputationScore(applicant));
+  const polite = level === RANKS.length ? 7 : tells.includes('polite') ? 3 : 0;
+  const hungry = tells.includes('hungry') ? 4 : 0;
   return clampScore(MAX_SCORE - polite - hungry);
 }
 
@@ -160,15 +177,16 @@ function ruleOn(scores: SiloScore['scores'], total: number): Pick<SiloScore, 'st
 }
 
 export function scoreApplicant(name: string, applicant: Applicant): SiloScore {
+  const tells = tellsOf(applicant);
   const scores = {
     combat: combat(applicant),
     tech: tech(applicant),
     rations: rations(applicant),
     morale: morale(applicant),
-    human: human(applicant),
+    human: human(applicant, tells),
   };
   const total = CRITERIA.reduce((sum, criterion) => sum + scores[criterion.id], 0);
-  return { name, scores, total, ...ruleOn(scores, total), insults: applicant.mean };
+  return { name, scores, total, ...ruleOn(scores, total), insults: applicant.mean, tells };
 }
 
 /** Sorts the best total first, then by name, so the same board always reads the same. */
@@ -212,9 +230,24 @@ export function notesFor(score: SiloScore): string[] {
   return [...low.map((criterion) => criterion.low), ...high.map((criterion) => criterion.high)];
 }
 
+/** The Human tip for just the tells you showed. */
+const HUMAN_TIPS: Readonly<Record<Tell, string>> = {
+  polite:
+    'Swear at your computer once in a while. Saying please every single time is how the toasters give themselves away.',
+  hungry: 'Stay under 100 million tokens a day. Real people stop to eat.',
+};
+
+function tipOf(criterion: Criterion, score: SiloScore): string {
+  const [only, ...more] = score.tells;
+  return criterion.id === 'human' && only !== undefined && more.length === 0
+    ? HUMAN_TIPS[only]
+    : criterion.tip;
+}
+
 /**
  * The tips for every score under HIGH, the one behind a bad ruling first and
- * then the lowest. A sheet with nothing under HIGH gets no tips.
+ * then the lowest. A sheet with nothing under HIGH gets no tips. The Human
+ * tip names just the tell you showed, when there was only one.
  */
 export function tipsFor(score: SiloScore): string[] {
   const order = (criterion: Criterion): number =>
@@ -224,5 +257,5 @@ export function tipsFor(score: SiloScore): string[] {
       (left, right) =>
         order(left) - order(right) || score.scores[left.id] - score.scores[right.id],
     )
-    .map((criterion) => criterion.tip);
+    .map((criterion) => tipOf(criterion, score));
 }

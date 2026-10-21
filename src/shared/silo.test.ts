@@ -113,7 +113,26 @@ describe('tipsFor', () => {
       tokensPerDay: 250 * MILLION,
     });
     expect(maxxer.scores).toMatchObject({ rations: 2, morale: 1, human: 6 });
-    expect(tipsFor(maxxer)).toStrictEqual([tip('rations'), tip('morale'), tip('human')]);
+    expect(maxxer.tells).toStrictEqual(['hungry']);
+    expect(tipsFor(maxxer)).toStrictEqual([
+      tip('rations'),
+      tip('morale'),
+      'Stay under 100 million tokens a day. Real people stop to eat.',
+    ]);
+  });
+
+  it('names only the tells that cost Human points', () => {
+    const theodore = scoreApplicant('Theodore', { prompts: 1000, kind: 1000, mean: 0 });
+    expect(theodore.tells).toStrictEqual(['polite']);
+    expect(tipsFor(theodore)[0]).toMatch(/^Swear at your computer once in a while\. Saying please/u);
+    const both = scoreApplicant('T-1000', {
+      prompts: 1000,
+      kind: 1000,
+      mean: 0,
+      tokensPerDay: 200 * MILLION,
+    });
+    expect(both.tells).toStrictEqual(['polite', 'hungry']);
+    expect(tipsFor(both)[0]).toBe(tip('human'));
   });
 
   it('skips the scores already at HIGH', () => {

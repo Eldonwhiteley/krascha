@@ -336,6 +336,21 @@ describe('leaderboard worker', () => {
     expect(silo.indexOf('<strong>Ann</strong>')).toBeLessThan(silo.indexOf('<strong>Bob</strong>'));
   });
 
+  it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    const page = await (await w.call('GET', '/')).text();
+    const check = '<span class="verified" title="Checked with GitHub">✓</span>';
+    expect(page).toContain(`<strong>Ann</strong> ${check} <span class="target">TARGET ACQUIRED</span>`);
+    expect(page).toContain(`<strong>Bob</strong> ${check} <span class="hearts" aria-hidden="true">`);
+    expect(page).toContain('animation:');
+    const style = page.slice(page.indexOf('<style>'), page.indexOf('</style>'));
+    const motion = /@media \(prefers-reduced-motion: no-preference\) \{(?:[^{}]|\{[^{}]*\})*\}/gu;
+    const outside = style.replaceAll(motion, '');
+    expect(outside).not.toContain('animation:');
+  });
+
   it('draws Krascha in the title and the tab icon', async () => {
     const w = world();
     const page = await (await w.call('GET', '/')).text();

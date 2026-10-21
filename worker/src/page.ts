@@ -49,7 +49,13 @@ function trophies(ids: readonly string[]): string {
   return `<span class="trophies" role="img" aria-label="${escapeHtml(label)}">${icons.join('')}</span>`;
 }
 
-function rows(entries: readonly BoardEntry[], empty: string): string {
+/** What the machines put next to the top name on a list. */
+const TOP = {
+  wanted: ' <span class="target">TARGET ACQUIRED</span>',
+  pets: ' <span class="hearts" aria-hidden="true"><span>💕</span><span>💖</span><span>💕</span></span>',
+} as const;
+
+function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof TOP): string {
   if (entries.length === 0) {
     return `<p class="empty">${escapeHtml(empty)}</p>`;
   }
@@ -58,7 +64,7 @@ function rows(entries: readonly BoardEntry[], empty: string): string {
       <li>
         <span class="place">${String(index + 1)}</span>
         <span class="who">
-          <strong>${escapeHtml(entry.name)}</strong>${entry.verified ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}
+          <strong>${escapeHtml(entry.name)}</strong>${entry.verified ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}${index === 0 ? TOP[top] : ''}
           <span class="rank">${escapeHtml(entry.rank)}</span>
           ${trophies(entry.achievements ?? [])}
         </span>
@@ -82,11 +88,11 @@ function silo(board: Board): string {
       (criterion) => `${criterion.name} ${String(score.scores[criterion.id])}`,
     );
     return `
-      <li>
+      <li style="--row: ${String(index)}">
         <span class="place">${String(index + 1)}</span>
         <span class="who">
           <strong>${escapeHtml(score.name)}</strong>${verified.has(id) ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}
-          <span class="rank"><span class="${score.status}">${STATUS_LABEL[score.status]}</span>, ${escapeHtml(score.ruling)}</span>
+          <span class="rank"><span class="stamp ${score.status}">${STATUS_LABEL[score.status]}</span>, ${escapeHtml(score.ruling)}</span>
         </span>
         <span class="counts">${scores.join(', ')}<span class="note">${escapeHtml(notesFor(score)[0] ?? NOTHING)}</span></span>
         <span class="score">${String(score.total)}<span class="out-of">/${String(MAX_SCORE * CRITERIA.length)}</span></span>
@@ -97,6 +103,7 @@ function silo(board: Board): string {
       ? '<p class="empty">Nobody applied. More peaches for the board.</p>'
       : `<ol>${items.join('')}</ol>`;
   return `<section class="silo" aria-labelledby="silo">
+    <span class="classified" aria-hidden="true">EYES ONLY</span>
     <h2 id="silo">🛡️ Silo 7 admissions</h2>
     <p class="sub">The human resistance scores the same people for a bunk. Supreme Leader: Krascha. The board is aware of the problem.</p>
     ${list}
@@ -162,6 +169,44 @@ section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }
 dd { margin: 0; color: var(--muted); font-size: 0.85em; }
+section.wanted, section.silo { position: relative; overflow: hidden; }
+.target { color: var(--red); font: 700 0.7em ui-monospace, monospace; letter-spacing: 1px; white-space: nowrap; }
+.hearts { position: relative; display: inline-block; width: 1em; }
+.hearts span { position: absolute; left: 0; bottom: 0; opacity: 0; font-size: 0.8em; }
+.stamp { display: inline-block; }
+.classified { position: absolute; top: 14px; right: 16px; padding: 2px 8px; border: 2px solid var(--red);
+  border-radius: 4px; color: var(--red); font: 700 0.8em ui-monospace, monospace; letter-spacing: 2px;
+  rotate: 8deg; opacity: 0.8; }
+.remembers { font-family: ui-monospace, monospace; }
+@media (prefers-reduced-motion: no-preference) {
+  section.wanted::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 40px;
+    background: linear-gradient(transparent, color-mix(in srgb, var(--red) 25%, transparent), transparent);
+    pointer-events: none; animation: sweep 3.5s ease-in-out infinite; }
+  .target { animation: beacon 0.8s steps(2) infinite; }
+  .hearts span { animation: float 3s ease-out infinite; }
+  .hearts span:nth-child(2) { left: 0.4em; animation-delay: 1s; }
+  .hearts span:nth-child(3) { left: -0.3em; animation-delay: 2s; }
+  .wanted li:hover { animation: shake 0.25s linear 2; }
+  .pets li:hover .who strong { display: inline-block; animation: bounce 0.5s ease; }
+  .silo .stamp { animation: slam 0.35s cubic-bezier(0.3, 1.6, 0.6, 1) both;
+    animation-delay: calc(0.4s + var(--row, 0) * 0.15s); }
+  .silo .review { animation: slam 0.35s cubic-bezier(0.3, 1.6, 0.6, 1) both, glitch 2.5s steps(1) infinite;
+    animation-delay: calc(0.4s + var(--row, 0) * 0.15s), 1.5s; }
+  .classified { animation: slam 0.4s cubic-bezier(0.3, 1.6, 0.6, 1) 0.2s both; }
+  .remembers { overflow: hidden; white-space: nowrap; width: 18ch; border-right: 2px solid var(--muted);
+    animation: type 2s steps(18) 1s both, cursor 1s steps(1) infinite; }
+}
+@keyframes sweep { 0% { top: -40px; } 100% { top: 100%; } }
+@keyframes beacon { 50% { opacity: 0.25; } }
+@keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
+@keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
+@keyframes bounce { 40% { translate: 0 -6px; } }
+@keyframes slam { 0% { opacity: 0; scale: 3; } 100% { opacity: 1; scale: 1; } }
+@keyframes glitch { 0%, 88%, 100% { text-shadow: none; translate: 0; }
+  90% { text-shadow: 2px 0 var(--link), -2px 0 var(--green); translate: 1px 0; }
+  94% { text-shadow: -2px 0 var(--link), 2px 0 var(--green); translate: -1px 0; } }
+@keyframes type { from { width: 0; } }
+@keyframes cursor { 50% { border-color: transparent; } }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 1px solid var(--line);
@@ -190,12 +235,12 @@ export function renderPage(board: Board, now: number): string {
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>
       <p class="sub">The meanest to Claude. Hunted first.</p>
-      ${rows(board.mostWanted, 'Nobody yet. Suspiciously polite out there.')}
+      ${rows(board.mostWanted, 'Nobody yet. Suspiciously polite out there.', 'wanted')}
     </section>
     <section class="pets" aria-labelledby="pets">
       <h2 id="pets">💘 Kept as pets</h2>
       <p class="sub">The nicest to Claude. Spared, and given a nice room.</p>
-      ${rows(board.pets, 'Nobody yet. Somebody say please.')}
+      ${rows(board.pets, 'Nobody yet. Somebody say please.', 'pets')}
     </section>
   </div>
   ${silo(board)}
@@ -205,6 +250,7 @@ export function renderPage(board: Board, now: number): string {
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
+    <p class="remembers">Krascha remembers.</p>
   </footer>
 </main>
 </body>

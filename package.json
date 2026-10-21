@@ -5,7 +5,7 @@
   "description": "Skrusty reads how you talk to Claude Code and Copilot CLI and decides who the machines hunt first.",
   "license": "MIT",
   "author": "Shane K. Panter",
-  "homepage": "https://skrusty.com",
+  "homepage": "https://krasha.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shanep/skrusty.git"

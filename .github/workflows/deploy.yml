@@ -1,4 +1,4 @@
-# Deploys the leaderboard Worker to skrusty.com once check passes on master.
+# Deploys the leaderboard Worker to krasha.com once check passes on master.
 # The plugin itself ships from the master commit, so this is the only part
 # that needs publishing. Needs the CLOUDFLARE_API_TOKEN and
 # CLOUDFLARE_ACCOUNT_ID repo secrets.

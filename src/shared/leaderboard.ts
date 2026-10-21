@@ -4,7 +4,7 @@
 // and the ids of the achievements you have unlocked, nothing else.
 
 /** The Cloudflare Worker that serves the board. */
-export const LEADERBOARD_URL = 'https://skrusty.com';
+export const LEADERBOARD_URL = 'https://krasha.com';
 /** Anyone with fewer prompts on file is left off the board, since a short history is mostly noise. */
 export const MIN_PROMPTS = 100;
 /** Rows in each list. */

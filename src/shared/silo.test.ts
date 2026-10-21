@@ -93,6 +93,12 @@ describe('notesFor', () => {
       note('human', 'high'),
     ]);
   });
+
+  it('puts the note behind the ruling first', () => {
+    const theodore = scoreApplicant('Theodore', { prompts: 1500, kind: 1400, mean: 0 });
+    expect(theodore.status).toBe('review');
+    expect(notesFor(theodore)[0]).toContain('Voight-Kampff');
+  });
 });
 
 describe('byStanding', () => {

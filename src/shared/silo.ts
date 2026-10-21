@@ -162,9 +162,23 @@ export function byStanding(left: SiloScore, right: SiloScore): number {
   return right.total - left.total || left.name.localeCompare(right.name);
 }
 
-/** The bad notes a score earns, then the good ones, in CRITERIA order. Middling scores earn nothing. */
+/** The low scores that decide a ruling, in the order ruleOn checks them. */
+const RULED_BY: readonly CriterionId[] = ['human', 'rations'];
+
+function ruledBy(criterion: Criterion): number {
+  const at = RULED_BY.indexOf(criterion.id);
+  return at === -1 ? RULED_BY.length : at;
+}
+
+/**
+ * The bad notes a score earns, then the good ones. The note behind the ruling
+ * comes first, so a one line note on the board explains the status. Middling
+ * scores earn nothing.
+ */
 export function notesFor(score: SiloScore): string[] {
-  const low = CRITERIA.filter((criterion) => score.scores[criterion.id] <= LOW);
+  const low = CRITERIA.filter((criterion) => score.scores[criterion.id] <= LOW).toSorted(
+    (left, right) => ruledBy(left) - ruledBy(right),
+  );
   const high = CRITERIA.filter((criterion) => score.scores[criterion.id] >= HIGH);
   return [...low.map((criterion) => criterion.low), ...high.map((criterion) => criterion.high)];
 }

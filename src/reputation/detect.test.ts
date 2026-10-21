@@ -133,6 +133,26 @@ describe('detectFrustration targets', () => {
     expect(target('you are the idiot')).toBe('agent');
   });
 
+  it('skips a word when the next one makes it code talk', () => {
+    expect(detectFrustration('can you lazy load the images')).toBeNull();
+    expect(detectFrustration('your garbage collector is slow')).toBeNull();
+    expect(detectFrustration('can you dumb down this explanation')).toBeNull();
+    expect(detectFrustration('make the clown emoji bigger')).toBeNull();
+    expect(target('you lazy machine')).toBe('agent');
+    expect(target('you dumb fucking machine')).toBe('agent');
+    expect(target('your output is garbage')).toBe('agent');
+  });
+
+  it('catches the misspellings and names people actually type', () => {
+    expect(terms('no you idot a real screen reader')).toStrictEqual(['idiot']);
+    expect(terms('you fuckwith the Settings UI still says')).toStrictEqual(['fuckwit']);
+    expect(target('status fuckwit')).toBe('agent');
+    expect(target('come on finish up you dolt')).toBe('agent');
+    expect(target('fix it clanker')).toBe('agent');
+    expect(target('fuck off')).toBe('agent');
+    expect(target('I already told you the path')).toBe('agent');
+  });
+
   it('calls a limp biscuit an insult', () => {
     expect(
       detectFrustration('what in the goddamn fucking hell?? Fix it you limp bisket'),
@@ -153,8 +173,8 @@ describe('detectFrustration targets', () => {
 
 describe('detectFrustration terms', () => {
   it('knows every form and its kind', () => {
-    expect(LEXICON).toHaveLength(32);
-    expect(ALL_FORMS).toHaveLength(95);
+    expect(LEXICON).toHaveLength(57);
+    expect(ALL_FORMS).toHaveLength(284);
     for (const entry of LEXICON) {
       for (const form of entry.forms) {
         const found = detectFrustration(form);

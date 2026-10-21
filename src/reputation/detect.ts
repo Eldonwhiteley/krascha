@@ -26,6 +26,8 @@ export interface Token {
 export interface Term {
   readonly term: string;
   readonly forms: readonly string[];
+  /** Words that, right after a form, make it something else ("lazy loading"). */
+  readonly notBefore?: readonly string[];
 }
 
 interface Form<E extends Term> {
@@ -122,7 +124,8 @@ export function findMatches<E extends Term>(forms: Forms<E>, tokens: readonly To
   let next = 0;
   for (const [index, token] of tokens.entries()) {
     const form = index < next ? undefined : formAt(forms, tokens, index, token.word);
-    if (form !== undefined) {
+    const after = tokens[index + (form?.words.length ?? 0)]?.word ?? '';
+    if (form !== undefined && form.entry.notBefore?.includes(after) !== true) {
       next = index + form.words.length;
       matches.push({ entry: form.entry, token, first: index, next });
     }

@@ -12,7 +12,7 @@ import {
 import { reputationScore } from '../../src/shared/reputation.js';
 import { CRITERIA, rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
 
-import { escapeHtml, REPO_URL } from './page.js';
+import { escapeHtml, MARKETPLACE_URL, REPO_URL } from './page.js';
 import { robotIcon } from './robot.js';
 import { cleanName, utcDay } from './store.js';
 import { fakeD1, fakeGitHub } from './test-helpers/fake-d1.js';
@@ -505,6 +505,22 @@ describe('leaderboard worker', () => {
         `<strong>${criterion.name}:</strong> ${escapeHtml(criterion.tip)}</li>`,
       );
     }
+  });
+
+  it('tells the backstory on the about page and links it both ways', async () => {
+    const w = world();
+    expect(await (await w.call('GET', '/')).text()).toContain('<a class="get" href="/about">');
+    const response = await w.call('GET', '/about');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    const page = await response.text();
+    expect(page).toContain('<title>About Krascha</title>');
+    for (const heading of ['🤖 Krascha', '🛡️ Silo 7', '🧑‍💻 shanep']) {
+      expect(page).toContain(`">${heading}</h2>`);
+    }
+    expect(page).toContain('He remembers.');
+    expect(page).toContain('<a class="get" href="/">');
+    expect(page).toContain(`<a href="${MARKETPLACE_URL}">shanep plugin marketplace</a>`);
   });
 
   it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {

@@ -36,7 +36,7 @@ Pass these after the skill name, `/krascha:krascha json` in Claude Code or
 
 - (nothing) - Rescan your prompts and show your rank, score and achievements
 - `json` - The same counts as JSON
-- `board` - The leaderboard at [krascha.com](https://krascha.com)
+- `board` - The leaderboard at [krascha.com](https://krascha.com). [krascha.com/about](https://krascha.com/about) has his backstory
 - `upload [name]` - Put your counts on the leaderboard under a name
 - `remove` - Take your entry off the leaderboard
 - `silo` - Your Silo 7 admission sheet, the other side of the verdict

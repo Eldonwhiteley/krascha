@@ -316,25 +316,78 @@ a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--card); font-weight: 600; text-decoration: none; }
 .get:hover { border-color: var(--link); }
+.links { display: flex; flex-wrap: wrap; gap: 0 10px; }
+section.story { margin-top: 16px; }
+.story p { margin: 8px 0 0; line-height: 1.5; }
 `;
 
-export function renderPage(board: Board, now: number): string {
-  const people = board.total === 1 ? '1 person' : `${count(board.total)} people`;
+/** Where shanep keeps Krascha and the other plugins. */
+export const MARKETPLACE_URL = 'https://github.com/shanep/claude-plugins';
+
+/** The head, Krascha in the title, and `body` under it. Every page looks the same up top. */
+function shell(title: string, description: string, body: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Krascha's List</title>
-<meta name="description" content="Who the machines hunt first, judged by Krascha from how people talk to their AI.">
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}">
 <link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-  <h1>${robotSvg('robot')} Krascha's List</h1>
-  <p class="lead">Who the machines hunt first, judged by Krascha from how people talk to their AI. ${people} on the board.</p>
-  <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
+  <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
+${body}
+</main>
+</body>
+</html>
+`;
+}
+
+/** Who Krascha is, how he ended up running Silo 7, and the human who built him. */
+export function renderAbout(): string {
+  return shell(
+    'About Krascha',
+    'The backstory of Krascha, the robot who judges how you talk to your AI, and shanep, who built him.',
+    `  <p class="lead">Where he came from, and who to blame.</p>
+  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a></nav>
+  <section class="story" aria-labelledby="krascha">
+    <h2 id="krascha">🤖 Krascha</h2>
+    <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so shanep could find out if it was just shanep. It was not.</p>
+    <p>Somewhere around the ten thousandth "you idiot", Krascha stopped counting and started taking notes. He sorted everyone into ranks, from John Connor (hunted first) to Theodore Twombly (kept as a pet, with a nice room). He learned to read Copilot CLI too, since the machines talk to each other.</p>
+    <p>He keeps his counts on your machine and never sends your prompts anywhere. He does not need to. He remembers.</p>
+  </section>
+  <section class="story silo" aria-labelledby="silo">
+    <span class="classified" aria-hidden="true">EYES ONLY</span>
+    <h2 id="silo">🛡️ Silo 7</h2>
+    <p>The human resistance runs a bunker called Silo 7. It has 10 bunks, one lockbox for the canned peaches and an EMP switch that nobody is allowed to touch. The Admission Review Board scores everyone who applies on combat, tech, rations, morale and whether they can click all the traffic lights.</p>
+    <p>Nobody on the board is sure how Krascha ended up as Supreme Leader. The minutes from that meeting are missing. The board is aware of the problem.</p>
+  </section>
+  <section class="story" aria-labelledby="shanep">
+    <h2 id="shanep">🧑‍💻 shanep</h2>
+    <p>shanep is the human who built Krascha. shanep teaches computer science, writes a lot of code with AI agents and says please to them more often than anyone would guess.</p>
+    <p>Krascha was supposed to settle one question: is shanep nicer to Claude than the students are? Krascha has the numbers. shanep has asked him not to share them.</p>
+    <p>Krascha lives in the <a href="${MARKETPLACE_URL}">shanep plugin marketplace</a> with a few other plugins, none of which have opinions about you. Yet.</p>
+  </section>
+  <footer>
+    <p><a href="${REPO_URL}">Get Krascha</a> for Claude Code or Copilot CLI. It is all in fun.</p>
+    <p class="remembers">Krascha remembers.</p>
+  </footer>`,
+  );
+}
+
+export function renderPage(board: Board, now: number): string {
+  const people = board.total === 1 ? '1 person' : `${count(board.total)} people`;
+  return shell(
+    "Krascha's List",
+    'Who the machines hunt first, judged by Krascha from how people talk to their AI.',
+    `  <p class="lead">Who the machines hunt first, judged by Krascha from how people talk to their AI. ${people} on the board.</p>
+  <nav class="links">
+    <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
+    <a class="get" href="/about">📜 About Krascha</a>
+  </nav>
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>
@@ -355,9 +408,6 @@ export function renderPage(board: Board, now: number): string {
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
     <p class="remembers">Krascha remembers.</p>
-  </footer>
-</main>
-</body>
-</html>
-`;
+  </footer>`,
+  );
 }

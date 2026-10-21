@@ -85,11 +85,34 @@ function name(entry: Pick<BoardEntry, 'name' | 'verified' | 'tools' | 'github'>)
   return `${shownName(entry)}${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}`;
 }
 
+function percent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+/** A bar with a knob `at` percent along, red before `cut` and green after it, with a line at the cut. */
+function slider(
+  at: number,
+  cut: number | null,
+  ends: readonly [string, string],
+  label: string,
+): string {
+  const style =
+    cut === null ? `--at: ${percent(at)}` : `--at: ${percent(at)}; --cut: ${percent(cut)}`;
+  return `<span class="scale" role="img" aria-label="${escapeHtml(label)}"><span class="end">${ends[0]}</span><span class="track${cut === null ? '' : ' cut'}" style="${style}"><span class="knob"></span></span><span class="end">${ends[1]}</span></span>`;
+}
+
 /** The scale from the resistance to the machines with a knob where the score sits, like the one in `krascha`. */
 function scale(score: number): string {
   const at = scalePercent(score);
   const label = `${String(Math.round(at))}% of the way from the resistance to the machines`;
-  return `<span class="scale" role="img" aria-label="${label}"><span class="end">Resistance</span><span class="track" style="--at: ${at.toFixed(1)}%"><span class="knob"></span></span><span class="end">Machines</span></span>`;
+  return slider(at, null, ['Resistance', 'Machines'], label);
+}
+
+/** The Silo 7 total from 0 to the most there is, green past the total that gets a bunk. */
+function bunkScale(total: number): string {
+  const most = MAX_SCORE * CRITERIA.length;
+  const label = `${String(total)} of ${String(most)}, and ${String(ADMIT_TOTAL)} gets a bunk`;
+  return slider((total / most) * 100, (ADMIT_TOTAL / most) * 100, ['Tent', 'Bunk'], label);
 }
 
 /** What the machines put next to the top name on a list. */
@@ -140,6 +163,7 @@ function silo(board: Board): string {
         </span>
         <span class="counts">${scores.join(', ')}<span class="note">${escapeHtml(notesFor(score)[0] ?? NOTHING)}</span></span>
         <span class="score">${String(score.total)}<span class="out-of">/${String(MAX_SCORE * CRITERIA.length)}</span></span>
+        ${bunkScale(score.total)}
       </li>`;
   });
   const list =
@@ -220,7 +244,9 @@ li:first-child { border-top: 0; }
 .scale { grid-column: 2 / 4; display: flex; gap: 6px; align-items: center; margin-top: 4px;
   color: var(--muted); font-size: 0.7em; }
 .track { position: relative; flex: 1; height: 4px; border-radius: 2px;
-  background: linear-gradient(to right, var(--red) var(--at), var(--green) var(--at)); }
+  background: linear-gradient(to right, var(--red) var(--cut, var(--at)), var(--green) var(--cut, var(--at))); }
+.track.cut::after { content: ""; position: absolute; left: var(--cut); top: -4px; bottom: -4px; width: 2px;
+  background: var(--fg); translate: -50% 0; }
 .knob { position: absolute; top: 50%; left: var(--at); width: 10px; height: 10px; border: 2px solid var(--fg);
   border-radius: 50%; background: var(--card); translate: -50% -50%; }
 .wanted .score { color: var(--red); }

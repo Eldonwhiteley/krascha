@@ -457,6 +457,20 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('<strong>Bob</strong></a>');
   });
 
+  it('slides each Silo 7 total from a tent to a bunk, with a line where a bunk starts', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    const board = await w.board();
+    const [first] = rankBoard(board);
+    const total = first?.score.total ?? 0;
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain(
+      `<span class="track cut" style="--at: ${((total / 50) * 100).toFixed(1)}%; --cut: 60.0%">`,
+    );
+    expect(page).toContain(`aria-label="${String(total)} of 50, and 30 gets a bunk"`);
+    expect(page).toContain('<span class="end">Tent</span>');
+  });
+
   it('explains every achievement on the page, earned or not', async () => {
     const w = world();
     const page = await (await w.call('GET', '/')).text();

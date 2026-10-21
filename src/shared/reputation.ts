@@ -1,6 +1,8 @@
 // The reputation score, shared so the report can work out how many more kind or
 // mean prompts it takes to change rank.
 
+import type { ToolId } from './tools.js';
+
 /** A mean prompt outweighs a kind one, since the machines hold grudges. */
 export const MEAN_WEIGHT = 2;
 /** Pulls a short history toward the middle, so one thank you is not a verdict. */
@@ -62,4 +64,6 @@ export interface ReputationSummary extends ReputationTally {
   readonly scannedAt: number | null;
   /** Average tokens a day over the last TOKEN_WINDOW_DAYS days, from Claude Code's usage stats. */
   readonly tokensPerDay: number;
+  /** The agents you typed any prompt into, in TOOLS order. */
+  readonly tools: readonly ToolId[];
 }

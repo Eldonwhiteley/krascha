@@ -80,7 +80,8 @@ async function ownerOf(request: Request, deps: Deps): Promise<Owner | null> {
   return KEY_PATTERN.test(secret) ? { id: `key:${await sha256(secret)}`, verified: false } : null;
 }
 
-const NO_OWNER = 'Send a GitHub token or a Krascha key. GitHub did not accept the token, if you sent one.';
+const NO_OWNER =
+  'Send a GitHub token or a Krascha key. GitHub did not accept the token, if you sent one.';
 
 async function upload(request: Request, env: Env, deps: Deps): Promise<Response> {
   const owner = await ownerOf(request, deps);
@@ -96,11 +97,20 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
   if (!isScoreUpload(body)) {
     return fail(
       400,
-      'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements and a machine id that looks like a Krascha key.',
+      'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements, a short list of agents and a machine id that looks like a Krascha key.',
     );
   }
   // Only these fields are kept, whatever else the body holds.
-  const { name, kind, mean, prompts, achievements = [], tokensPerDay = 0, machine } = body;
+  const {
+    name,
+    kind,
+    mean,
+    prompts,
+    achievements = [],
+    tokensPerDay = 0,
+    tools = [],
+    machine,
+  } = body;
   const now = deps.now();
   // The address is only hashed with the day, for the cap on new unverified entries.
   const address = request.headers.get('cf-connecting-ip') ?? 'unknown';
@@ -113,6 +123,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       prompts,
       achievements,
       tokensPerDay,
+      tools,
       ...(machine === undefined ? {} : { machine }),
     },
     now,

@@ -19,6 +19,7 @@ import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderb
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 import { rankBoard, scoreApplicant } from '../shared/silo.js';
+import { toolNames } from '../shared/tools.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
@@ -193,6 +194,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     prompts: summary.prompts,
     achievements: unlockedIds(summary),
     tokensPerDay: summary.tokensPerDay,
+    tools: summary.tools,
     machine,
   });
   await saveSaved(dir, { entryId: standing.entry.id, name, auth: credential.kind, key });
@@ -228,7 +230,9 @@ function boardRows(title: string, entries: readonly BoardEntry[], me: string | n
       const mark = entry.id === me ? ' <- you' : '';
       const check = entry.verified ? ' [GitHub]' : '';
       const score = entry.score.toFixed(2).padStart(5);
-      return `  ${String(place + 1).padStart(2)}. ${score}  ${entry.name}${check} (${entry.rank})${mark}`;
+      const tools = toolNames(entry.tools ?? []);
+      const about = tools === '' ? entry.rank : `${entry.rank}, ${tools}`;
+      return `  ${String(place + 1).padStart(2)}. ${score}  ${entry.name}${check} (${about})${mark}`;
     }),
   ];
 }

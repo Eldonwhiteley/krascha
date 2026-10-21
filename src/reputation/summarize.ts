@@ -4,6 +4,8 @@
 
 import type { ReputationHit, ReputationSummary } from '../shared/reputation.js';
 import { reputationScore } from '../shared/reputation.js';
+import type { ToolId } from '../shared/tools.js';
+import { knownTools, toolOf } from '../shared/tools.js';
 
 import type { ReputationIndex } from './store.js';
 
@@ -100,7 +102,9 @@ export function summarize(
   const total: Tally = { prompts: 0, kind: 0, mean: 0, general: 0 };
   const days = new Map<string, Tally>();
   const sessions = new Map<string, Tally>();
+  const tools = new Set<ToolId>();
   for (const [id, prompt] of index.prompts) {
+    tools.add(toolOf(id));
     const target = index.hits.get(id)?.target;
     const kind = index.kind.has(id);
     for (const tally of [
@@ -127,5 +131,6 @@ export function summarize(
     recent: hits.toSorted((left, right) => right.at - left.at).slice(0, RECENT_HITS),
     scannedAt: index.scannedAt,
     tokensPerDay,
+    tools: knownTools([...tools]),
   };
 }

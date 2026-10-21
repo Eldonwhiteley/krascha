@@ -11,12 +11,12 @@ import { z } from 'zod';
 import { readAllLines, readOptional } from '../files.js';
 import type { Prompt } from '../reputation/prompts.js';
 import { typedText } from '../reputation/prompts.js';
+import { COPILOT_PREFIX } from '../shared/tools.js';
 
 import { shortTitle } from './claude.js';
 import { listDir, stampOf } from './listing.js';
 import type { PromptFile, PromptFileRead, UserPrompts } from './types.js';
 
-const COPILOT_PREFIX = 'c:';
 const EVENTS_FILE = 'events.jsonl';
 const WORKSPACE_FILE = 'workspace.yaml';
 

@@ -17,6 +17,7 @@ import { rankFor } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
 import type { Applicant } from '../../src/shared/silo.js';
 import { scoreApplicant } from '../../src/shared/silo.js';
+import { knownTools } from '../../src/shared/tools.js';
 
 export type Row = Readonly<Record<string, unknown>>;
 
@@ -38,7 +39,7 @@ export interface Owner {
 }
 
 const COLUMNS =
-  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day';
+  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools';
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -73,6 +74,7 @@ function entryOf(row: Row): BoardEntry {
     // Dropping unknown ids means a retired achievement just stops showing.
     achievements: knownIds(text(row, 'achievements').split(',')),
     tokensPerDay: number_(row, 'tokens_per_day'),
+    tools: knownTools(text(row, 'tools').split(',')),
   };
 }
 
@@ -226,13 +228,19 @@ async function claimNewEntry(database: D1Database, origin: string, day: string):
   return true;
 }
 
-function machineOf(row: Row): MachineCounts {
+/** One machine's last upload, with the agents it was typed into. */
+interface SavedMachine extends MachineCounts {
+  readonly tools: readonly string[];
+}
+
+function machineOf(row: Row): SavedMachine {
   return {
     kind: number_(row, 'kind'),
     mean: number_(row, 'mean'),
     prompts: number_(row, 'prompts'),
     tokensPerDay: number_(row, 'tokens_per_day'),
     achievements: text(row, 'achievements').split(','),
+    tools: text(row, 'tools').split(','),
   };
 }
 
@@ -246,7 +254,7 @@ async function saveMachine(
   database: D1Database,
   owner: Owner,
   upload: ScoreUpload,
-): Promise<MachineCounts[]> {
+): Promise<SavedMachine[]> {
   const machine = upload.machine ?? '';
   await database
     .prepare(
@@ -258,11 +266,12 @@ async function saveMachine(
     .run();
   await database
     .prepare(
-      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, tokens_per_day)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, tokens_per_day, tools)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner, machine) DO UPDATE SET
          kind = excluded.kind, mean = excluded.mean, prompts = excluded.prompts,
-         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day`,
+         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
+         tools = excluded.tools`,
     )
     .bind(
       owner.id,
@@ -272,10 +281,13 @@ async function saveMachine(
       upload.prompts,
       knownIds(upload.achievements ?? []).join(','),
       upload.tokensPerDay ?? 0,
+      knownTools(upload.tools ?? []).join(','),
     )
     .run();
   const { results } = await database
-    .prepare('SELECT kind, mean, prompts, achievements, tokens_per_day FROM machines WHERE owner = ?')
+    .prepare(
+      'SELECT kind, mean, prompts, achievements, tokens_per_day, tools FROM machines WHERE owner = ?',
+    )
     .bind(owner.id)
     .all();
   return results.map((row) => machineOf(row));
@@ -300,20 +312,21 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   const machines = await saveMachine(database, owner, upload);
   const sum = (pick: (machine: MachineCounts) => number): number =>
     machines.reduce((total, machine) => total + pick(machine), 0);
+  const tools = knownTools(machines.flatMap((machine) => machine.tools));
   const kind = sum((machine) => machine.kind);
   const mean = sum((machine) => machine.mean);
   const prompts = sum((machine) => machine.prompts);
   const tokensPerDay = sum((machine) => machine.tokensPerDay);
   await database
     .prepare(
-      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo, tools)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner) DO UPDATE SET
          name = excluded.name, kind = excluded.kind, mean = excluded.mean,
          prompts = excluded.prompts, score = excluded.score, uploaded_at = excluded.uploaded_at,
          upload_day = excluded.upload_day, uploads_today = excluded.uploads_today,
          achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
-         silo = excluded.silo`,
+         silo = excluded.silo, tools = excluded.tools`,
     )
     .bind(
       owner.id,
@@ -330,6 +343,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       combinedIds(machines).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),
+      tools.join(','),
     )
     .run();
   const row = await database

@@ -1,8 +1,8 @@
 // The global Reputation leaderboard, shared by the Cloudflare Worker that
 // serves it and the CLI that uploads to it and shows it.
 // An upload carries a display name, three counts, your average tokens a day,
-// the ids of the achievements you have unlocked and a random id for the
-// machine they came from, nothing else.
+// the ids of the achievements you have unlocked, the agents you use and a
+// random id for the machine they came from, nothing else.
 
 /** The Cloudflare Worker that serves the board. */
 export const LEADERBOARD_URL = 'https://krascha.com';
@@ -23,6 +23,8 @@ export const MAX_NAME_LENGTH = 40;
  * it back would make a cycle. achievements.test.ts keeps the list under it.
  */
 export const MAX_ACHIEVEMENTS = 64;
+/** Agent ids one upload may carry, with room for agents Krascha reads later. */
+export const MAX_TOOLS = 8;
 /** A trillion tokens a day is past anything one person runs, so anything above it is junk. */
 export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
 /** Shown for anyone who uploads without a name. */
@@ -38,6 +40,8 @@ export interface ScoreUpload {
   readonly achievements?: readonly string[];
   /** Average tokens a day over the last 60 days. Missing from builds older than tokens on the board. */
   readonly tokensPerDay?: number;
+  /** Ids from TOOLS for the agents you typed into. Missing from builds older than tools on the board. */
+  readonly tools?: readonly string[];
   /**
    * A random id for the machine the counts come from, so uploads from your
    * machines add up. Missing from older builds, whose upload replaces them all.
@@ -61,6 +65,8 @@ export interface BoardEntry {
   readonly achievements?: readonly string[];
   /** 0 for an upload without it. Missing from a server older than tokens on the board. */
   readonly tokensPerDay?: number;
+  /** Ids from TOOLS, in list order. Empty for an upload without them, and missing from a server older than tools on the board. */
+  readonly tools?: readonly string[];
 }
 
 /** Where one entry stands. Place is counted from the most wanted, and is null below MIN_PROMPTS. */
@@ -122,6 +128,7 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     value['kind'] + value['mean'] <= value['prompts'] &&
     (value['achievements'] === undefined || isIdList(value['achievements'], MAX_ACHIEVEMENTS)) &&
     isTokens(value['tokensPerDay'], MAX_TOKENS_PER_DAY) &&
+    (value['tools'] === undefined || isIdList(value['tools'], MAX_TOOLS)) &&
     (value['machine'] === undefined ||
       (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine'])))
   );
@@ -140,7 +147,8 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     isCount(value['prompts']) &&
     typeof value['uploadedAt'] === 'number' &&
     (value['achievements'] === undefined || isIdList(value['achievements'], Infinity)) &&
-    isTokens(value['tokensPerDay'], Infinity)
+    isTokens(value['tokensPerDay'], Infinity) &&
+    (value['tools'] === undefined || isIdList(value['tools'], Infinity))
   );
 }
 
@@ -160,7 +168,8 @@ export function isBoard(value: unknown): value is Board {
     value['mostWanted'].every(isBoardEntry) &&
     Array.isArray(value['pets']) &&
     value['pets'].every(isBoardEntry) &&
-    (value['bunks'] === undefined || (Array.isArray(value['bunks']) && value['bunks'].every(isBoardEntry))) &&
+    (value['bunks'] === undefined ||
+      (Array.isArray(value['bunks']) && value['bunks'].every(isBoardEntry))) &&
     isCount(value['total']) &&
     (value['me'] === null || isStanding(value['me']))
   );

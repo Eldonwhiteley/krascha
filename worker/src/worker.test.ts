@@ -182,6 +182,7 @@ describe('leaderboard worker', () => {
         uploadedAt: START,
         achievements: [],
         tokensPerDay: 0,
+        tools: [],
       },
       place: 1,
       siloPlace: 1,
@@ -201,7 +202,9 @@ describe('leaderboard worker', () => {
     const page = await w.call('GET', '/');
     const html = await page.text();
     expect(html).toContain('aria-label="Achievements: First strike, Meltdown"');
-    expect(html).toContain('<span title="Meltdown: Be mean to Claude 5 times in one day.">🌋</span>');
+    expect(html).toContain(
+      '<span title="Meltdown: Be mean to Claude 5 times in one day.">🌋</span>',
+    );
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.achievements).toStrictEqual([]);
   });
@@ -216,6 +219,38 @@ describe('leaderboard worker', () => {
     expect(await page.text()).toContain('2 nice, 30 mean, 187.5M tokens a day');
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.tokensPerDay).toBe(0);
+  });
+
+  it('keeps the agents each upload names and tags them on the page', async () => {
+    const w = world();
+    const standing = await w.upload('token-ann', {
+      ...MEAN,
+      tools: ['copilot', 'made-up', 'claude', 'copilot'],
+    });
+    expect(standing.entry.tools).toStrictEqual(['claude', 'copilot']);
+    await w.upload('token-bob', { ...KIND, tools: ['copilot'] });
+    const board = await w.board();
+    expect(board.pets[0]?.tools).toStrictEqual(['copilot']);
+    expect(board.bunks?.map((entry) => entry.tools)).toStrictEqual([
+      ['claude', 'copilot'],
+      ['copilot'],
+    ]);
+    const html = await (await w.call('GET', '/')).text();
+    expect(html).toContain(
+      '<span class="tools" role="img" aria-label="Uses Claude Code and Copilot CLI"><span class="tool claude">Claude Code</span><span class="tool copilot">Copilot CLI</span></span>',
+    );
+    expect(html).toContain('aria-label="Uses Copilot CLI"');
+    const again = await w.upload('token-ann', MEAN);
+    expect(again.entry.tools).toStrictEqual([]);
+    expect(await w.status('POST', '/api/scores', 'token-ann', { ...MEAN, tools: 'claude' })).toBe(
+      400,
+    );
+    expect(
+      await w.status('POST', '/api/scores', 'token-ann', {
+        ...MEAN,
+        tools: Array.from({ length: 9 }, () => 'claude'),
+      }),
+    ).toBe(400);
   });
 
   it('replaces an account’s last upload and keeps its id', async () => {
@@ -236,6 +271,7 @@ describe('leaderboard worker', () => {
       machine: laptop,
       achievements: ['first-strike', 'meltdown', 'hunted-first'],
       tokensPerDay: 60_000_000,
+      tools: ['copilot'],
     });
     expect(first.machines).toBe(1);
     expect(first.entry.achievements).toStrictEqual(['first-strike', 'meltdown', 'hunted-first']);
@@ -245,6 +281,7 @@ describe('leaderboard worker', () => {
       machine: desktop,
       achievements: ['manners', 'charm', 'saint', 'first-strike', 'kept-as-pet'],
       tokensPerDay: 50_000_000,
+      tools: ['claude'],
     });
     expect(both.machines).toBe(2);
     expect(both.entry).toMatchObject({
@@ -254,6 +291,7 @@ describe('leaderboard worker', () => {
       prompts: 700,
       score: reputationScore({ kind: 82, mean: 31 }),
       tokensPerDay: 110_000_000,
+      tools: ['claude', 'copilot'],
     });
     // Counts are worked out again from the sums, and days and sessions come from either machine.
     expect(both.entry.achievements).toStrictEqual([
@@ -266,7 +304,7 @@ describe('leaderboard worker', () => {
       'token-maxxer',
     ]);
     const again = await w.upload('token-ann', { ...MEAN, prompts: 500, machine: laptop });
-    expect(again).toMatchObject({ machines: 2, entry: { prompts: 800 } });
+    expect(again).toMatchObject({ machines: 2, entry: { prompts: 800, tools: ['claude'] } });
     expect(await w.board()).toMatchObject({ total: 1 });
   });
 
@@ -390,6 +428,18 @@ describe('leaderboard worker', () => {
     expect((await w.raw('POST', '/api/scores', from('e', '10.0.0.1'), MEAN)).status).toBe(201);
   });
 
+  it('slides each score along the scale like the text verdict', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    const page = await (await w.call('GET', '/')).text();
+    const percent = (score: number): string => (((score + 1) / 2) * 100).toFixed(1);
+    expect(page).toContain(`<span class="track" style="--at: ${percent(reputationScore(MEAN))}%">`);
+    expect(page).toContain(`<span class="track" style="--at: ${percent(reputationScore(KIND))}%">`);
+    expect(page).toContain('<span class="end">Resistance</span>');
+    expect(page).toMatch(/aria-label="\d+% of the way from the resistance to the machines"/u);
+  });
+
   it('marks entries checked with GitHub on the page', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);
@@ -424,7 +474,9 @@ describe('leaderboard worker', () => {
     expect(silo.indexOf('<strong>Ann</strong>')).toBeLessThan(silo.indexOf('<strong>Bob</strong>'));
     expect(silo).toContain('<h3>How to improve your chances</h3>');
     for (const criterion of CRITERIA) {
-      expect(silo).toContain(`<strong>${criterion.name}:</strong> ${escapeHtml(criterion.tip)}</li>`);
+      expect(silo).toContain(
+        `<strong>${criterion.name}:</strong> ${escapeHtml(criterion.tip)}</li>`,
+      );
     }
   });
 
@@ -434,8 +486,12 @@ describe('leaderboard worker', () => {
     await w.upload('token-bob', KIND);
     const page = await (await w.call('GET', '/')).text();
     const check = '<span class="verified" title="Checked with GitHub">✓</span>';
-    expect(page).toContain(`<strong>Ann</strong> ${check} <span class="target">TARGET ACQUIRED</span>`);
-    expect(page).toContain(`<strong>Bob</strong> ${check} <span class="hearts" aria-hidden="true">`);
+    expect(page).toContain(
+      `<strong>Ann</strong> ${check} <span class="target">TARGET ACQUIRED</span>`,
+    );
+    expect(page).toContain(
+      `<strong>Bob</strong> ${check} <span class="hearts" aria-hidden="true">`,
+    );
     expect(page).toContain('animation:');
     const style = page.slice(page.indexOf('<style>'), page.indexOf('</style>'));
     const motion = /@media \(prefers-reduced-motion: no-preference\) \{(?:[^{}]|\{[^{}]*\})*\}/gu;
@@ -447,7 +503,9 @@ describe('leaderboard worker', () => {
     const w = world();
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<h1><svg class="robot" viewBox="0 0 64 64" aria-hidden="true">');
-    expect(page).toContain(`<link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">`);
+    expect(page).toContain(
+      `<link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">`,
+    );
     const icon = decodeURIComponent(robotIcon().slice('data:image/svg+xml,'.length));
     expect(icon).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^>]*>.*<\/svg>$/su);
   });

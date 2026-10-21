@@ -72,6 +72,7 @@ describe('summarize', () => {
       recent: [],
       scannedAt: null,
       tokensPerDay: 0,
+      tools: [],
     });
   });
 
@@ -156,6 +157,15 @@ describe('summarize', () => {
       terms: ['please'],
       excerpt: 'please',
     });
+  });
+
+  it('names the agents the prompts were typed into, Claude Code first', () => {
+    const index = emptyIndex();
+    put(index, 'c:e1', { sessionId: 's1', at: DAY1 });
+    expect(summarize(index, title, 0).tools).toStrictEqual(['copilot']);
+    put(index, 'h:x', { sessionId: 's2', at: DAY1 });
+    put(index, 't:u1', { sessionId: 's3', at: DAY1 });
+    expect(summarize(index, title, 0).tools).toStrictEqual(['claude', 'copilot']);
   });
 
   it('breaks session ties by id', () => {

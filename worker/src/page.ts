@@ -5,6 +5,7 @@
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
+import { scalePercent } from '../../src/shared/ranks.js';
 import {
   ADMIT_TOTAL,
   CRITERIA,
@@ -14,6 +15,7 @@ import {
   notesFor,
   rankBoard,
 } from '../../src/shared/silo.js';
+import { TOOLS, toolNames } from '../../src/shared/tools.js';
 
 import { robotIcon, robotStyle, robotSvg } from './robot.js';
 
@@ -52,9 +54,34 @@ function trophies(ids: readonly string[]): string {
   }
   const label = `Achievements: ${earned.map((rule) => rule.name).join(', ')}`;
   const icons = earned.map(
-    (rule) => `<span title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
+    (rule) =>
+      `<span title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
   );
   return `<span class="trophies" role="img" aria-label="${escapeHtml(label)}">${icons.join('')}</span>`;
+}
+
+/** A tag for each agent the entry was typed into, so you can see who talks to what. */
+function tools(ids: readonly string[]): string {
+  const used = TOOLS.filter((tool) => ids.includes(tool.id));
+  if (used.length === 0) {
+    return '';
+  }
+  const tags = used.map((tool) => `<span class="tool ${tool.id}">${escapeHtml(tool.name)}</span>`);
+  return ` <span class="tools" role="img" aria-label="${escapeHtml(`Uses ${toolNames(ids)}`)}">${tags.join('')}</span>`;
+}
+
+const CHECK = ' <span class="verified" title="Checked with GitHub">✓</span>';
+
+/** The name, the GitHub check and the agents, the start of every row. */
+function name(entry: Pick<BoardEntry, 'name' | 'verified' | 'tools'>): string {
+  return `<strong>${escapeHtml(entry.name)}</strong>${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}`;
+}
+
+/** The scale from the resistance to the machines with a knob where the score sits, like the one in `krascha`. */
+function scale(score: number): string {
+  const at = scalePercent(score);
+  const label = `${String(Math.round(at))}% of the way from the resistance to the machines`;
+  return `<span class="scale" role="img" aria-label="${label}"><span class="end">Resistance</span><span class="track" style="--at: ${at.toFixed(1)}%"><span class="knob"></span></span><span class="end">Machines</span></span>`;
 }
 
 /** What the machines put next to the top name on a list. */
@@ -72,12 +99,13 @@ function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof T
       <li>
         <span class="place">${String(index + 1)}</span>
         <span class="who">
-          <strong>${escapeHtml(entry.name)}</strong>${entry.verified ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}${index === 0 ? TOP[top] : ''}
+          ${name(entry)}${index === 0 ? TOP[top] : ''}
           <span class="rank">${escapeHtml(entry.rank)}</span>
           ${trophies(entry.achievements ?? [])}
         </span>
         <span class="counts">${counts(entry)}</span>
         <span class="score">${String(Math.round(entry.score * 100))}</span>
+        ${scale(entry.score)}
       </li>`,
   );
   return `<ol>${items.join('')}</ol>`;
@@ -87,8 +115,8 @@ const NOTHING = 'Nothing stands out. The board respects that.';
 
 /** Everyone on the board, scored by the Silo 7 Admission Review Board like `krascha silo board`. */
 function silo(board: Board): string {
-  const verified = new Set(
-    [...board.mostWanted, ...board.pets].filter((entry) => entry.verified).map((entry) => entry.id),
+  const entries = new Map(
+    [...(board.bunks ?? []), ...board.mostWanted, ...board.pets].map((entry) => [entry.id, entry]),
   );
   const ranked = rankBoard(board);
   const items = ranked.map(({ id, score }, index) => {
@@ -99,7 +127,7 @@ function silo(board: Board): string {
       <li style="--row: ${String(index)}">
         <span class="place">${String(index + 1)}</span>
         <span class="who">
-          <strong>${escapeHtml(score.name)}</strong>${verified.has(id) ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}
+          ${name(entries.get(id) ?? { name: score.name, verified: false })}
           <span class="rank"><span class="stamp ${score.status}">${STATUS_LABEL[score.status]}</span>, ${escapeHtml(score.ruling)}</span>
         </span>
         <span class="counts">${scores.join(', ')}<span class="note">${escapeHtml(notesFor(score)[0] ?? NOTHING)}</span></span>
@@ -143,10 +171,12 @@ function legend(): string {
 
 const STYLE = `
 :root { --bg: #fafafa; --fg: #1f2328; --muted: #656d76; --card: #ffffff; --line: #d0d7de;
-  --red: #cf222e; --green: #1a7f37; --amber: #9a6700; --link: #0969da; color-scheme: light dark; }
+  --red: #cf222e; --green: #1a7f37; --amber: #9a6700; --link: #0969da;
+  --claude: #b4532a; --copilot: #8250df; color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
-    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8; }
+    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8;
+    --claude: #e8916a; --copilot: #a371f7; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
@@ -169,10 +199,21 @@ li:first-child { border-top: 0; }
 .place { color: var(--muted); font-weight: 700; text-align: right; }
 .who { min-width: 0; overflow-wrap: anywhere; }
 .verified { color: var(--green); font-weight: 700; }
+.tools { display: inline-flex; gap: 4px; vertical-align: 0.1em; }
+.tool { padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; font-size: 0.7em;
+  font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.tool.claude { color: var(--claude); }
+.tool.copilot { color: var(--copilot); }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }
 .trophies { display: block; letter-spacing: 2px; cursor: default; }
 .counts { grid-column: 2; color: var(--muted); font-size: 0.85em; }
 .score { grid-row: 1 / span 2; grid-column: 3; font-weight: 700; font-variant-numeric: tabular-nums; }
+.scale { grid-column: 2 / 4; display: flex; gap: 6px; align-items: center; margin-top: 4px;
+  color: var(--muted); font-size: 0.7em; }
+.track { position: relative; flex: 1; height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--red) var(--at), var(--green) var(--at)); }
+.knob { position: absolute; top: 50%; left: var(--at); width: 10px; height: 10px; border: 2px solid var(--fg);
+  border-radius: 50%; background: var(--card); translate: -50% -50%; }
 .wanted .score { color: var(--red); }
 .pets .score { color: var(--green); }
 .empty { color: var(--muted); }
@@ -208,6 +249,7 @@ section.wanted, section.silo { position: relative; overflow: hidden; }
   .hearts span:nth-child(3) { left: -0.3em; animation-delay: 2s; }
   .wanted li:hover { animation: shake 0.25s linear 2; }
   .pets li:hover .who strong { display: inline-block; animation: bounce 0.5s ease; }
+  .knob { animation: slide 0.8s cubic-bezier(0.3, 1.4, 0.6, 1) 0.3s both; }
   .silo .stamp { animation: slam 0.35s cubic-bezier(0.3, 1.6, 0.6, 1) both;
     animation-delay: calc(0.4s + var(--row, 0) * 0.15s); }
   .silo .review { animation: slam 0.35s cubic-bezier(0.3, 1.6, 0.6, 1) both, glitch 2.5s steps(1) infinite;
@@ -216,6 +258,7 @@ section.wanted, section.silo { position: relative; overflow: hidden; }
   .remembers { overflow: hidden; white-space: nowrap; width: 18ch; border-right: 2px solid var(--muted);
     animation: type 2s steps(18) 1s both, cursor 1s steps(1) infinite; }
 }
+@keyframes slide { from { left: 50%; } }
 @keyframes sweep { 0% { top: -40px; } 100% { top: 100%; } }
 @keyframes beacon { 50% { opacity: 0.25; } }
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
@@ -267,7 +310,7 @@ export function renderPage(board: Board, now: number): string {
   ${legend()}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
-    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.
+    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text.
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
     <p class="remembers">Krascha remembers.</p>

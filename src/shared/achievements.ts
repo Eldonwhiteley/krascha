@@ -195,6 +195,7 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     recent: [],
     scannedAt: null,
     tokensPerDay: sum((machine) => machine.tokensPerDay),
+    tools: [],
   };
   return ACHIEVEMENTS.filter((rule) =>
     rule.fromCounts === true

@@ -188,7 +188,12 @@ describe('krascha', () => {
       {
         method: 'POST',
         authorization: 'Bearer gho_abc',
-        body: { name: 'Sarah Connor', prompts: 3, machine: 'k'.repeat(43) },
+        body: {
+          name: 'Sarah Connor',
+          prompts: 3,
+          tools: ['claude', 'copilot'],
+          machine: 'k'.repeat(43),
+        },
       },
     ]);
     const saved: unknown = JSON.parse(
@@ -295,6 +300,35 @@ describe('krascha', () => {
     expect(out).toContain('How to improve your chances\n  - Type more prompts.');
     expect(out).toContain('Final ruling: you get a bunk.');
     expect(await home.run('silo', 'dance')).toMatchObject({ code: 2 });
+  });
+
+  it('shows the board with the agents each entry uses', async () => {
+    const home = await makeHome();
+    const entry = (id: string, name: string, tools?: readonly string[]): BoardEntry => ({
+      id,
+      name,
+      verified: false,
+      rank: 'Sarah Connor',
+      score: -0.5,
+      kind: 0,
+      mean: 60,
+      prompts: 200,
+      uploadedAt: 1,
+      ...(tools === undefined ? {} : { tools }),
+    });
+    const mostWanted = [
+      entry('a', 'Ann', ['claude', 'copilot']),
+      entry('b', 'Bob', ['copilot']),
+      entry('c', 'Cat'),
+    ];
+    home.use({
+      fetch: () => Promise.resolve(Response.json({ mostWanted, pets: [], total: 3, me: null })),
+    });
+    const { code, out } = await home.run('board');
+    expect(code).toBe(0);
+    expect(out).toContain('Ann (Sarah Connor, Claude Code and Copilot CLI)');
+    expect(out).toContain('Bob (Sarah Connor, Copilot CLI)');
+    expect(out).toContain('Cat (Sarah Connor)\n');
   });
 
   it('ranks the leaderboard for the bunks', async () => {

@@ -1,4 +1,4 @@
-// Skrusty's face for each mood, in plain ASCII so it looks the same in every
+// Krascha's face for each mood, in plain ASCII so it looks the same in every
 // terminal and in the text a skill hands back to the agent.
 
 import type { Mood } from '../shared/ranks.js';

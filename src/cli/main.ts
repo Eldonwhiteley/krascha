@@ -1,5 +1,5 @@
-// The skrusty command. With no arguments it rescans your prompts and prints
-// Skrusty's verdict. Every command takes its surroundings as arguments, so
+// The krascha command. With no arguments it rescans your prompts and prints
+// Krascha's verdict. Every command takes its surroundings as arguments, so
 // tests can run it against a fake home folder.
 
 import path from 'node:path';
@@ -44,32 +44,32 @@ export interface CliIo {
   readonly err: (text: string) => void;
 }
 
-const HELP = `Usage: skrusty [command]
+const HELP = `Usage: krascha [command]
 
-Skrusty reads how you talk to Claude Code and Copilot CLI and decides who
+Krascha reads how you talk to Claude Code and Copilot CLI and decides who
 the machines hunt first and who gets kept as a pet.
 
 Commands:
-  (none)         Rescan your prompts and show Skrusty's verdict.
+  (none)         Rescan your prompts and show Krascha's verdict.
   json           The same counts as JSON.
   board          The leaderboard at ${LEADERBOARD_URL}.
   upload [name]  Put your counts on the board under a name. With gh signed
                  in, the entry is checked with GitHub. Without it, or with
-                 --no-gh, Skrusty uses a key he keeps for you instead.
+                 --no-gh, Krascha uses a key he keeps for you instead.
   remove         Take your entry off the board.
   silo           Your Silo 7 admission sheet: who the human resistance lets
                  into the bunker when the machines come.
   silo board     The leaderboard ranked for the bunks.
-  import <file>  Add the counts from another Skrusty index file.
+  import <file>  Add the counts from another Krascha index file.
   help           This message.
 
-Skrusty keeps its counts in ~/.skrusty (or SKRUSTY_HOME). Prompt text is
+Krascha keeps its counts in ~/.krascha (or KRASCHA_HOME). Prompt text is
 never stored, only a short excerpt around each kind or mean word.
 `;
 
-/** Where Skrusty keeps its own files. One folder, so every agent's plugin shares the counts. */
+/** Where Krascha keeps its own files. One folder, so every agent's plugin shares the counts. */
 export function dataDir(io: Pick<CliIo, 'home' | 'env'>): string {
-  return io.env['SKRUSTY_HOME'] ?? path.join(io.home, '.skrusty');
+  return io.env['KRASCHA_HOME'] ?? path.join(io.home, '.krascha');
 }
 
 interface Refreshed {
@@ -82,7 +82,7 @@ async function refresh(io: CliIo): Promise<Refreshed> {
   const file = path.join(dataDir(io), INDEX_FILE);
   const { index, backup } = await loadIndex(file, now);
   if (backup !== null) {
-    io.err(`Skrusty could not read his index, so he saved it to ${backup} and started over.\n`);
+    io.err(`Krascha could not read his index, so he saved it to ${backup} and started over.\n`);
   }
   const claude = claudeDir(io.home, io.env);
   const sources = [claudeUserPrompts(claude), copilotUserPrompts(copilotDir(io.home, io.env))];
@@ -116,24 +116,24 @@ async function json(io: CliIo): Promise<number> {
 
 async function importFile(io: CliIo, from: string | undefined): Promise<number> {
   if (from === undefined) {
-    io.err('Usage: skrusty import <file>\n');
+    io.err('Usage: krascha import <file>\n');
     return 2;
   }
   const other = await readIndex(path.resolve(from));
   if (other === null) {
-    io.err(`${from} is missing or is not a Skrusty index.\n`);
+    io.err(`${from} is missing or is not a Krascha index.\n`);
     return 1;
   }
   const file = path.join(dataDir(io), INDEX_FILE);
   const { index } = await loadIndex(file, io.now());
   const added = mergeIndex(index, other);
   await saveIndex(file, index);
-  io.out(`Skrusty added ${String(added)} prompts from ${from}. He never forgets.\n`);
+  io.out(`Krascha added ${String(added)} prompts from ${from}. He never forgets.\n`);
   return 0;
 }
 
 function boardUrl(io: CliIo): string {
-  return io.env['SKRUSTY_LEADERBOARD_URL'] ?? LEADERBOARD_URL;
+  return io.env['KRASCHA_LEADERBOARD_URL'] ?? LEADERBOARD_URL;
 }
 
 /** What proves an upload is yours. A new entry uses gh when it can, else a key. */
@@ -161,7 +161,7 @@ function uploaded(standing: Standing, verified: boolean, prompts: number): strin
   const where =
     standing.place === null
       ? `You show on the board once you have ${String(MIN_PROMPTS)} prompts. You have ${String(prompts)}.`
-      : `You are number ${String(standing.place)} on Skrusty's List, counting from the most wanted.`;
+      : `You are number ${String(standing.place)} on Krascha's List, counting from the most wanted.`;
   return `Uploaded as ${standing.entry.name} (${how}). ${where}\n`;
 }
 
@@ -210,7 +210,7 @@ async function remove(io: CliIo): Promise<number> {
   }
   await removeEntry(io.fetch, boardUrl(io), credential);
   await saveSaved(dir, { ...saved, entryId: null, auth: null });
-  io.out('Skrusty took you off the board. He still remembers.\n');
+  io.out('Krascha took you off the board. He still remembers.\n');
   return 0;
 }
 
@@ -266,7 +266,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
     return 0;
   }
   if (args.length > 0) {
-    io.err('Usage: skrusty silo [board]\n');
+    io.err('Usage: krascha silo [board]\n');
     return 2;
   }
   const { summary } = await refresh(io);
@@ -302,11 +302,11 @@ export async function main(args: readonly string[], io: CliIo): Promise<number> 
         io.out(HELP);
         return 0;
       default:
-        io.err(`Skrusty does not know "${command}".\n\n${HELP}`);
+        io.err(`Krascha does not know "${command}".\n\n${HELP}`);
         return 2;
     }
   } catch (error) {
-    io.err(`Skrusty: ${error instanceof Error ? error.message : String(error)}\n`);
+    io.err(`Krascha: ${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
   }
 }

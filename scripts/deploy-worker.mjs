@@ -1,4 +1,4 @@
-// Deploys Skrusty's List, the leaderboard Worker, to Cloudflare at
+// Deploys Krascha's List, the leaderboard Worker, to Cloudflare at
 // krascha.com. The first run creates the D1 database and writes its id into
 // worker/wrangler.toml. Every run applies new migrations and deploys.
 //
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'worker');
 const TOML = path.join(DIR, 'wrangler.toml');
-const DATABASE = 'skrusty';
+const DATABASE = 'krascha';
 const PLACEHOLDER = 'REPLACE_ON_FIRST_DEPLOY';
 const WRANGLER = ['--yes', 'wrangler@4.147.0'];
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u;
@@ -64,4 +64,4 @@ if (toml.includes(PLACEHOLDER)) {
 
 wrangler(['d1', 'migrations', 'apply', DATABASE, '--remote']);
 wrangler(['deploy']);
-say('Skrusty\'s List is live at https://krascha.com');
+say('Krascha\'s List is live at https://krascha.com');

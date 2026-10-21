@@ -1,6 +1,6 @@
 // The reputation index: every prompt counted so far, every mean and kind hit,
 // and which transcript files were already read. It lives in one JSON file in
-// Skrusty's own folder, so the counts outlive the transcripts Claude
+// Krascha's own folder, so the counts outlive the transcripts Claude
 // Code deletes after cleanupPeriodDays. Prompt text is never stored, only the
 // short excerpt around a hit.
 

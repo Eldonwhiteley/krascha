@@ -1,18 +1,18 @@
 {
-  "name": "skrusty",
+  "name": "krascha",
   "version": "0.1.0",
   "private": true,
-  "description": "Skrusty reads how you talk to Claude Code and Copilot CLI and decides who the machines hunt first.",
+  "description": "Krascha reads how you talk to Claude Code and Copilot CLI and decides who the machines hunt first.",
   "license": "MIT",
   "author": "Shane K. Panter",
   "homepage": "https://krascha.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shanep/skrusty.git"
+    "url": "git+https://github.com/shanep/krascha.git"
   },
   "type": "module",
   "bin": {
-    "skrusty": "dist/cli.js"
+    "krascha": "dist/cli.js"
   },
   "files": [
     "dist"

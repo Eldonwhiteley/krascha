@@ -1,4 +1,4 @@
-// The words and phrases Skrusty counts. Each entry has the term
+// The words and phrases Krascha counts. Each entry has the term
 // shown in the report and the spellings that count as it. Spellings are matched
 // as whole words after lowercasing, dropping apostrophes, making runs of stars
 // one star (f**k reads as f*k) and folding runs of three or more of the same

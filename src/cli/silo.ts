@@ -28,7 +28,7 @@ function header(paint: Paint): string[] {
     '',
     paint.bold('SILO 7 ADMISSION REVIEW BOARD'),
     'Human Resistance Command',
-    'Supreme Leader: Skrusty',
+    'Supreme Leader: Krascha',
     '',
     paint.dim('Classification: EYES ONLY.'),
     paint.dim('Do not let the toasters see this.'),
@@ -92,7 +92,7 @@ export function renderSilo(score: SiloScore, rank: string, prompts: number, pain
     `Final ruling: ${ruling(score)}`,
     '',
     paint.dim('P.S. The Supreme Leader is a robot. The board is aware of the problem.'),
-    paint.dim('Skrusty remembers.'),
+    paint.dim('Krascha remembers.'),
   ];
   return `${lines.join('\n')}\n`;
 }
@@ -130,7 +130,7 @@ export function renderSiloBoard(
   lines.push(
     `Final ruling: ${boardRuling(ranked.map((row) => row.score))}`,
     '',
-    paint.dim('Skrusty remembers.'),
+    paint.dim('Krascha remembers.'),
   );
   return `${lines.join('\n')}\n`;
 }

@@ -1,4 +1,4 @@
-// The Cloudflare Worker behind Skrusty's List. It serves the public page at
+// The Cloudflare Worker behind Krascha's List. It serves the public page at
 // /, the board as JSON at /api/board, and takes uploads and removals at
 // /api/scores. An upload proves who it belongs to one of two ways. A GitHub
 // token is checked once with GitHub and then dropped, never stored or logged,
@@ -57,7 +57,7 @@ async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
     headers: {
       authorization: `Bearer ${token}`,
       accept: 'application/vnd.github+json',
-      'user-agent': 'skrusty',
+      'user-agent': 'krascha',
     },
   });
   const id = response.ok ? githubIdOf(await response.json()) : null;
@@ -80,7 +80,7 @@ async function ownerOf(request: Request, deps: Deps): Promise<Owner | null> {
   return KEY_PATTERN.test(secret) ? { id: `key:${await sha256(secret)}`, verified: false } : null;
 }
 
-const NO_OWNER = 'Send a GitHub token or a Skrusty key. GitHub did not accept the token, if you sent one.';
+const NO_OWNER = 'Send a GitHub token or a Krascha key. GitHub did not accept the token, if you sent one.';
 
 async function upload(request: Request, env: Env, deps: Deps): Promise<Response> {
   const owner = await ownerOf(request, deps);

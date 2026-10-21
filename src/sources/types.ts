@@ -1,4 +1,4 @@
-// Where an agent keeps what its user typed. Skrusty reads every agent's
+// Where an agent keeps what its user typed. Krascha reads every agent's
 // prompt files through this one shape.
 
 import type { Prompt } from '../reputation/prompts.js';

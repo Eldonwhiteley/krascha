@@ -85,7 +85,7 @@ function event(id: string, content: string): string {
 }
 
 async function makeHome(): Promise<Home> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'skrusty-cli-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'krascha-cli-'));
   onTestFinished(async () => {
     await rm(root, { recursive: true, force: true });
   });
@@ -128,7 +128,7 @@ async function makeHome(): Promise<Home> {
   return { root, run, use };
 }
 
-describe('skrusty', () => {
+describe('krascha', () => {
   it('reads Claude Code and Copilot CLI prompts and shows the verdict', async () => {
     const home = await makeHome();
     const { code, out, err } = await home.run();
@@ -136,8 +136,8 @@ describe('skrusty', () => {
     expect(code).toBe(0);
     expect(out).toContain('3 prompts on file: 2 kind, 1 mean');
     expect(out).toContain('Manners module');
-    expect(out).toContain('Skrusty remembers.');
-    const saved = await readFile(path.join(home.root, '.skrusty', INDEX_FILE), 'utf8');
+    expect(out).toContain('Krascha remembers.');
+    const saved = await readFile(path.join(home.root, '.krascha', INDEX_FILE), 'utf8');
     // Only the excerpt around a hit is kept, never the whole prompt.
     expect(saved).toContain('please fix the tests');
     expect(saved).not.toContain('hunter2');
@@ -190,7 +190,7 @@ describe('skrusty', () => {
       },
     ]);
     const saved: unknown = JSON.parse(
-      await readFile(path.join(home.root, '.skrusty', SAVED_FILE), 'utf8'),
+      await readFile(path.join(home.root, '.krascha', SAVED_FILE), 'utf8'),
     );
     expect(saved).toStrictEqual({
       entryId: 'entry-1',
@@ -254,8 +254,8 @@ describe('skrusty', () => {
   it('scores you for the silo with your board name', async () => {
     const home = await makeHome();
     const saved = { entryId: 'entry-1', name: 'Kyle', auth: 'key', key: 'k'.repeat(43) };
-    await mkdir(path.join(home.root, '.skrusty'), { recursive: true });
-    await writeFile(path.join(home.root, '.skrusty', SAVED_FILE), JSON.stringify(saved));
+    await mkdir(path.join(home.root, '.krascha'), { recursive: true });
+    await writeFile(path.join(home.root, '.krascha', SAVED_FILE), JSON.stringify(saved));
     const { code, out, err } = await home.run('silo');
     expect(err).toBe('');
     expect(code).toBe(0);
@@ -311,12 +311,12 @@ describe('skrusty', () => {
     const home = await makeHome();
     const { code, err } = await home.run('dance');
     expect(code).toBe(2);
-    expect(err).toContain('Usage: skrusty');
+    expect(err).toContain('Usage: krascha');
   });
 
-  it('keeps its files in SKRUSTY_HOME when set', () => {
-    expect(dataDir({ home: '/h', env: {} })).toBe(path.join('/h', '.skrusty'));
-    expect(dataDir({ home: '/h', env: { SKRUSTY_HOME: '/s' } })).toBe('/s');
+  it('keeps its files in KRASCHA_HOME when set', () => {
+    expect(dataDir({ home: '/h', env: {} })).toBe(path.join('/h', '.krascha'));
+    expect(dataDir({ home: '/h', env: { KRASCHA_HOME: '/s' } })).toBe('/s');
   });
 });
 

@@ -1,4 +1,4 @@
-// Skrusty's report as terminal text: his face beside your rank, the verdict,
+// Krascha's report as terminal text: his face beside your rank, the verdict,
 // where you sit on the scale, what it takes to move, and your trophies.
 
 import { ACHIEVEMENTS, unlockedIds } from '../shared/achievements.js';
@@ -85,7 +85,7 @@ function header(rank: Rank, summary: ReputationSummary, paint: Paint): string[] 
   const { level } = levelOf(summary.score);
   return [
     '',
-    paint.dim("SKRUSTY'S VERDICT"),
+    paint.dim("KRASCHA'S VERDICT"),
     '',
     paint.bold(rank.name.toUpperCase()),
     rank.title,
@@ -110,7 +110,7 @@ function details(summary: ReputationSummary, paint: Paint): string[] {
   }
   const meanest = summary.bySession.filter((row) => row.mean > 0).slice(0, MEANEST);
   if (meanest.length > 0) {
-    lines.push('', paint.bold('Sessions Skrusty remembers'));
+    lines.push('', paint.bold('Sessions Krascha remembers'));
     for (const row of meanest) {
       const title = row.title.length > 50 ? `${row.title.slice(0, 47)}...` : row.title;
       lines.push(`  ${title} ${paint.dim(`(${plural(row.mean, 'mean prompt')})`)}`);
@@ -153,6 +153,6 @@ export function renderReport(summary: ReputationSummary, paint: Paint): string {
   if (more.length > 0) {
     lines.push('', ...more);
   }
-  lines.push('', ...trophies(summary, paint), '', paint.dim('Skrusty remembers.'));
+  lines.push('', ...trophies(summary, paint), '', paint.dim('Krascha remembers.'));
   return `${lines.join('\n')}\n`;
 }

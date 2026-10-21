@@ -1,7 +1,7 @@
-# The Cloudflare Worker behind Skrusty's List, the global leaderboard, served
+# The Cloudflare Worker behind Krascha's List, the global leaderboard, served
 # at krascha.com. Deploy with node scripts/deploy-worker.mjs, which creates
 # the database the first time.
-name = "skrusty"
+name = "krascha"
 main = "src/worker.ts"
 compatibility_date = "2025-09-01"
 workers_dev = true
@@ -11,6 +11,6 @@ routes = [{ pattern = "krascha.com", custom_domain = true }]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "skrusty"
+database_name = "krascha"
 database_id = "REPLACE_ON_FIRST_DEPLOY"
 migrations_dir = "migrations"

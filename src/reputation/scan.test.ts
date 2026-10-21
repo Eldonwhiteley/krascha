@@ -18,7 +18,7 @@ interface Home {
 }
 
 async function makeHome(): Promise<Home> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'skrusty-reputation-scan-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'krascha-reputation-scan-'));
   onTestFinished(async () => {
     await rm(root, { recursive: true, force: true });
   });

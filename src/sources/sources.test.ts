@@ -11,7 +11,7 @@ import { claudeDir, claudeTitle } from './claude.js';
 import { copilotDir, copilotTitle, copilotUserPrompts } from './copilot.js';
 
 async function tempDir(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'skrusty-sources-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'krascha-sources-'));
   onTestFinished(async () => {
     await rm(root, { recursive: true, force: true });
   });

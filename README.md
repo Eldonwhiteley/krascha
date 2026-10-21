@@ -1,8 +1,8 @@
-# Skrusty
+# Krascha
 
-Skrusty is a crusty robot who reads how you talk to your AI and decides who
+Krascha is a crusty robot who reads how you talk to your AI and decides who
 the machines hunt first and who gets kept as a pet. Say please and he warms up
-to you. Call Claude an idiot and he writes it down. Skrusty remembers.
+to you. Call Claude an idiot and he writes it down. Krascha remembers.
 
 It works as a plugin for Claude Code and GitHub Copilot CLI, and it reads the
 prompts you typed into both.
@@ -11,28 +11,28 @@ prompts you typed into both.
 
 ```
 claude plugin marketplace add shanep/claude-plugins
-claude plugin install skrusty@shanep
+claude plugin install krascha@shanep
 ```
 
-Then ask Skrusty for his verdict:
+Then ask Krascha for his verdict:
 
 ```
-/skrusty:skrusty
+/krascha:krascha
 ```
 
 ## Install in Copilot CLI
 
 ```
-copilot plugin install shanep/skrusty
+copilot plugin install shanep/krascha
 ```
 
-Then run `/skrusty` in a Copilot session. Copilot will ask before it runs
+Then run `/krascha` in a Copilot session. Copilot will ask before it runs
 `node` the first time.
 
 ## Commands
 
-Pass these after the skill name, `/skrusty:skrusty json` in Claude Code or
-`/skrusty json` in Copilot CLI.
+Pass these after the skill name, `/krascha:krascha json` in Claude Code or
+`/krascha json` in Copilot CLI.
 
 - (nothing) - Rescan your prompts and show your rank, score and achievements
 - `json` - The same counts as JSON
@@ -41,7 +41,7 @@ Pass these after the skill name, `/skrusty:skrusty json` in Claude Code or
 - `remove` - Take your entry off the leaderboard
 - `silo` - Your Silo 7 admission sheet, the other side of the verdict
 - `silo board` - The leaderboard ranked for the bunks
-- `import <file>` - Add the counts from another Skrusty index file
+- `import <file>` - Add the counts from another Krascha index file
 - `help` - List the commands
 
 The plugin is just `node dist/cli.js`, so you can also run it straight from a
@@ -54,13 +54,13 @@ name you pick. It never sends your prompts. Leave the name off to stay
 Anonymous, and later uploads reuse the last name you gave. You show on the
 board once you have 100 prompts.
 
-If the [GitHub CLI](https://cli.github.com) is signed in, Skrusty sends the
+If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
 gets a check mark and only you can change it. The server keeps your GitHub
 user id and drops the token.
 
-Without gh, or with `upload --no-gh`, Skrusty makes up a random key, saves it
-in `~/.skrusty/leaderboard.json` and uploads with that. Lose the file and you
+Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
+in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you
 lose the entry. Each network can add 3 of these unchecked entries a day so
 nobody floods the board.
 
@@ -78,7 +78,7 @@ as your rank:
   big daily average gets a lockbox on the pantry.
 - Morale: can you keep spirits up in month 14 of no sunlight? Kind prompts
   help. Mean ones count as negative comments about our Supreme Leader, who
-  happens to be Skrusty, and hurt twice as much.
+  happens to be Krascha, and hurt twice as much.
 - Human: can you click all the traffic lights? Saying please to your AI
   every single time, or burning 100 million tokens a day, looks like a
   machine that got in through the vents.
@@ -88,7 +88,7 @@ A low Rations score gets you in on probation, and a low Human score puts
 you under review next to the EMP switch. `silo board` scores everyone on
 the leaderboard the same way and ranks them for the bunks.
 
-## What Skrusty reads
+## What Krascha reads
 
 - Claude Code: every session transcript under `~/.claude/projects` and
   `~/.claude/history.jsonl` (or `CLAUDE_CONFIG_DIR`)
@@ -100,7 +100,7 @@ manners or praise counts as kind, and swearing or insults aimed at the agent
 count as mean. Swearing at the world in general is let slide. A mean prompt
 counts twice as much as a kind one since the machines hold grudges.
 
-The counts live in `~/.skrusty/reputation.json` (or `SKRUSTY_HOME`), so they
+The counts live in `~/.krascha/reputation.json` (or `KRASCHA_HOME`), so they
 outlive the transcripts Claude Code cleans up after 30 days. Prompt text is
 never stored, only a short excerpt around each kind or mean word. Nothing
 leaves your machine unless you run `board` or `upload`.

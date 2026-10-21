@@ -1,7 +1,7 @@
 #!/bin/sh
 # Validate the plugin manifest, then typecheck, test, and make sure dist/
 # matches the source, since the plugin runs the committed bundle. Every push
-# to master goes straight to every machine with skrusty@shanep, so this is the
+# to master goes straight to every machine with krascha@shanep, so this is the
 # real gate.
 set -e
 if command -v claude >/dev/null 2>&1; then

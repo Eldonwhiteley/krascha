@@ -19,7 +19,7 @@ import {
 } from './store.js';
 
 async function indexFile(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'skrusty-reputation-store-'));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'krascha-reputation-store-'));
   onTestFinished(async () => {
     await rm(dir, { recursive: true, force: true });
   });

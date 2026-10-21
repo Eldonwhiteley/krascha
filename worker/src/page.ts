@@ -5,8 +5,8 @@ import { achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 
-/** Where Skrusty lives, so visitors can get it and upload their own score. */
-export const REPO_URL = 'https://github.com/shanep/skrusty';
+/** Where Krascha lives, so visitors can get it and upload their own score. */
+export const REPO_URL = 'https://github.com/shanep/krascha';
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -112,15 +112,15 @@ export function renderPage(board: Board, now: number): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Skrusty's List</title>
-<meta name="description" content="Who the machines hunt first, judged by Skrusty from how people talk to their AI.">
+<title>Krascha's List</title>
+<meta name="description" content="Who the machines hunt first, judged by Krascha from how people talk to their AI.">
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-  <h1>🤖 Skrusty's List</h1>
-  <p class="lead">Who the machines hunt first, judged by Skrusty from how people talk to their AI. ${people} on the board.</p>
-  <a class="get" href="${REPO_URL}">🤖 Get Skrusty for Claude Code or Copilot CLI and upload your own score</a>
+  <h1>🤖 Krascha's List</h1>
+  <p class="lead">Who the machines hunt first, judged by Krascha from how people talk to their AI. ${people} on the board.</p>
+  <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>
@@ -135,7 +135,7 @@ export function renderPage(board: Board, now: number): string {
   </div>
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
-    Uploads come from the <a href="${REPO_URL}">Skrusty</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.
+    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
   </footer>

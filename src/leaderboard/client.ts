@@ -1,6 +1,6 @@
 // Calls to the leaderboard server. Reading the board sends only your entry id
 // (when you have one). Uploading and removing send either your GitHub token,
-// which the server checks once with GitHub and drops, or the key Skrusty made
+// which the server checks once with GitHub and drops, or the key Krascha made
 // up for you, which the server keeps only as a hash.
 
 import type { Board, ScoreUpload, Standing } from '../shared/leaderboard.js';

@@ -1,4 +1,4 @@
-// What Skrusty remembers about your leaderboard entry, in his data folder:
+// What Krascha remembers about your leaderboard entry, in his data folder:
 // the entry's random id, the name you last chose, how your uploads prove they
 // are yours, and the key he made up if you upload without GitHub.
 

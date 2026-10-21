@@ -72,9 +72,17 @@ function tools(ids: readonly string[]): string {
 
 const CHECK = ' <span class="verified" title="Checked with GitHub">✓</span>';
 
+/** The name, linked to the GitHub account when there is one. */
+function shownName(entry: Pick<BoardEntry, 'name' | 'github'>): string {
+  const strong = `<strong>${escapeHtml(entry.name)}</strong>`;
+  return entry.github === undefined
+    ? strong
+    : `<a class="github" href="https://github.com/${escapeHtml(entry.github)}">${strong}</a>`;
+}
+
 /** The name, the GitHub check and the agents, the start of every row. */
-function name(entry: Pick<BoardEntry, 'name' | 'verified' | 'tools'>): string {
-  return `<strong>${escapeHtml(entry.name)}</strong>${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}`;
+function name(entry: Pick<BoardEntry, 'name' | 'verified' | 'tools' | 'github'>): string {
+  return `${shownName(entry)}${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}`;
 }
 
 /** The scale from the resistance to the machines with a knob where the score sits, like the one in `krascha`. */
@@ -199,6 +207,7 @@ li:first-child { border-top: 0; }
 .place { color: var(--muted); font-weight: 700; text-align: right; }
 .who { min-width: 0; overflow-wrap: anywhere; }
 .verified { color: var(--green); font-weight: 700; }
+.github { color: inherit; text-underline-offset: 2px; }
 .tools { display: inline-flex; gap: 4px; vertical-align: 0.1em; }
 .tool { padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; font-size: 0.7em;
   font-weight: 600; line-height: 1.5; white-space: nowrap; }
@@ -310,7 +319,7 @@ export function renderPage(board: Board, now: number): string {
   ${legend()}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
-    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text.
+    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
     <p class="remembers">Krascha remembers.</p>

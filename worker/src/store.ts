@@ -36,10 +36,12 @@ export interface D1Database {
 export interface Owner {
   readonly id: string;
   readonly verified: boolean;
+  /** The GitHub login when GitHub vouched for it, kept for a link to the account. */
+  readonly github: string | null;
 }
 
 const COLUMNS =
-  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools';
+  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools, github';
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -61,10 +63,12 @@ function number_(row: Row, key: string): number {
 function entryOf(row: Row): BoardEntry {
   const name = text(row, 'name');
   const score = number_(row, 'score');
+  const github = text(row, 'github');
   return {
     id: text(row, 'entry_id'),
     name: name === '' ? ANONYMOUS : name,
     verified: number_(row, 'verified') === 1,
+    ...(github === '' ? {} : { github }),
     rank: rankFor(score).name,
     score,
     kind: number_(row, 'kind'),
@@ -319,14 +323,14 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   const tokensPerDay = sum((machine) => machine.tokensPerDay);
   await database
     .prepare(
-      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo, tools)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo, tools, github)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner) DO UPDATE SET
          name = excluded.name, kind = excluded.kind, mean = excluded.mean,
          prompts = excluded.prompts, score = excluded.score, uploaded_at = excluded.uploaded_at,
          upload_day = excluded.upload_day, uploads_today = excluded.uploads_today,
          achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
-         silo = excluded.silo, tools = excluded.tools`,
+         silo = excluded.silo, tools = excluded.tools, github = excluded.github`,
     )
     .bind(
       owner.id,
@@ -344,6 +348,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),
       tools.join(','),
+      owner.github ?? '',
     )
     .run();
   const row = await database

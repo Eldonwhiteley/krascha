@@ -58,8 +58,10 @@ you gave. You show on the board once you have 100 prompts.
 
 If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
-gets a check mark and only you can change it. The server keeps your GitHub
-user id and drops the token.
+gets a check mark, your name links to your GitHub account and only you can
+change it. The server keeps your GitHub user id and login and drops the token.
+To keep your name unlinked, upload with `--no-gh`, and run `remove` first if
+you are already on the board with GitHub.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you

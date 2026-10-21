@@ -17,6 +17,8 @@ export const NEW_ENTRIES_PER_DAY = 3;
 /** A key the CLI makes up for uploading without GitHub: random base64url text. */
 export const KEY_PATTERN = /^[\w-]{32,128}$/u;
 export const MAX_NAME_LENGTH = 40;
+/** A GitHub login: letters, digits and hyphens, 39 at most, not starting with a hyphen. */
+export const GITHUB_LOGIN_PATTERN = /^[a-z\d][a-z\d-]{0,38}$/iu;
 /**
  * Achievement ids one upload may carry. A number rather than ACHIEVEMENTS.length,
  * since achievements.ts depends on this file through reputation.ts and importing
@@ -55,6 +57,8 @@ export interface BoardEntry {
   readonly name: string;
   /** True when the upload came with a GitHub token the server checked. */
   readonly verified: boolean;
+  /** The GitHub login of a checked entry, for a link to the account. Missing otherwise. */
+  readonly github?: string;
   readonly rank: string;
   readonly score: number;
   readonly kind: number;
@@ -140,6 +144,8 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     typeof value['id'] === 'string' &&
     typeof value['name'] === 'string' &&
     typeof value['verified'] === 'boolean' &&
+    (value['github'] === undefined ||
+      (typeof value['github'] === 'string' && GITHUB_LOGIN_PATTERN.test(value['github']))) &&
     typeof value['rank'] === 'string' &&
     typeof value['score'] === 'number' &&
     isCount(value['kind']) &&

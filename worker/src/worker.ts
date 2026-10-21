@@ -2,10 +2,12 @@
 // /, the board as JSON at /api/board, and takes uploads and removals at
 // /api/scores. An upload proves who it belongs to one of two ways. A GitHub
 // token is checked once with GitHub and then dropped, never stored or logged,
-// and its entry shows as verified. A key the CLI made up is stored only as a
-// hash, so it ties uploads together without saying who anyone is.
+// and its entry shows as verified and links to the account, so only the user
+// id and login are kept. A key the CLI made up is stored only as a hash, so it
+// ties uploads together without saying who anyone is.
 
 import {
+  GITHUB_LOGIN_PATTERN,
   isScoreUpload,
   KEY_PATTERN,
   NEW_ENTRIES_PER_DAY,
@@ -46,10 +48,16 @@ export async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** The numeric id from GitHub's user response, the only field kept. */
-function githubIdOf(user: unknown): number | null {
-  const id: unknown = typeof user === 'object' && user !== null ? Reflect.get(user, 'id') : null;
-  return typeof id === 'number' ? id : null;
+/** The numeric id and login from GitHub's user response, the only fields kept. */
+function githubUserOf(user: unknown): { readonly id: number; readonly login: string } | null {
+  if (typeof user !== 'object' || user === null) {
+    return null;
+  }
+  const id: unknown = Reflect.get(user, 'id');
+  const login: unknown = Reflect.get(user, 'login');
+  return typeof id === 'number' && typeof login === 'string' && GITHUB_LOGIN_PATTERN.test(login)
+    ? { id, login }
+    : null;
 }
 
 async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
@@ -60,8 +68,10 @@ async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
       'user-agent': 'krascha',
     },
   });
-  const id = response.ok ? githubIdOf(await response.json()) : null;
-  return id === null ? null : { id: `github:${String(id)}`, verified: true };
+  const user = response.ok ? githubUserOf(await response.json()) : null;
+  return user === null
+    ? null
+    : { id: `github:${String(user.id)}`, verified: true, github: user.login };
 }
 
 /**
@@ -77,7 +87,9 @@ async function ownerOf(request: Request, deps: Deps): Promise<Owner | null> {
   if (scheme === 'Bearer') {
     return githubOwner(secret, deps);
   }
-  return KEY_PATTERN.test(secret) ? { id: `key:${await sha256(secret)}`, verified: false } : null;
+  return KEY_PATTERN.test(secret)
+    ? { id: `key:${await sha256(secret)}`, verified: false, github: null }
+    : null;
 }
 
 const NO_OWNER =

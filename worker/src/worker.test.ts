@@ -174,6 +174,7 @@ describe('leaderboard worker', () => {
         id: 'entry-1',
         name: 'Ann',
         verified: true,
+        github: 'ann',
         rank: 'John Connor',
         score: reputationScore(MEAN),
         kind: 2,
@@ -440,11 +441,20 @@ describe('leaderboard worker', () => {
     expect(page).toMatch(/aria-label="\d+% of the way from the resistance to the machines"/u);
   });
 
-  it('marks entries checked with GitHub on the page', async () => {
+  it('marks entries checked with GitHub on the page and links them to the account', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);
+    const key = { authorization: `Key ${'a'.repeat(40)}`, 'cf-connecting-ip': '10.0.0.1' };
+    expect((await w.raw('POST', '/api/scores', key, KIND)).status).toBe(201);
+    const board = await w.board();
+    expect(board.mostWanted[0]).toMatchObject({ name: 'Ann', github: 'ann' });
+    expect(board.pets[0]).not.toHaveProperty('github');
     const page = await (await w.call('GET', '/')).text();
-    expect(page).toContain('<span class="verified" title="Checked with GitHub">✓</span>');
+    expect(page).toContain(
+      '<a class="github" href="https://github.com/ann"><strong>Ann</strong></a> <span class="verified" title="Checked with GitHub">✓</span>',
+    );
+    expect(page).toContain('<strong>Bob</strong>');
+    expect(page).not.toContain('<strong>Bob</strong></a>');
   });
 
   it('explains every achievement on the page, earned or not', async () => {
@@ -487,10 +497,10 @@ describe('leaderboard worker', () => {
     const page = await (await w.call('GET', '/')).text();
     const check = '<span class="verified" title="Checked with GitHub">✓</span>';
     expect(page).toContain(
-      `<strong>Ann</strong> ${check} <span class="target">TARGET ACQUIRED</span>`,
+      `<strong>Ann</strong></a> ${check} <span class="target">TARGET ACQUIRED</span>`,
     );
     expect(page).toContain(
-      `<strong>Bob</strong> ${check} <span class="hearts" aria-hidden="true">`,
+      `<strong>Bob</strong></a> ${check} <span class="hearts" aria-hidden="true">`,
     );
     expect(page).toContain('animation:');
     const style = page.slice(page.indexOf('<style>'), page.indexOf('</style>'));

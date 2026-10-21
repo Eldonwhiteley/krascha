@@ -4,17 +4,18 @@
 
 import path from 'node:path';
 
-import type { FetchFunction } from '../leaderboard/client.js';
-import { fetchBoard } from '../leaderboard/client.js';
-import { loadSaved } from '../leaderboard/saved.js';
+import type { Credential, FetchFunction } from '../leaderboard/client.js';
+import { fetchBoard, removeEntry, uploadScore } from '../leaderboard/client.js';
+import type { SavedEntry } from '../leaderboard/saved.js';
+import { loadSaved, saveSaved } from '../leaderboard/saved.js';
 import { scanInto } from '../reputation/scan.js';
 import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
 import { unlockedIds } from '../shared/achievements.js';
-import type { Board, BoardEntry } from '../shared/leaderboard.js';
-import { LEADERBOARD_URL } from '../shared/leaderboard.js';
+import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
+import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
@@ -31,6 +32,10 @@ export interface CliIo {
   readonly env: NodeJS.ProcessEnv;
   readonly now: () => number;
   readonly fetch: FetchFunction;
+  /** The token from `gh auth token`, or null when gh is missing or signed out. */
+  readonly githubToken: () => Promise<string | null>;
+  /** A fresh random key for uploading without GitHub. */
+  readonly newKey: () => string;
   /** True when stdout is a terminal that takes color. */
   readonly color: boolean;
   readonly out: (text: string) => void;
@@ -46,6 +51,10 @@ Commands:
   (none)         Rescan your prompts and show Skrusty's verdict.
   json           The same counts as JSON.
   board          The leaderboard at ${LEADERBOARD_URL}.
+  upload [name]  Put your counts on the board under a name. With gh signed
+                 in, the entry is checked with GitHub. Without it, or with
+                 --no-gh, Skrusty uses a key he keeps for you instead.
+  remove         Take your entry off the board.
   import <file>  Add the counts from another Skrusty index file.
   help           This message.
 
@@ -118,6 +127,88 @@ async function importFile(io: CliIo, from: string | undefined): Promise<number> 
   return 0;
 }
 
+function boardUrl(io: CliIo): string {
+  return io.env['SKRUSTY_LEADERBOARD_URL'] ?? LEADERBOARD_URL;
+}
+
+/** What proves an upload is yours. A new entry uses gh when it can, else a key. */
+async function credentialFor(
+  io: CliIo,
+  saved: SavedEntry,
+  useGitHub: boolean,
+): Promise<Credential | string> {
+  const auth = saved.entryId === null ? null : saved.auth;
+  if (auth === 'key' || (auth === null && !useGitHub)) {
+    return { kind: 'key', key: saved.key ?? io.newKey() };
+  }
+  const token = await io.githubToken();
+  if (token !== null) {
+    return { kind: 'github', token };
+  }
+  if (auth === 'github') {
+    return 'Your entry is checked with GitHub, but gh is not signed in. Run gh auth login first.';
+  }
+  return { kind: 'key', key: saved.key ?? io.newKey() };
+}
+
+function uploaded(standing: Standing, verified: boolean, prompts: number): string {
+  const how = verified ? 'checked with GitHub' : 'not checked with GitHub';
+  const where =
+    standing.place === null
+      ? `You show on the board once you have ${String(MIN_PROMPTS)} prompts. You have ${String(prompts)}.`
+      : `You are number ${String(standing.place)} on Skrusty's List, counting from the most wanted.`;
+  return `Uploaded as ${standing.entry.name} (${how}). ${where}\n`;
+}
+
+async function upload(io: CliIo, args: readonly string[]): Promise<number> {
+  const dir = dataDir(io);
+  const saved = await loadSaved(dir);
+  const words = args.filter((arg) => arg !== '--no-gh');
+  const name = words.length > 0 ? words.join(' ').trim() : (saved.name ?? '');
+  if (name.length > MAX_NAME_LENGTH) {
+    io.err(`Keep the name to ${String(MAX_NAME_LENGTH)} characters.\n`);
+    return 2;
+  }
+  const credential = await credentialFor(io, saved, !args.includes('--no-gh'));
+  if (typeof credential === 'string') {
+    io.err(`${credential}\n`);
+    return 1;
+  }
+  const key = credential.kind === 'key' ? credential.key : saved.key;
+  // The key is saved before the upload, so an answer lost on the way back does not orphan the entry.
+  await saveSaved(dir, { ...saved, key });
+  const { summary } = await refresh(io);
+  const standing = await uploadScore(io.fetch, boardUrl(io), credential, {
+    name,
+    kind: summary.kind,
+    mean: summary.mean,
+    prompts: summary.prompts,
+    achievements: unlockedIds(summary),
+    tokensPerDay: summary.tokensPerDay,
+  });
+  await saveSaved(dir, { entryId: standing.entry.id, name, auth: credential.kind, key });
+  io.out(uploaded(standing, standing.entry.verified, summary.prompts));
+  return 0;
+}
+
+async function remove(io: CliIo): Promise<number> {
+  const dir = dataDir(io);
+  const saved = await loadSaved(dir);
+  if (saved.entryId === null) {
+    io.out('You are not on the board.\n');
+    return 0;
+  }
+  const credential = await credentialFor(io, saved, saved.auth === 'github');
+  if (typeof credential === 'string') {
+    io.err(`${credential}\n`);
+    return 1;
+  }
+  await removeEntry(io.fetch, boardUrl(io), credential);
+  await saveSaved(dir, { ...saved, entryId: null, auth: null });
+  io.out('Skrusty took you off the board. He still remembers.\n');
+  return 0;
+}
+
 function boardRows(title: string, entries: readonly BoardEntry[], me: string | null): string[] {
   if (entries.length === 0) {
     return [title, '  Nobody yet.'];
@@ -126,8 +217,9 @@ function boardRows(title: string, entries: readonly BoardEntry[], me: string | n
     title,
     ...entries.map((entry, place) => {
       const mark = entry.id === me ? ' <- you' : '';
+      const check = entry.verified ? ' [GitHub]' : '';
       const score = entry.score.toFixed(2).padStart(5);
-      return `  ${String(place + 1).padStart(2)}. ${score}  ${entry.name} (${entry.rank})${mark}`;
+      return `  ${String(place + 1).padStart(2)}. ${score}  ${entry.name}${check} (${entry.rank})${mark}`;
     }),
   ];
 }
@@ -149,8 +241,7 @@ function renderBoard(board: Board, me: string | null): string {
 
 async function board(io: CliIo): Promise<number> {
   const { entryId } = await loadSaved(dataDir(io));
-  const base = io.env['SKRUSTY_LEADERBOARD_URL'] ?? LEADERBOARD_URL;
-  io.out(renderBoard(await fetchBoard(io.fetch, base, entryId), entryId));
+  io.out(renderBoard(await fetchBoard(io.fetch, boardUrl(io), entryId), entryId));
   return 0;
 }
 
@@ -166,6 +257,10 @@ export async function main(args: readonly string[], io: CliIo): Promise<number> 
         return await json(io);
       case 'board':
         return await board(io);
+      case 'upload':
+        return await upload(io, rest);
+      case 'remove':
+        return await remove(io);
       case 'import':
         return await importFile(io, rest[0]);
       case 'help':

@@ -54,7 +54,7 @@ function rows(entries: readonly BoardEntry[], empty: string): string {
       <li>
         <span class="place">${String(index + 1)}</span>
         <span class="who">
-          <strong>${escapeHtml(entry.name)}</strong>
+          <strong>${escapeHtml(entry.name)}</strong>${entry.verified ? ' <span class="verified" title="Checked with GitHub">✓</span>' : ''}
           <span class="rank">${escapeHtml(entry.rank)}</span>
           ${trophies(entry.achievements ?? [])}
         </span>
@@ -90,6 +90,7 @@ li { display: grid; gap: 0 10px; grid-template-columns: 2em 1fr auto; align-item
 li:first-child { border-top: 0; }
 .place { color: var(--muted); font-weight: 700; text-align: right; }
 .who { min-width: 0; overflow-wrap: anywhere; }
+.verified { color: var(--green); font-weight: 700; }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }
 .trophies { display: block; letter-spacing: 2px; cursor: default; }
 .counts { grid-column: 2; color: var(--muted); font-size: 0.85em; }
@@ -135,7 +136,7 @@ export function renderPage(board: Board, now: number): string {
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Skrusty</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days and the achievements unlocked, never prompt text.
-    It is all in fun, and scores are self reported.</p>
+    A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
     <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
   </footer>
 </main>

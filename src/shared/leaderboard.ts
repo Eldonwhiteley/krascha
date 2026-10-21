@@ -11,6 +11,10 @@ export const MIN_PROMPTS = 100;
 export const BOARD_SIZE = 10;
 /** Uploads one person may make in a UTC day. */
 export const UPLOADS_PER_DAY = 5;
+/** Entries without a GitHub check one network may start in a UTC day, so nobody fills the board with made-up keys. */
+export const NEW_ENTRIES_PER_DAY = 3;
+/** A key the CLI makes up for uploading without GitHub: random base64url text. */
+export const KEY_PATTERN = /^[\w-]{32,128}$/u;
 export const MAX_NAME_LENGTH = 40;
 /**
  * Achievement ids one upload may carry. A number rather than ACHIEVEMENTS.length,
@@ -39,6 +43,8 @@ export interface ScoreUpload {
 export interface BoardEntry {
   readonly id: string;
   readonly name: string;
+  /** True when the upload came with a GitHub token the server checked. */
+  readonly verified: boolean;
   readonly rank: string;
   readonly score: number;
   readonly kind: number;
@@ -112,6 +118,7 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     isRecord(value) &&
     typeof value['id'] === 'string' &&
     typeof value['name'] === 'string' &&
+    typeof value['verified'] === 'boolean' &&
     typeof value['rank'] === 'string' &&
     typeof value['score'] === 'number' &&
     isCount(value['kind']) &&

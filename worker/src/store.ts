@@ -1,10 +1,16 @@
-// The leaderboard's one table in Cloudflare D1: a row per GitHub account. The
-// D1 types here are the few calls this file makes, so the Worker needs no
+// The leaderboard's tables in Cloudflare D1: a row per owner, and a count of
+// the unverified entries each network started today. The D1 types here are the few calls this file makes, so the Worker needs no
 // Cloudflare type package.
 
 import { knownIds } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
-import { ANONYMOUS, BOARD_SIZE, MIN_PROMPTS, UPLOADS_PER_DAY } from '../../src/shared/leaderboard.js';
+import {
+  ANONYMOUS,
+  BOARD_SIZE,
+  MIN_PROMPTS,
+  NEW_ENTRIES_PER_DAY,
+  UPLOADS_PER_DAY,
+} from '../../src/shared/leaderboard.js';
 import { rankFor } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
 
@@ -21,14 +27,14 @@ export interface D1Database {
   prepare: (query: string) => D1Statement;
 }
 
-/** Who the GitHub token belongs to. Only these two fields are kept. */
-export interface Account {
-  readonly githubId: number;
-  readonly login: string;
+/** Who an upload belongs to: "github:<id>" when GitHub vouched for it, else "key:<hash>". */
+export interface Owner {
+  readonly id: string;
+  readonly verified: boolean;
 }
 
 const COLUMNS =
-  'entry_id, name, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day';
+  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day';
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -53,6 +59,7 @@ function entryOf(row: Row): BoardEntry {
   return {
     id: text(row, 'entry_id'),
     name: name === '' ? ANONYMOUS : name,
+    verified: number_(row, 'verified') === 1,
     rank: rankFor(score).name,
     score,
     kind: number_(row, 'kind'),
@@ -131,47 +138,72 @@ export async function readBoard(database: D1Database, me: string | null): Promis
 
 export type SaveResult =
   | { readonly ok: true; readonly standing: Standing }
-  | { readonly ok: false; readonly reason: 'limit' };
+  | { readonly ok: false; readonly reason: 'limit' | 'new-entries' };
 
 /**
- * Saves an upload over the account's last one. The score is worked out here
+ * Saves an upload over the owner's last one. The score is worked out here
  * from the counts, so a client cannot send a score that does not match them.
  */
 export interface Save {
-  readonly account: Account;
+  readonly owner: Owner;
   readonly upload: ScoreUpload;
   readonly now: number;
-  /** A fresh entry id, used for an account's first upload. */
+  /** A fresh entry id, used for an owner's first upload. */
   readonly newId: () => string;
+  /** A hash of the network the upload came from, for the cap on new unverified entries. */
+  readonly origin: string;
+}
+
+/** Counts a new unverified entry from `origin`, or false when it already started its share today. */
+async function claimNewEntry(database: D1Database, origin: string, day: string): Promise<boolean> {
+  await database.prepare('DELETE FROM new_entries WHERE day <> ?').bind(day).run();
+  const row = await database
+    .prepare('SELECT count FROM new_entries WHERE origin = ? AND day = ?')
+    .bind(origin, day)
+    .first();
+  if (row !== null && number_(row, 'count') >= NEW_ENTRIES_PER_DAY) {
+    return false;
+  }
+  await database
+    .prepare(
+      `INSERT INTO new_entries (origin, day, count) VALUES (?, ?, 1)
+       ON CONFLICT (origin, day) DO UPDATE SET count = count + 1`,
+    )
+    .bind(origin, day)
+    .run();
+  return true;
 }
 
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
-  const { account, upload, now, newId } = save;
+  const { owner, upload, now, newId } = save;
   const day = utcDay(now);
   const found = await database
-    .prepare('SELECT entry_id, upload_day, uploads_today FROM scores WHERE github_id = ?')
-    .bind(account.githubId)
+    .prepare('SELECT entry_id, upload_day, uploads_today FROM scores WHERE owner = ?')
+    .bind(owner.id)
     .first();
   const sameDay = found !== null && text(found, 'upload_day') === day;
   const uploadsToday = sameDay ? number_(found, 'uploads_today') : 0;
   if (uploadsToday >= UPLOADS_PER_DAY) {
     return { ok: false, reason: 'limit' };
   }
+  if (found === null && !owner.verified && !(await claimNewEntry(database, save.origin, day))) {
+    return { ok: false, reason: 'new-entries' };
+  }
   const entryId = found === null ? newId() : text(found, 'entry_id');
   const score = reputationScore(upload);
   await database
     .prepare(
-      `INSERT INTO scores (github_id, login, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day)
+      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (github_id) DO UPDATE SET
-         login = excluded.login, name = excluded.name, kind = excluded.kind, mean = excluded.mean,
+       ON CONFLICT (owner) DO UPDATE SET
+         name = excluded.name, kind = excluded.kind, mean = excluded.mean,
          prompts = excluded.prompts, score = excluded.score, uploaded_at = excluded.uploaded_at,
          upload_day = excluded.upload_day, uploads_today = excluded.uploads_today,
          achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day`,
     )
     .bind(
-      account.githubId,
-      account.login,
+      owner.id,
+      owner.verified ? 1 : 0,
       entryId,
       cleanName(upload.name),
       upload.kind,
@@ -195,6 +227,6 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   return { ok: true, standing: await standingOf(database, row) };
 }
 
-export async function removeScore(database: D1Database, account: Account): Promise<void> {
-  await database.prepare('DELETE FROM scores WHERE github_id = ?').bind(account.githubId).run();
+export async function removeScore(database: D1Database, owner: Owner): Promise<void> {
+  await database.prepare('DELETE FROM scores WHERE owner = ?').bind(owner.id).run();
 }

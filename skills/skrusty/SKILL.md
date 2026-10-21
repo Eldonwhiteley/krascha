@@ -1,7 +1,7 @@
 ---
 name: skrusty
 description: Skrusty's verdict on how you talk to your AI, with your rank, score and achievements.
-argument-hint: "[json | board | import <file> | help]"
+argument-hint: "[json | board | upload [name] [--no-gh] | remove | import <file> | help]"
 allowed-tools: Bash(node *)
 disable-model-invocation: true
 ---

@@ -1,13 +1,20 @@
-// The Cloudflare Worker behind the Reputation leaderboard. It serves the
-// public page at /, the board as JSON at /api/board, and takes uploads and
-// removals at /api/scores. A GitHub token proves who is uploading: it is
-// checked once with GitHub and then dropped, never stored or logged.
+// The Cloudflare Worker behind Skrusty's List. It serves the public page at
+// /, the board as JSON at /api/board, and takes uploads and removals at
+// /api/scores. An upload proves who it belongs to one of two ways. A GitHub
+// token is checked once with GitHub and then dropped, never stored or logged,
+// and its entry shows as verified. A key the CLI made up is stored only as a
+// hash, so it ties uploads together without saying who anyone is.
 
-import { isScoreUpload, UPLOADS_PER_DAY } from '../../src/shared/leaderboard.js';
+import {
+  isScoreUpload,
+  KEY_PATTERN,
+  NEW_ENTRIES_PER_DAY,
+  UPLOADS_PER_DAY,
+} from '../../src/shared/leaderboard.js';
 
 import { renderPage } from './page.js';
-import type { Account, D1Database } from './store.js';
-import { readBoard, removeScore, saveScore } from './store.js';
+import type { D1Database, Owner } from './store.js';
+import { readBoard, removeScore, saveScore, utcDay } from './store.js';
 
 export interface Env {
   readonly DB: D1Database;
@@ -33,40 +40,52 @@ function fail(status: number, error: string): Response {
   return json({ error }, status);
 }
 
-/** The id and login from GitHub's user response, the only fields kept. */
-function accountFrom(user: unknown): Account | null {
-  if (typeof user !== 'object' || user === null) {
-    return null;
-  }
-  const id: unknown = Reflect.get(user, 'id');
-  const login: unknown = Reflect.get(user, 'login');
-  return typeof id === 'number' && typeof login === 'string' ? { githubId: id, login } : null;
+/** Hex SHA-256 of some text. */
+export async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** The GitHub account behind a bearer token, or null when GitHub does not accept it. */
-async function accountOf(request: Request, deps: Deps): Promise<Account | null> {
-  const match = /^Bearer (\S+)$/u.exec(request.headers.get('authorization') ?? '');
-  const bearer = match?.[1];
-  if (bearer === undefined) {
-    return null;
-  }
+/** The numeric id from GitHub's user response, the only field kept. */
+function githubIdOf(user: unknown): number | null {
+  const id: unknown = typeof user === 'object' && user !== null ? Reflect.get(user, 'id') : null;
+  return typeof id === 'number' ? id : null;
+}
+
+async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
   const response = await deps.fetch('https://api.github.com/user', {
     headers: {
-      authorization: `Bearer ${bearer}`,
+      authorization: `Bearer ${token}`,
       accept: 'application/vnd.github+json',
       'user-agent': 'skrusty',
     },
   });
-  if (!response.ok) {
-    return null;
-  }
-  return accountFrom(await response.json());
+  const id = response.ok ? githubIdOf(await response.json()) : null;
+  return id === null ? null : { id: `github:${String(id)}`, verified: true };
 }
 
+/**
+ * Who sent the request: "Bearer <GitHub token>" or "Key <key>". Null when
+ * there is no credential, GitHub turns the token down, or the key is malformed.
+ */
+async function ownerOf(request: Request, deps: Deps): Promise<Owner | null> {
+  const match = /^(Bearer|Key) (\S+)$/u.exec(request.headers.get('authorization') ?? '');
+  const [, scheme, secret] = match ?? [];
+  if (secret === undefined) {
+    return null;
+  }
+  if (scheme === 'Bearer') {
+    return githubOwner(secret, deps);
+  }
+  return KEY_PATTERN.test(secret) ? { id: `key:${await sha256(secret)}`, verified: false } : null;
+}
+
+const NO_OWNER = 'Send a GitHub token or a Skrusty key. GitHub did not accept the token, if you sent one.';
+
 async function upload(request: Request, env: Env, deps: Deps): Promise<Response> {
-  const account = await accountOf(request, deps);
-  if (account === null) {
-    return fail(401, 'Sign in to GitHub to upload a score.');
+  const owner = await ownerOf(request, deps);
+  if (owner === null) {
+    return fail(401, NO_OWNER);
   }
   let body: unknown;
   try {
@@ -82,12 +101,22 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
   }
   // Only these fields are kept, whatever else the body holds.
   const { name, kind, mean, prompts, achievements = [], tokensPerDay = 0 } = body;
+  const now = deps.now();
+  // The address is only hashed with the day, for the cap on new unverified entries.
+  const address = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const saved = await saveScore(env.DB, {
-    account,
+    owner,
     upload: { name, kind, mean, prompts, achievements, tokensPerDay },
-    now: deps.now(),
+    now,
     newId: deps.newId,
+    origin: await sha256(`${utcDay(now)} ${address}`),
   });
+  if (!saved.ok && saved.reason === 'new-entries') {
+    return fail(
+      429,
+      `Only ${String(NEW_ENTRIES_PER_DAY)} new entries without GitHub can come from one network a day. Try again tomorrow (UTC), or upload with gh signed in.`,
+    );
+  }
   if (!saved.ok) {
     return fail(
       429,
@@ -98,11 +127,11 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
 }
 
 async function remove(request: Request, env: Env, deps: Deps): Promise<Response> {
-  const account = await accountOf(request, deps);
-  if (account === null) {
-    return fail(401, 'Sign in to GitHub to remove your score.');
+  const owner = await ownerOf(request, deps);
+  if (owner === null) {
+    return fail(401, NO_OWNER);
   }
-  await removeScore(env.DB, account);
+  await removeScore(env.DB, owner);
   return new Response(null, { status: 204 });
 }
 

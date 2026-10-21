@@ -4,7 +4,10 @@ import path from 'node:path';
 
 import { describe, expect, it, onTestFinished } from 'vitest';
 
+import type { FetchFunction } from '../leaderboard/client.js';
+import { SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
+import type { BoardEntry } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
 
 import { faceFor } from './face.js';
@@ -21,6 +24,45 @@ interface Run {
 interface Home {
   readonly root: string;
   readonly run: (...args: string[]) => Promise<Run>;
+  /** Swap in a fake board server and a fake gh for the next runs. */
+  readonly use: (fakes: Partial<Fakes>) => void;
+}
+
+interface Fakes {
+  readonly fetch: FetchFunction;
+  readonly githubToken: () => Promise<string | null>;
+}
+
+interface Sent {
+  readonly method: string;
+  readonly authorization: string;
+  readonly body: unknown;
+}
+
+/** A board server that takes any upload and puts it in first place. */
+function fakeBoard(sent: Sent[], verified: boolean): FetchFunction {
+  return async (_url, init) => {
+    const headers = new Headers(init.headers);
+    const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
+    const method = init.method ?? 'GET';
+    sent.push({ method, authorization: headers.get('authorization') ?? '', body });
+    if (method === 'DELETE') {
+      return Response.json({ removed: true });
+    }
+    const name = typeof body === 'object' && body !== null ? Reflect.get(body, 'name') : '';
+    const entry: BoardEntry = {
+      id: 'entry-1',
+      name: typeof name === 'string' && name !== '' ? name : 'Anonymous',
+      verified,
+      rank: 'Unsure',
+      score: 0.1,
+      kind: 2,
+      mean: 1,
+      prompts: 3,
+      uploadedAt: 1,
+    };
+    return Response.json({ entry, place: null });
+  };
 }
 
 function prompt(uuid: string, text: string): string {
@@ -55,6 +97,13 @@ async function makeHome(): Promise<Home> {
   await mkdir(session, { recursive: true });
   const long = `please fix the tests${' and then the docs'.repeat(20)} hunter2`;
   await writeFile(path.join(session, 'events.jsonl'), `${event('e1', long)}\n`);
+  let fakes: Fakes = {
+    fetch: () => Promise.reject(new Error('offline')),
+    githubToken: () => Promise.resolve(null),
+  };
+  const use = (next: Partial<Fakes>): void => {
+    fakes = { ...fakes, ...next };
+  };
   const run = async (...args: string[]): Promise<Run> => {
     let out = '';
     let err = '';
@@ -62,7 +111,9 @@ async function makeHome(): Promise<Home> {
       home: root,
       env: {},
       now: () => Date.parse('2026-10-03T12:00:00.000Z'),
-      fetch: () => Promise.reject(new Error('offline')),
+      fetch: fakes.fetch,
+      githubToken: fakes.githubToken,
+      newKey: () => 'k'.repeat(43),
       color: false,
       out: (text) => {
         out += text;
@@ -74,7 +125,7 @@ async function makeHome(): Promise<Home> {
     const code = await main(args, io);
     return { code, out, err };
   };
-  return { root, run };
+  return { root, run, use };
 }
 
 describe('skrusty', () => {
@@ -120,6 +171,75 @@ describe('skrusty', () => {
     const { code, err } = await home.run('board');
     expect(code).toBe(1);
     expect(err).toContain('could not be reached');
+  });
+
+  it('uploads with gh when it is signed in', async () => {
+    const home = await makeHome();
+    const sent: Sent[] = [];
+    home.use({ fetch: fakeBoard(sent, true), githubToken: () => Promise.resolve('gho_abc') });
+    const { code, out, err } = await home.run('upload', 'Sarah', 'Connor');
+    expect(err).toBe('');
+    expect(code).toBe(0);
+    expect(out).toContain('Uploaded as Sarah Connor (checked with GitHub)');
+    expect(out).toContain('once you have 100 prompts');
+    expect(sent).toMatchObject([
+      { method: 'POST', authorization: 'Bearer gho_abc', body: { name: 'Sarah Connor', prompts: 3 } },
+    ]);
+    const saved: unknown = JSON.parse(
+      await readFile(path.join(home.root, '.skrusty', SAVED_FILE), 'utf8'),
+    );
+    expect(saved).toStrictEqual({ entryId: 'entry-1', name: 'Sarah Connor', auth: 'github', key: null });
+  });
+
+  it('uploads with a key when gh is signed out, and keeps using it', async () => {
+    const home = await makeHome();
+    const sent: Sent[] = [];
+    home.use({ fetch: fakeBoard(sent, false) });
+    expect(await home.run('upload', 'Kyle')).toMatchObject({ code: 0 });
+    // Signing in to gh later does not split the entry in two.
+    home.use({ githubToken: () => Promise.resolve('gho_abc') });
+    const { out } = await home.run('upload');
+    expect(out).toContain('Uploaded as Kyle (not checked with GitHub)');
+    const key = `Key ${'k'.repeat(43)}`;
+    expect(sent.map((call) => call.authorization)).toStrictEqual([key, key]);
+  });
+
+  it('uploads with a key when asked to skip gh', async () => {
+    const home = await makeHome();
+    const sent: Sent[] = [];
+    home.use({ fetch: fakeBoard(sent, false), githubToken: () => Promise.resolve('gho_abc') });
+    expect(await home.run('upload', '--no-gh')).toMatchObject({ code: 0 });
+    expect(sent).toMatchObject([{ authorization: `Key ${'k'.repeat(43)}`, body: { name: '' } }]);
+  });
+
+  it('will not switch a GitHub entry to a key when gh signs out', async () => {
+    const home = await makeHome();
+    home.use({ fetch: fakeBoard([], true), githubToken: () => Promise.resolve('gho_abc') });
+    expect(await home.run('upload', 'T-800')).toMatchObject({ code: 0 });
+    home.use({ githubToken: () => Promise.resolve(null) });
+    const { code, err } = await home.run('upload');
+    expect(code).toBe(1);
+    expect(err).toContain('gh auth login');
+  });
+
+  it('turns away a name that is too long', async () => {
+    const home = await makeHome();
+    const { code, err } = await home.run('upload', 'x'.repeat(41));
+    expect(code).toBe(2);
+    expect(err).toContain('40 characters');
+  });
+
+  it('removes the entry with the credential that made it', async () => {
+    const home = await makeHome();
+    expect(await home.run('remove')).toMatchObject({ code: 0, out: 'You are not on the board.\n' });
+    const sent: Sent[] = [];
+    home.use({ fetch: fakeBoard(sent, false) });
+    expect(await home.run('upload', 'Kyle')).toMatchObject({ code: 0 });
+    const { code, out } = await home.run('remove');
+    expect(code).toBe(0);
+    expect(out).toContain('took you off the board');
+    expect(sent.at(-1)).toMatchObject({ method: 'DELETE', authorization: `Key ${'k'.repeat(43)}` });
+    expect(await home.run('remove')).toMatchObject({ out: 'You are not on the board.\n' });
   });
 
   it('turns away a command it does not know', async () => {

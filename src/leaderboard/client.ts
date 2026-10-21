@@ -1,12 +1,22 @@
 // Calls to the leaderboard server. Reading the board sends only your entry id
-// (when you have one). Uploading and removing send your GitHub token, which
-// the server checks once with GitHub and drops.
+// (when you have one). Uploading and removing send either your GitHub token,
+// which the server checks once with GitHub and drops, or the key Skrusty made
+// up for you, which the server keeps only as a hash.
 
 import type { Board, ScoreUpload, Standing } from '../shared/leaderboard.js';
 import { isBoard, isStanding } from '../shared/leaderboard.js';
 
 /** The global fetch, or a stand-in for tests. */
 export type FetchFunction = (url: string, init: RequestInit) => Promise<Response>;
+
+/** How an upload proves it belongs to you. */
+export type Credential =
+  | { readonly kind: 'github'; readonly token: string }
+  | { readonly kind: 'key'; readonly key: string };
+
+function authorization(credential: Credential): string {
+  return credential.kind === 'github' ? `Bearer ${credential.token}` : `Key ${credential.key}`;
+}
 
 const TIMEOUT_MS = 10_000;
 
@@ -68,12 +78,12 @@ export async function fetchBoard(
 export async function uploadScore(
   fetch: FetchFunction,
   base: string,
-  token: string,
+  credential: Credential,
   upload: ScoreUpload,
 ): Promise<Standing> {
   const response = await call(fetch, endpoint(base, 'api/scores'), {
     method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: { authorization: authorization(credential), 'content-type': 'application/json' },
     body: JSON.stringify(upload),
   });
   if (!response.ok) {
@@ -89,11 +99,11 @@ export async function uploadScore(
 export async function removeEntry(
   fetch: FetchFunction,
   base: string,
-  token: string,
+  credential: Credential,
 ): Promise<void> {
   const response = await call(fetch, endpoint(base, 'api/scores'), {
     method: 'DELETE',
-    headers: { authorization: `Bearer ${token}` },
+    headers: { authorization: authorization(credential) },
   });
   if (!response.ok) {
     throw await failure(response);

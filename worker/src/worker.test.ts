@@ -32,6 +32,12 @@ interface World {
     token?: string,
     body?: unknown,
   ) => Promise<number>;
+  readonly raw: (
+    method: string,
+    path: string,
+    headers: Readonly<Record<string, string>>,
+    body?: unknown,
+  ) => Promise<Response>;
   readonly board: (me?: string) => Promise<Board>;
   readonly upload: (token: string, body: unknown) => Promise<Standing>;
   readonly setNow: (at: number) => void;
@@ -54,24 +60,28 @@ function world(): World {
       return `entry-${String(ids)}`;
     },
   };
-  const call = async (
+  const raw = async (
     method: string,
     path: string,
-    bearer?: string,
+    headers: Readonly<Record<string, string>>,
     body?: unknown,
   ): Promise<Response> => {
-    const headers = new Headers();
-    if (bearer !== undefined) {
-      headers.set('authorization', `Bearer ${bearer}`);
-    }
-    const init: RequestInit = { method, headers };
+    const init: RequestInit = { method, headers: new Headers(headers) };
     if (body !== undefined) {
       init.body = typeof body === 'string' ? body : JSON.stringify(body);
     }
     return handle(new Request(`https://board.test${path}`, init), env, deps);
   };
+  const call = async (
+    method: string,
+    path: string,
+    bearer?: string,
+    body?: unknown,
+  ): Promise<Response> =>
+    raw(method, path, bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }, body);
   return {
     call,
+    raw,
     status: async (method, path, bearer, body): Promise<number> => {
       const response = await call(method, path, bearer, body);
       return response.status;
@@ -147,6 +157,7 @@ describe('leaderboard worker', () => {
       entry: {
         id: 'entry-1',
         name: 'Ann',
+        verified: true,
         rank: 'John Connor',
         score: reputationScore(MEAN),
         kind: 2,
@@ -245,6 +256,54 @@ describe('leaderboard worker', () => {
     expect(await w.status('DELETE', '/api/scores', 'token-ann')).toBe(204);
     const board = await w.board();
     expect(board.pets.map((entry) => entry.name)).toStrictEqual(['Bob']);
+  });
+
+  it('takes uploads with a made-up key, unverified, and ties them together', async () => {
+    const w = world();
+    const key = (id: string, ip = '10.0.0.1') => ({
+      authorization: `Key ${id.repeat(40)}`,
+      'cf-connecting-ip': ip,
+    });
+    const first = await w.raw('POST', '/api/scores', key('a'), MEAN);
+    expect(first.status).toBe(201);
+    expect(await first.json()).toMatchObject({ entry: { id: 'entry-1', verified: false } });
+    const again = await w.raw('POST', '/api/scores', key('a'), KIND);
+    expect(await again.json()).toMatchObject({ entry: { id: 'entry-1', name: 'Bob' } });
+    expect(await w.board()).toMatchObject({ total: 1 });
+    expect((await w.raw('POST', '/api/scores', { authorization: 'Key short' }, MEAN)).status).toBe(
+      401,
+    );
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).not.toContain('class="verified"');
+    expect(w.githubCalls()).toBe(0);
+    expect((await w.raw('DELETE', '/api/scores', key('a'))).status).toBe(204);
+    expect(await w.board()).toMatchObject({ total: 0 });
+  });
+
+  it('caps new unverified entries per network per UTC day', async () => {
+    const w = world();
+    const from = (id: string, ip: string) => ({
+      authorization: `Key ${id.repeat(40)}`,
+      'cf-connecting-ip': ip,
+    });
+    for (const id of ['a', 'b', 'c']) {
+      expect((await w.raw('POST', '/api/scores', from(id, '10.0.0.1'), MEAN)).status).toBe(201);
+    }
+    const capped = await w.raw('POST', '/api/scores', from('d', '10.0.0.1'), MEAN);
+    expect(capped.status).toBe(429);
+    expect(await capped.json()).toMatchObject({ error: expect.stringContaining('gh signed in') });
+    expect((await w.raw('POST', '/api/scores', from('a', '10.0.0.1'), KIND)).status).toBe(201);
+    expect((await w.raw('POST', '/api/scores', from('d', '10.0.0.2'), MEAN)).status).toBe(201);
+    expect(await w.status('POST', '/api/scores', 'token-ann', MEAN)).toBe(201);
+    w.setNow(START + DAY);
+    expect((await w.raw('POST', '/api/scores', from('e', '10.0.0.1'), MEAN)).status).toBe(201);
+  });
+
+  it('marks entries checked with GitHub on the page', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<span class="verified" title="Checked with GitHub">✓</span>');
   });
 
   it('serves a public page with names escaped', async () => {

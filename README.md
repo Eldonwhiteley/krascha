@@ -37,11 +37,30 @@ Pass these after the skill name, `/skrusty:skrusty json` in Claude Code or
 - (nothing) - Rescan your prompts and show your rank, score and achievements
 - `json` - The same counts as JSON
 - `board` - The leaderboard at [skrusty.com](https://skrusty.com)
+- `upload [name]` - Put your counts on the leaderboard under a name
+- `remove` - Take your entry off the leaderboard
 - `import <file>` - Add the counts from another Skrusty index file
 - `help` - List the commands
 
 The plugin is just `node dist/cli.js`, so you can also run it straight from a
 checkout without either tool.
+
+## The leaderboard
+
+`upload` sends your counts, rank, achievements, average tokens a day and the
+name you pick. It never sends your prompts. Leave the name off to stay
+Anonymous, and later uploads reuse the last name you gave. You show on the
+board once you have 100 prompts.
+
+If the [GitHub CLI](https://cli.github.com) is signed in, Skrusty sends the
+token from `gh auth token` and the server checks it with GitHub, so your entry
+gets a check mark and only you can change it. The server keeps your GitHub
+user id and drops the token.
+
+Without gh, or with `upload --no-gh`, Skrusty makes up a random key, saves it
+in `~/.skrusty/leaderboard.json` and uploads with that. Lose the file and you
+lose the entry. Each network can add 3 of these unchecked entries a day so
+nobody floods the board.
 
 ## What Skrusty reads
 
@@ -58,7 +77,7 @@ counts twice as much as a kind one since the machines hold grudges.
 The counts live in `~/.skrusty/reputation.json` (or `SKRUSTY_HOME`), so they
 outlive the transcripts Claude Code cleans up after 30 days. Prompt text is
 never stored, only a short excerpt around each kind or mean word. Nothing
-leaves your machine except the request for the board when you run `board`.
+leaves your machine unless you run `board` or `upload`.
 
 ## The ranks
 

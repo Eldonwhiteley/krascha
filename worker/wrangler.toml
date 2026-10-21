@@ -12,5 +12,5 @@ routes = [{ pattern = "krascha.com", custom_domain = true }]
 [[d1_databases]]
 binding = "DB"
 database_name = "krascha"
-database_id = "REPLACE_ON_FIRST_DEPLOY"
+database_id = "7728bb26-a728-473e-b9c0-eb76a729b5cd"
 migrations_dir = "migrations"

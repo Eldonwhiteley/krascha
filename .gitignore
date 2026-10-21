@@ -1,3 +1,5 @@
 node_modules/
 .wrangler/
 *.tsbuildinfo
+.claude/worktrees/
+.claude/settings.local.json

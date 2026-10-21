@@ -2,7 +2,7 @@ import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import type { Applicant } from './silo.js';
-import { CRITERIA, MAX_SCORE, byStanding, notesFor, scoreApplicant } from './silo.js';
+import { CRITERIA, MAX_SCORE, byStanding, notesFor, scoreApplicant, tipsFor } from './silo.js';
 
 const MILLION = 1_000_000;
 
@@ -98,6 +98,27 @@ describe('notesFor', () => {
     const theodore = scoreApplicant('Theodore', { prompts: 1500, kind: 1400, mean: 0 });
     expect(theodore.status).toBe('review');
     expect(notesFor(theodore)[0]).toContain('Voight-Kampff');
+  });
+});
+
+describe('tipsFor', () => {
+  const tip = (id: string): string | undefined =>
+    CRITERIA.find((criterion) => criterion.id === id)?.tip;
+
+  it('puts the tip behind the ruling first, then the lowest scores', () => {
+    const maxxer = scoreApplicant('Sarah', {
+      prompts: 2564,
+      kind: 40,
+      mean: 300,
+      tokensPerDay: 250 * MILLION,
+    });
+    expect(maxxer.scores).toMatchObject({ rations: 2, morale: 1, human: 6 });
+    expect(tipsFor(maxxer)).toStrictEqual([tip('rations'), tip('morale'), tip('human')]);
+  });
+
+  it('skips the scores already at HIGH', () => {
+    const newcomer = scoreApplicant('New', { prompts: 0, kind: 0, mean: 0 });
+    expect(tipsFor(newcomer)).toStrictEqual([tip('tech'), tip('combat'), tip('morale')]);
   });
 });
 

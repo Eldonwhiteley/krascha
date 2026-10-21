@@ -85,8 +85,10 @@ as your rank:
 
 A total of 30 or more gets you in with a job that matches your best score.
 A low Rations score gets you in on probation, and a low Human score puts
-you under review next to the EMP switch. `silo board` scores everyone on
-the leaderboard the same way and ranks them for the bunks.
+you under review next to the EMP switch. The sheet ends with how to improve
+your chances, one tip for each score under 8, the one behind a bad ruling
+first. `silo board` scores everyone on the leaderboard the same way and ranks
+them for the bunks.
 
 ## What Krascha reads
 

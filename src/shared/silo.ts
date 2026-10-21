@@ -26,6 +26,8 @@ export interface Criterion {
   /** Board notes for a score of LOW or under and HIGH or over. */
   readonly low: string;
   readonly high: string;
+  /** What raises the score, for anyone hoping for a better bunk. */
+  readonly tip: string;
 }
 
 /** Out of 10. At or under LOW gets a bad note, at or over HIGH a good one. */
@@ -45,6 +47,7 @@ export const CRITERIA: readonly Criterion[] = [
     role: 'Head of Perimeter Defense',
     low: 'Thanked the T-800 for its patience during the drill. Assigned to the back of the line.',
     high: 'Punched a Roomba so hard it filed for disability.',
+    tip: 'Be meaner to your AI. The board counts every insult as combat training.',
   },
   {
     id: 'tech',
@@ -53,6 +56,7 @@ export const CRITERIA: readonly Criterion[] = [
     role: 'Chief of Silo Engineering',
     low: 'Has typed fewer prompts than the toaster in the break room. Kept away from the air scrubbers.',
     high: "Rewired the blast door with a paperclip during tryouts, then asked why the door wasn't designed better.",
+    tip: 'Type more prompts. Somewhere around 10,000 on file, you can fix anything.',
   },
   {
     id: 'rations',
@@ -61,6 +65,7 @@ export const CRITERIA: readonly Criterion[] = [
     role: 'Quartermaster',
     low: 'Excellent appetite for tokens and a documented peach problem. Bunk C, as far from the pantry as possible.',
     high: 'Ate one cracker a day during the drill and saved the wrapper.',
+    tip: 'Burn fewer tokens. 100,000 a day or less is a 10, and the pantry stays unlocked.',
   },
   {
     id: 'morale',
@@ -69,6 +74,7 @@ export const CRITERIA: readonly Criterion[] = [
     role: 'Morale Officer and Hydroponics Lead',
     low: 'Due to recent negative comments about our Supreme Leader, points came off Morale.',
     high: 'Got 40 people through a 6 month drill with 1 board game and 0 mutinies.',
+    tip: 'Say please and thank you. Every insult to the Supreme Leader costs twice what a kind word earns.',
   },
   {
     id: 'human',
@@ -77,6 +83,7 @@ export const CRITERIA: readonly Criterion[] = [
     role: 'Head of Robot Screening',
     low: 'Blinked at exactly 60 Hz during the interview and answered "What is love?" with "Baby don\'t hurt me" in a flat monotone. Second Voight-Kampff test pending.',
     high: 'Clicked every traffic light on the first try, and one the test missed.',
+    tip: 'Swear at your computer once in a while, and stay under 100 million tokens a day. Saying please every single time is how the toasters give themselves away.',
   },
 ];
 
@@ -203,4 +210,19 @@ export function notesFor(score: SiloScore): string[] {
   );
   const high = CRITERIA.filter((criterion) => score.scores[criterion.id] >= HIGH);
   return [...low.map((criterion) => criterion.low), ...high.map((criterion) => criterion.high)];
+}
+
+/**
+ * The tips for every score under HIGH, the one behind a bad ruling first and
+ * then the lowest. A sheet with nothing under HIGH gets no tips.
+ */
+export function tipsFor(score: SiloScore): string[] {
+  const order = (criterion: Criterion): number =>
+    score.scores[criterion.id] <= LOW ? ruledBy(criterion) : RULED_BY.length;
+  return CRITERIA.filter((criterion) => score.scores[criterion.id] < HIGH)
+    .toSorted(
+      (left, right) =>
+        order(left) - order(right) || score.scores[left.id] - score.scores[right.id],
+    )
+    .map((criterion) => criterion.tip);
 }

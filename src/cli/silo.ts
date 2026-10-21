@@ -1,9 +1,10 @@
-// The Silo 7 admission sheet as terminal text: one for you, with every score
-// and the board's notes, and one that ranks the leaderboard for the bunks.
+// The Silo 7 admission sheet as terminal text: one for you, with every score,
+// the board's notes and how to do better, and one that ranks the leaderboard
+// for the bunks.
 
 import type { Mood } from '../shared/ranks.js';
 import type { Ranked, SiloScore, Status } from '../shared/silo.js';
-import { CRITERIA, HIGH, LOW, MAX_SCORE, STATUS_LABEL, notesFor } from '../shared/silo.js';
+import { CRITERIA, HIGH, LOW, MAX_SCORE, STATUS_LABEL, notesFor, tipsFor } from '../shared/silo.js';
 
 import { faceFor } from './face.js';
 import type { Paint } from './render.js';
@@ -16,6 +17,7 @@ const MOOD: Readonly<Record<Status, Mood>> = {
 };
 
 const NOTHING = 'Nothing stands out. The board respects that.';
+const PERFECT = 'Nothing. Do not touch anything.';
 
 function header(paint: Paint): string[] {
   return [
@@ -68,6 +70,7 @@ export function renderSilo(score: SiloScore, rank: string, prompts: number, pain
     const comments = plural(score.insults, 'negative comment');
     notes.push(`The board has ${comments} about our Supreme Leader on file. It is watching.`);
   }
+  const tips = tipsFor(score);
   const lines = [
     ...beside(faceFor(MOOD[score.status]), header(paint), 4),
     '',
@@ -82,6 +85,9 @@ export function renderSilo(score: SiloScore, rank: string, prompts: number, pain
     '',
     paint.bold('Board notes'),
     ...bullets(notes.length > 0 ? notes : [NOTHING]),
+    '',
+    paint.bold('How to improve your chances'),
+    ...bullets(tips.length > 0 ? tips : [PERFECT]),
     '',
     `Final ruling: ${ruling(score)}`,
     '',

@@ -274,6 +274,7 @@ describe('krascha', () => {
       ].join('\n'),
     );
     expect(out).toContain('1 negative comment about our Supreme Leader on file');
+    expect(out).toContain('How to improve your chances\n  - Type more prompts.');
     expect(out).toContain('Final ruling: you get a bunk.');
     expect(await home.run('silo', 'dance')).toMatchObject({ code: 2 });
   });

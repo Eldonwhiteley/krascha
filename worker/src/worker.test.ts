@@ -10,7 +10,7 @@ import {
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 import { reputationScore } from '../../src/shared/reputation.js';
-import { rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
+import { CRITERIA, rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
 
 import { escapeHtml, REPO_URL } from './page.js';
 import { robotIcon } from './robot.js';
@@ -334,6 +334,10 @@ describe('leaderboard worker', () => {
       expect(silo).toContain(`${String(score.total)}<span class="out-of">/50</span>`);
     }
     expect(silo.indexOf('<strong>Ann</strong>')).toBeLessThan(silo.indexOf('<strong>Bob</strong>'));
+    expect(silo).toContain('<h3>How to improve your chances</h3>');
+    for (const criterion of CRITERIA) {
+      expect(silo).toContain(`<strong>${criterion.name}:</strong> ${escapeHtml(criterion.tip)}</li>`);
+    }
   });
 
   it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {

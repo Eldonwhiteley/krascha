@@ -5,7 +5,15 @@
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
-import { CRITERIA, MAX_SCORE, STATUS_LABEL, notesFor, rankBoard } from '../../src/shared/silo.js';
+import {
+  ADMIT_TOTAL,
+  CRITERIA,
+  LOW,
+  MAX_SCORE,
+  STATUS_LABEL,
+  notesFor,
+  rankBoard,
+} from '../../src/shared/silo.js';
 
 import { robotIcon, robotStyle, robotSvg } from './robot.js';
 
@@ -102,11 +110,20 @@ function silo(board: Board): string {
     items.length === 0
       ? '<p class="empty">Nobody applied. More peaches for the board.</p>'
       : `<ol>${items.join('')}</ol>`;
+  const tips = CRITERIA.map(
+    (criterion) => `
+      <li><strong>${escapeHtml(criterion.name)}:</strong> ${escapeHtml(criterion.tip)}</li>`,
+  );
+  const most = String(MAX_SCORE * CRITERIA.length);
   return `<section class="silo" aria-labelledby="silo">
     <span class="classified" aria-hidden="true">EYES ONLY</span>
     <h2 id="silo">🛡️ Silo 7 admissions</h2>
     <p class="sub">The human resistance scores the same people for a bunk. Supreme Leader: Krascha. The board is aware of the problem.</p>
     ${list}
+    <h3>How to improve your chances</h3>
+    <p class="sub">${String(ADMIT_TOTAL)} of ${most} gets you a bunk with no conditions. A Human of ${String(LOW)} or less means a second Voight-Kampff test, and Rations of ${String(LOW)} or less gets the pantry a lockbox.</p>
+    <ul class="tips">${tips.join('')}
+    </ul>
   </section>`;
 }
 
@@ -165,6 +182,9 @@ section.silo { margin-top: 16px; border-top: 4px solid var(--amber); }
 .admitted { color: var(--green); font-weight: 700; }
 .probation, .review { color: var(--red); font-weight: 700; }
 .note { display: block; color: var(--fg); }
+h3 { margin: 16px 0 2px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 1em; }
+.tips { margin: 0; padding-left: 1.2em; }
+.tips li { display: list-item; padding: 2px 0; border-top: 0; }
 section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }

@@ -23,8 +23,13 @@ Then ask Krascha for his verdict:
 ## Install in Copilot CLI
 
 ```
-copilot plugin install shanep/krascha
+copilot plugin marketplace add shanep/claude-plugins
+copilot plugin install krascha@shanep
 ```
+
+Copilot is dropping installs straight from a repo, so if you installed with
+`copilot plugin install shanep/krascha`, run `copilot plugin uninstall krascha`
+first. Your counts live in `~/.krascha` and stay put.
 
 Then run `/krascha` in a Copilot session. Copilot will ask before it runs
 `node` the first time.

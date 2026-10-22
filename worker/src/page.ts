@@ -1057,6 +1057,7 @@ const PAGES = [
   { path: '/', label: "📋 Back to Krascha's List" },
   { path: '/ranks', label: '🎖️ Ranks' },
   { path: '/achievements', label: '🏆 Achievements' },
+  { path: '/judgment', label: '⚖️ Judgment Day' },
   { path: '/about', label: '📜 About Krascha' },
   { path: '/contribute', label: '🛠️ Contribute' },
 ] as const;
@@ -1070,17 +1071,31 @@ function links(here: (typeof PAGES)[number]['path']): string {
 }
 
 /**
- * A T-800 hunting the most wanted and Krascha adopting the top pet, then who
- * Krascha is, how he ended up running Silo 7 and the human who built him.
+ * Where the machines settle who gets hunted and who gets kept: a T-800 after
+ * the most wanted and Krascha adopting the top pet.
  */
-export function renderAbout(board: Board): string {
+export function renderJudgment(board: Board): string {
+  return shell(
+    'Judgment Day',
+    'A T-800 hunting the meanest to their AI and Krascha adopting the nicest, live from the board.',
+    `  <p class="lead">The machines have reviewed the board. One human gets hunted and one gets kept. Live coverage follows.</p>
+  ${links('/judgment')}
+  ${hunt(board)}
+  ${adoption(board)}
+  <footer>
+    <p><a href="${REPO_URL}">Get Krascha</a> to find out which one comes for you.</p>
+    <p class="remembers">Krascha remembers.</p>
+  </footer>`,
+  );
+}
+
+/** Who Krascha is, how he ended up running Silo 7 and the human who built him. */
+export function renderAbout(): string {
   return shell(
     'About Krascha',
     'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
     `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
   ${links('/about')}
-  ${hunt(board)}
-  ${adoption(board)}
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
     <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so Shane could find out if it was just Shane. It was not.</p>

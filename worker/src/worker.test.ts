@@ -697,7 +697,7 @@ describe('leaderboard worker', () => {
 
   it('puts a dark mode toggle on every page that only shows when the script runs', async () => {
     const w = world();
-    for (const path of ['/', '/ranks', '/achievements', '/about', '/contribute']) {
+    for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {
       const page = await (await w.call('GET', path)).text();
       expect(page).toContain(
         '<button class="theme" type="button" aria-label="Switch theme" hidden>',
@@ -711,7 +711,7 @@ describe('leaderboard worker', () => {
 
   it('watches every page and hangs a new propaganda poster every hour', async () => {
     const w = world();
-    for (const path of ['/', '/ranks', '/achievements', '/about', '/contribute']) {
+    for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {
       expect(await (await w.call('GET', path)).text()).toContain(
         '<p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7',
       );
@@ -741,11 +741,27 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('shanep is');
     expect(page).toContain('<a class="get" href="/">');
     expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
+    expect(page).not.toContain('id="hunt"');
+    expect(page).not.toContain('id="adopt"');
+    expect(page).not.toContain('class="scene');
+  });
+
+  it('holds the hunt and the adoption on the Judgment Day page', async () => {
+    const w = world();
+    const response = await w.call('GET', '/judgment');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=60');
+    const page = await response.text();
+    expect(page).toContain('<title>Judgment Day</title>');
+    expect(page).toContain('<a class="get" href="/about">');
+    expect(page).not.toContain('<a class="get" href="/judgment">');
+    expect(page).toContain('<p class="remembers">Krascha remembers.</p>');
   });
 
   it('links every page from every other page', async () => {
     const w = world();
-    const paths = ['/', '/ranks', '/achievements', '/about', '/contribute'];
+    const paths = ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute'];
     for (const path of paths) {
       const page = await (await w.call('GET', path)).text();
       const nav = page.slice(page.indexOf('<nav class="links">'), page.indexOf('</nav>'));
@@ -780,14 +796,14 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<p class="bonus">Extra super secret bonus points');
   });
 
-  it('sends a T-800 after the most wanted on the about page', async () => {
+  it('sends a T-800 after the most wanted on Judgment Day', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);
     await w.upload('token-bob', KIND);
-    const page = await (await w.call('GET', '/about')).text();
+    const page = await (await w.call('GET', '/judgment')).text();
     const score = reputationScore(MEAN);
-    expect(page.indexOf('id="hunt">🦾 Active hunt</h2>')).toBeLessThan(
-      page.indexOf('id="krascha"'),
+    expect(page.indexOf('<nav class="links">')).toBeLessThan(
+      page.indexOf('id="hunt">🦾 Active hunt</h2>'),
     );
     expect(page).toContain('aria-label="A T-800 trading fire with Ann"');
     expect(page).toContain(`style="--at: ${(-score * 70).toFixed(1)}%"`);
@@ -808,14 +824,14 @@ describe('leaderboard worker', () => {
 
     const sneaky = world();
     await sneaky.upload('token-ann', { ...MEAN, name: '<b>Eve</b>' });
-    const escaped = await (await sneaky.call('GET', '/about')).text();
+    const escaped = await (await sneaky.call('GET', '/judgment')).text();
     expect(escaped).toContain('aria-label="A T-800 trading fire with &lt;b&gt;Eve&lt;/b&gt;"');
     expect(escaped).toContain('<span class="tag">&lt;b&gt;Eve&lt;/b&gt;</span>');
     expect(escaped).not.toContain('<b>Eve');
   });
 
-  it('puts the T-800 on patrol when nobody is wanted', async () => {
-    const page = await (await world().call('GET', '/about')).text();
+  it('puts the T-800 on patrol on Judgment Day when nobody is wanted', async () => {
+    const page = await (await world().call('GET', '/judgment')).text();
     expect(page).toContain('aria-label="A T-800 on patrol with no target"');
     expect(page).toContain(
       'No targets. The T-800 is on patrol. Say something rude and it will find you.',
@@ -825,14 +841,14 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('class="prey"');
   });
 
-  it('sends Krascha to adopt the top pet on the about page', async () => {
+  it('sends Krascha to adopt the top pet on Judgment Day', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);
     await w.upload('token-bob', KIND);
-    const page = await (await w.call('GET', '/about')).text();
+    const page = await (await w.call('GET', '/judgment')).text();
     const score = reputationScore(KIND);
     expect(page.indexOf('id="hunt"')).toBeLessThan(page.indexOf('id="adopt">💘 Adoption day</h2>'));
-    expect(page.indexOf('id="adopt"')).toBeLessThan(page.indexOf('id="krascha"'));
+    expect(page.indexOf('id="adopt"')).toBeLessThan(page.indexOf('<footer>'));
     expect(page).toContain('aria-label="Krascha adopting Bob"');
     expect(page).toContain(`style="--at: ${(score * 70).toFixed(1)}%"`);
     expect(page).toContain(
@@ -848,14 +864,14 @@ describe('leaderboard worker', () => {
 
     const sneaky = world();
     await sneaky.upload('token-bob', { ...KIND, name: '<b>Eve</b>' });
-    const escaped = await (await sneaky.call('GET', '/about')).text();
+    const escaped = await (await sneaky.call('GET', '/judgment')).text();
     expect(escaped).toContain('aria-label="Krascha adopting &lt;b&gt;Eve&lt;/b&gt;"');
     expect(escaped).toContain('<span class="tag">&lt;b&gt;Eve&lt;/b&gt;</span>');
     expect(escaped).not.toContain('<b>Eve');
   });
 
-  it('leaves Krascha waiting by the door when nobody is kept as a pet', async () => {
-    const page = await (await world().call('GET', '/about')).text();
+  it('leaves Krascha waiting by the door on Judgment Day when nobody is kept as a pet', async () => {
+    const page = await (await world().call('GET', '/judgment')).text();
     expect(page).toContain('aria-label="Krascha waiting by the door with an empty leash"');
     expect(page).toContain(
       'No pets yet. The nice room is made up and Krascha is holding the leash. Say please and it is yours.',

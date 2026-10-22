@@ -6,6 +6,8 @@
 import type { MachineCounts } from '../../src/shared/achievements.js';
 import {
   accountIds,
+  BETA_TESTER,
+  BETA_TESTERS,
   BUNK_ASSIGNED,
   CHAMPION,
   combinedIds,
@@ -553,6 +555,24 @@ function githubIds(owner: Owner, found: Row | null): string[] {
   ];
 }
 
+/**
+ * Whether the owner is one of the first BETA_TESTERS to upload, signing them
+ * up while there is room. A spot stays with the owner after a remove.
+ */
+async function betaTester(database: D1Database, owner: string): Promise<boolean> {
+  await database
+    .prepare(
+      'INSERT OR IGNORE INTO beta_testers (owner) SELECT ? WHERE (SELECT COUNT(*) FROM beta_testers) < ?',
+    )
+    .bind(owner, BETA_TESTERS)
+    .run();
+  const signed = await database
+    .prepare('SELECT owner FROM beta_testers WHERE owner = ?')
+    .bind(owner)
+    .first();
+  return signed !== null;
+}
+
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
   const { owner, upload, now, newId } = save;
   const day = utcDay(now);
@@ -570,6 +590,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   }
   const entryId = found === null ? newId() : text(found, 'entry_id');
   const machines = await saveMachine(database, owner, upload);
+  const beta = await betaTester(database, owner.id);
   const sum = (pick: (machine: MachineCounts) => number): number =>
     machines.reduce((total, machine) => total + pick(machine), 0);
   const tools = knownTools(machines.flatMap((machine) => machine.tools));
@@ -605,6 +626,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
         ...accountIds(githubIdOf(owner)),
         ...machineIds(machines),
         ...githubIds(owner, found),
+        ...(beta ? [BETA_TESTER] : []),
       ]).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),

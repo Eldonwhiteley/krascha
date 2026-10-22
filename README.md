@@ -97,6 +97,8 @@ them:
   upload with gh.
 - Good cop, bad cop goes to anyone with one machine that leans nice and one
   that leans mean.
+- Beta tester went to the first 5 people to upload. Those spots are gone, and
+  a `remove` does not free one.
 - Crowd favorite takes 10 likes.
 - Obsolete model goes to anyone who was number one on the most wanted or the
   pets list until someone else passed them. Leaving the board or crossing to

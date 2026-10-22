@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ACHIEVEMENTS,
+  BETA_TESTER,
+  BETA_TESTERS,
   BUNK_ASSIGNED,
   CHAMPION,
   CROWD_FAVORITE,
@@ -63,8 +65,15 @@ interface World {
   readonly sql: (query: string) => Promise<void>;
 }
 
-function world(): World {
-  const env = { DB: fakeD1() };
+/** Fills the Beta tester spots, as on the live board, so they stay out of the other tests. */
+const BETA_TAKEN = `INSERT INTO beta_testers (owner) VALUES ${Array.from(
+  { length: BETA_TESTERS },
+  (_, at) => `('key:early-${String(at)}')`,
+).join(', ')}`;
+
+/** A board to test against. `beta` leaves the Beta tester spots open, like a brand new board. */
+function world(beta = false): World {
+  const env = { DB: fakeD1(beta ? '' : BETA_TAKEN) };
   let now = START;
   let ids = 0;
   let githubCalls = 0;
@@ -757,6 +766,52 @@ describe('leaderboard worker', () => {
     const board = await w.board(luke.entry.id);
     expect(earned(board.me?.entry.achievements)).toStrictEqual(['kyle-reese']);
     expect(board.held).toMatchObject({ 'kyle-reese': 1 });
+  });
+
+  it('makes the first 5 to upload beta testers for good', async () => {
+    const w = world(true);
+    const tokens = ['token-ann', 'token-bob', 'token-cat', 'token-dan', 'token-eve', 'token-fay'];
+    const ids: (readonly string[])[] = [];
+    for (const token of tokens) {
+      ids.push((await w.upload(token, KIND)).entry.achievements ?? []);
+    }
+    expect(ids.map((held) => held.includes(BETA_TESTER))).toStrictEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+    // A remove frees no spot, and the beta tester gets it back on the way in.
+    expect(await w.status('DELETE', '/api/scores', 'token-ann')).toBe(204);
+    expect((await w.upload('token-fay', KIND)).entry.achievements).not.toContain(BETA_TESTER);
+    expect((await w.upload('token-ann', KIND)).entry.achievements).toContain(BETA_TESTER);
+    expect((await w.board()).held).toMatchObject({ [BETA_TESTER]: 5 });
+  });
+
+  it('makes the first 5 rows already on the board beta testers', async () => {
+    const w = world(true);
+    const tokens = ['token-ann', 'token-bob', 'token-cat', 'token-dan', 'token-eve', 'token-fay'];
+    for (const token of tokens) {
+      await w.upload(token, KIND);
+    }
+    await w.sql('DELETE FROM beta_testers');
+    await w.sql(`UPDATE scores SET achievements = 'manners'`);
+    // Everything but the CREATE TABLE, twice, to show a second run changes nothing.
+    const migration = readFileSync(
+      new URL('../migrations/0013_beta_testers.sql', import.meta.url),
+      'utf8',
+    )
+      .split(';')
+      .filter((statement) => /^(INSERT|UPDATE)/mu.test(statement));
+    for (const statement of [...migration, ...migration]) {
+      await w.sql(statement);
+    }
+    const board = await w.board();
+    expect(board.held).toMatchObject({ [BETA_TESTER]: 5 });
+    const fay = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'fay');
+    expect(fay?.achievements).toStrictEqual(['manners']);
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {

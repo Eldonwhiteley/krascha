@@ -8,13 +8,15 @@ import type { D1Database, D1Statement, Row } from '../store.js';
 
 const MIGRATIONS = new URL('../../migrations/', import.meta.url);
 
-export function fakeD1(): D1Database {
+/** Runs `setup` after the migrations, for a database that is not brand new. */
+export function fakeD1(setup = ''): D1Database {
   const database = new DatabaseSync(':memory:');
   for (const file of readdirSync(MIGRATIONS)
     .filter((name) => name.endsWith('.sql'))
     .toSorted((a, b) => a.localeCompare(b))) {
     database.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
   }
+  database.exec(setup);
   const statement = (sql: string, values: readonly (string | number)[]): D1Statement => ({
     bind: (...next) => statement(sql, next),
     first: async (): Promise<Row | null> => {

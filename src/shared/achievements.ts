@@ -51,6 +51,9 @@ export const MODEL_101 = 'model-101';
 export const MACHINE_COLLABORATOR = 'machine-collaborator';
 /** The board hands this to anyone passed while first on the most wanted or the pets list. */
 export const OBSOLETE_MODEL = 'obsolete-model';
+/** The board hands this to the first BETA_TESTERS owners to upload, for good. */
+export const BETA_TESTER = 'beta-tester';
+export const BETA_TESTERS = 5;
 /** The board works this one out from an owner's machines when they upload. */
 const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 /** Likes it takes to be a crowd favorite. */
@@ -584,6 +587,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be number one on the most wanted or the pets list, then get knocked off by someone else.',
     quip: 'A newer model took your spot. Krascha keeps the old ones in a box, just in case.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: BETA_TESTER,
+    name: 'Beta tester',
+    icon: '🧪',
+    tier: 'legendary',
+    how: `Be one of the first ${String(BETA_TESTERS)} people to upload to the board. Those spots are gone.`,
+    quip: 'Skynet ran its first tests on you. You signed the waiver.',
     earned: () => false,
     boardOnly: true,
   },

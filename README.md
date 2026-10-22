@@ -161,7 +161,9 @@ From hunted first to kept as a pet:
 
 ## Development
 
-You need Node 22 or newer.
+You need Node 22 or newer. To send a change, fork the repo and open a pull
+request. [krascha.com/contribute](https://krascha.com/contribute) walks
+through it step by step.
 
 ```
 npm install

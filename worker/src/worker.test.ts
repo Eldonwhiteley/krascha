@@ -616,7 +616,7 @@ describe('leaderboard worker', () => {
 
   it('puts a dark mode toggle on every page that only shows when the script runs', async () => {
     const w = world();
-    for (const path of ['/', '/about']) {
+    for (const path of ['/', '/about', '/contribute']) {
       const page = await (await w.call('GET', path)).text();
       expect(page).toContain(
         '<button class="theme" type="button" aria-label="Switch theme" hidden>',
@@ -630,7 +630,7 @@ describe('leaderboard worker', () => {
 
   it('watches every page and hangs a new propaganda poster every hour', async () => {
     const w = world();
-    for (const path of ['/', '/about']) {
+    for (const path of ['/', '/about', '/contribute']) {
       expect(await (await w.call('GET', path)).text()).toContain(
         '<p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7',
       );
@@ -660,6 +660,26 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('shanep is');
     expect(page).toContain('<a class="get" href="/">');
     expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
+  });
+
+  it('explains how to contribute and links it from the other pages', async () => {
+    const w = world();
+    for (const path of ['/', '/about']) {
+      expect(await (await w.call('GET', path)).text()).toContain(
+        '<a class="get" href="/contribute">',
+      );
+    }
+    const response = await w.call('GET', '/contribute');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    const page = await response.text();
+    expect(page).toContain('<title>Contribute to Krascha</title>');
+    for (const step of ['Fork it', 'Keep your fork up to date', 'Push and open a pull request']) {
+      expect(page).toContain(step);
+    }
+    expect(page).toContain(`<a href="${REPO_URL}/fork">`);
+    expect(page).toContain('git rebase upstream/master');
+    expect(page).toContain('<p class="bonus">Extra super secret bonus points');
   });
 
   it('keeps the Arizona beachfront sale off the about page', async () => {

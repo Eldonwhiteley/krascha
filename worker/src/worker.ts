@@ -14,7 +14,7 @@ import {
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 
-import { renderAbout, renderPage } from './page.js';
+import { renderAbout, renderContribute, renderPage } from './page.js';
 import type { D1Database, Owner } from './store.js';
 import { readBoard, removeScore, saveScore, utcDay } from './store.js';
 
@@ -181,6 +181,14 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     }
     case 'GET /about': {
       return new Response(renderAbout(), {
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'public, max-age=60',
+        },
+      });
+    }
+    case 'GET /contribute': {
+      return new Response(renderContribute(), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'public, max-age=60',

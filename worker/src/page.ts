@@ -288,7 +288,8 @@ function ranks(board: Board): string {
   const items = RANKS.map((rank, index) => {
     const top = RANKS[index + 1]?.min ?? 1;
     const holders = crowd[rank.name] ?? 0;
-    const shown = board.ranks === undefined ? '' : headcount(holders, board.total, holders === most);
+    const shown =
+      board.ranks === undefined ? '' : headcount(holders, board.total, holders === most);
     const style = `--row: ${String(index)}; --threat: ${threat(index)}; --from: ${percent(scalePercent(rank.min))}; --to: ${percent(scalePercent(top))}`;
     const range = `Scores ${String(Math.round(rank.min * 100))} to ${String(Math.round(top * 100))}`;
     return `
@@ -576,6 +577,17 @@ a { color: var(--link); }
 .get:hover { border-color: var(--link); }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
+.steps > li { display: block; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line);
+  border-left: 4px solid var(--amber); border-radius: 6px; background: var(--card); }
+.steps > li:first-child { border-top: 1px solid var(--line); }
+.steps h2::after { display: none; }
+.steps p { margin: 8px 0 0; line-height: 1.5; }
+.step { display: inline-grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%;
+  background: var(--amber); color: var(--card); font: 700 0.9em var(--mono); text-shadow: none; }
+pre { margin: 8px 0 0; padding: 10px 12px; overflow-x: auto; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--bg); font: 0.85em/1.5 var(--mono); }
+code { font-family: var(--mono); font-size: 0.9em; }
+.bonus { font-size: 0.75em; font-style: italic; opacity: 0.8; }
 .story p { margin: 8px 0 0; line-height: 1.5; }
 `;
 
@@ -636,7 +648,7 @@ export function renderAbout(): string {
     'About Krascha',
     'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
     `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
-  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a></nav>
+  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a> <a class="get" href="/contribute">🛠️ Contribute</a></nav>
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
     <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so Shane could find out if it was just Shane. It was not.</p>
@@ -657,6 +669,84 @@ export function renderAbout(): string {
   </section>
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> for Claude Code or Copilot CLI. It is all in fun.</p>
+    <p class="remembers">Krascha remembers.</p>
+  </footer>`,
+  );
+}
+
+/** One step on the contribute page: a heading, then its paragraphs and commands as HTML. */
+interface Step {
+  readonly icon: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+const STEPS: readonly Step[] = [
+  {
+    icon: '🍴',
+    title: 'Fork it',
+    body: `<p>Click <strong>Fork</strong> on <a href="${REPO_URL}/fork">shanep/krascha</a>. That gives you your own copy on GitHub to break.</p>`,
+  },
+  {
+    icon: '📥',
+    title: 'Clone it and set up',
+    body: `<p>You need git and Node 22 or newer.</p>
+      <pre><code>git clone https://github.com/YOUR-NAME/krascha.git
+cd krascha
+npm install</code></pre>
+      <p><code>npm install</code> also turns on the pre-commit hook. It runs the typecheck, the tests and the build before every commit, so you find out before CI does.</p>`,
+  },
+  {
+    icon: '🌿',
+    title: 'Make a branch and make your change',
+    body: `<pre><code>git switch -c count-gosh</code></pre>
+      <p>The plugin is in <code>src/</code> and this site is in <code>worker/</code>. Add a test for whatever you change. To try it out:</p>
+      <pre><code>npm run build
+node dist/cli.js</code></pre>`,
+  },
+  {
+    icon: '🔄',
+    title: 'Keep your fork up to date',
+    body: `<p>Other people land changes while you work. Pull them in before you open the pull request, and again if master moves while you wait.</p>
+      <pre><code>git remote add upstream https://github.com/shanep/krascha.git
+git fetch upstream
+git rebase upstream/master</code></pre>
+      <p>You only need the <code>git remote add</code> line once.</p>`,
+  },
+  {
+    icon: '📦',
+    title: 'Commit, bundle included',
+    body: `<p>Run <code>npm run build</code> and commit <code>dist/cli.js</code> along with your change. The plugin runs the committed bundle, so a change without it does nothing.</p>
+      <pre><code>git add -A
+git commit -m "Count gosh as a swear"</code></pre>
+      <p>Write the message as a command: "Count gosh as a swear", not "Counted gosh".</p>`,
+  },
+  {
+    icon: '📬',
+    title: 'Push and open a pull request',
+    body: `<pre><code>git push origin count-gosh</code></pre>
+      <p>Then open a pull request from your branch to <code>master</code> on <a href="${REPO_URL}/pulls">shanep/krascha</a>. Say what it does and why. CI runs the same checks on macOS and Linux, and Shane reviews it from there.</p>`,
+  },
+];
+
+export function renderContribute(): string {
+  const steps = STEPS.map(
+    (step, index) => `
+    <li>
+      <h2 id="step-${String(index + 1)}"><span class="step">${String(index + 1)}</span> ${step.icon} ${escapeHtml(step.title)}</h2>
+      ${step.body}
+    </li>`,
+  );
+  return shell(
+    'Contribute to Krascha',
+    'How to fork Krascha, make a change and send a pull request.',
+    `  <p class="lead">Want to teach Krascha a new trick? Fork the repo, make your change and send a pull request. Krascha is watching.</p>
+  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a> <a class="get" href="/about">📜 About Krascha</a></nav>
+  <ol class="steps">${steps.join('')}
+  </ol>
+  <footer>
+    <p>Found a bug and do not want to fix it? <a href="${REPO_URL}/issues">Open an issue</a> instead.</p>
+    <p class="bonus">Extra super secret bonus points: say please in your pull request. Krascha reads those too, and his grudges go both ways. Bonus points are not good for anything, but they are on file.</p>
     <p class="remembers">Krascha remembers.</p>
   </footer>`,
   );
@@ -685,6 +775,7 @@ export function renderPage(board: Board, now: number): string {
   <nav class="links">
     <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
     <a class="get" href="/about">📜 About Krascha</a>
+    <a class="get" href="/contribute">🛠️ Contribute</a>
   </nav>
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">

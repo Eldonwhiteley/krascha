@@ -6,7 +6,7 @@
 import type { PromptFile, UserPrompts } from '../sources/types.js';
 
 import type { FileStamp, ReputationIndex } from './store.js';
-import { addHistoryPrompt, addPrompt, claimSession } from './store.js';
+import { addHistoryPrompt, addPrompt, claimSession, setTokens } from './store.js';
 
 export interface ScanInputs {
   /** Every agent's prompt files, from the observers that keep them. */
@@ -32,9 +32,12 @@ interface Listed {
 }
 
 async function readTranscript(index: ReputationIndex, item: Listed): Promise<number> {
-  const { prompts, title } = await item.source.read(item.file);
+  const { prompts, title, tokensByDay } = await item.source.read(item.file);
   if (item.file.sessionId !== null) {
     claimSession(index, item.file.sessionId, title);
+    if (tokensByDay !== undefined) {
+      setTokens(index, item.file.sessionId, tokensByDay);
+    }
   }
   return prompts.filter((prompt) => addPrompt(index, prompt)).length;
 }

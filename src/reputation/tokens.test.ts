@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { DailyUsage } from '../usage.js';
 
-import { averageTokensPerDay } from './tokens.js';
+import { emptyIndex, setTokens } from './store.js';
+import { averageTokensPerDay, indexUsage, totalTokens } from './tokens.js';
 
 const NOW = new Date(2026, 9, 16, 9).getTime();
 
@@ -34,5 +35,25 @@ describe('averageTokensPerDay', () => {
   it('counts days with activity but no tokens toward the span', () => {
     const days = [day('2026-10-15', {}), day('2026-10-16', { opus: 500 })];
     expect(averageTokensPerDay(days, NOW)).toBe(250);
+  });
+});
+
+describe('indexUsage', () => {
+  it('adds up every session by day, oldest first', () => {
+    const index = emptyIndex();
+    setTokens(index, 's1', { '2026-10-16': 100, '2026-10-14': 50 });
+    setTokens(index, 's2', { '2026-10-16': 20 });
+    const days = indexUsage(index);
+    expect(days).toStrictEqual([
+      day('2026-10-14', { all: 50 }),
+      day('2026-10-16', { all: 120 }),
+    ]);
+    expect(totalTokens(days)).toBe(170);
+    expect(averageTokensPerDay(days, NOW)).toBe(57);
+  });
+
+  it('is empty for an index with no tokens', () => {
+    expect(indexUsage(emptyIndex())).toStrictEqual([]);
+    expect(totalTokens([])).toBe(0);
   });
 });

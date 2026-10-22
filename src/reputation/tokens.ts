@@ -1,10 +1,12 @@
 // How hard you run Claude: the average tokens a day over the last
 // TOKEN_WINDOW_DAYS days, from the daily totals in Claude Code's usage stats.
 // Someone newer than the window is averaged over the days since their first.
+// Copilot CLI's tokens come from the index instead, and are kept apart.
 
 import type { DailyUsage } from '../usage.js';
 import { TOKEN_WINDOW_DAYS } from '../shared/reputation.js';
 
+import type { ReputationIndex } from './store.js';
 import { dayOf } from './summarize.js';
 
 const DAY_MS = 86_400_000;
@@ -36,4 +38,22 @@ export function averageTokensPerDay(days: readonly DailyUsage[], now: number): n
     .filter((day) => day.date >= from && day.date <= to)
     .reduce((sum, day) => sum + tokensOf(day), 0);
   return Math.round(tokens / span);
+}
+
+/** Every session's tokens in the index added up by day, oldest first, in the shape averageTokensPerDay reads. */
+export function indexUsage(index: ReputationIndex): DailyUsage[] {
+  const totals = new Map<string, number>();
+  for (const days of index.tokens.values()) {
+    for (const [date, tokens] of Object.entries(days)) {
+      totals.set(date, (totals.get(date) ?? 0) + tokens);
+    }
+  }
+  return [...totals]
+    .map(([date, tokens]) => ({ date, tokensByModel: { all: tokens } }))
+    .toSorted((left, right) => left.date.localeCompare(right.date));
+}
+
+/** Every token in the days, all time. */
+export function totalTokens(days: readonly DailyUsage[]): number {
+  return days.reduce((sum, day) => sum + tokensOf(day), 0);
 }

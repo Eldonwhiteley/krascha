@@ -4,7 +4,15 @@ import { MEAN_WEIGHT, reputationScore, SCORE_DAMPING } from '../shared/reputatio
 
 import type { HitEntry, ReputationIndex } from './store.js';
 import { emptyIndex } from './store.js';
+import type { TokenCounts } from './summarize.js';
 import { dayOf, RECENT_HITS, summarize, TOP_TERMS } from './summarize.js';
+
+const NO_TOKENS: TokenCounts = {
+  tokensPerDay: 0,
+  lifetimeTokens: 0,
+  copilotTokensPerDay: 0,
+  copilotLifetimeTokens: 0,
+};
 
 // Noon UTC is the same calendar day in every time zone from UTC-11 to UTC+11.
 const DAY1 = Date.UTC(2026, 9, 1, 12);
@@ -59,7 +67,7 @@ describe('dayOf', () => {
 
 describe('summarize', () => {
   it('is empty for an empty index', () => {
-    expect(summarize(emptyIndex(), title, 0, 0)).toStrictEqual({
+    expect(summarize(emptyIndex(), title, NO_TOKENS)).toStrictEqual({
       prompts: 0,
       kind: 0,
       mean: 0,
@@ -73,6 +81,8 @@ describe('summarize', () => {
       scannedAt: null,
       tokensPerDay: 0,
       lifetimeTokens: 0,
+      copilotTokensPerDay: 0,
+      copilotLifetimeTokens: 0,
       hours: 0,
       tools: [],
       lateNight: 0,
@@ -103,7 +113,7 @@ describe('summarize', () => {
       { kind: ['thanks'], mean: hit('general', 'damn') },
     );
     put(index, 'claude:e', { sessionId: 's1', at: at(14, 14) }, { mean: hit('agent', 'idiot') });
-    const summary = summarize(index, title, 0, 0);
+    const summary = summarize(index, title, NO_TOKENS);
     expect(summary.lateNight).toBe(3);
     expect(summary.selfAware).toBe(1);
     expect(summary.mixed).toBe(1);
@@ -118,7 +128,7 @@ describe('summarize', () => {
     put(index, 'd', { sessionId: 's1', at: DAY1 + 16 * minute });
     put(index, 'e', { sessionId: 's4', at: DAY1 + 31 * minute });
     put(index, 'f', { sessionId: 's5', at: DAY1 + 31 * minute }, { kind: ['please'] });
-    const state = summarize(index, title, 0, 0);
+    const state = summarize(index, title, NO_TOKENS);
     expect(state.swarm).toBe(3);
     expect(state.rageQuits).toBe(1);
     expect(state.badWords).toBe(3);
@@ -140,7 +150,7 @@ describe('summarize', () => {
     put(index, 'f', { sessionId: 's4', at: DAY1 }, { mean: hit('agent', 'idiot') });
     put(index, 'g', { sessionId: 's4', at: DAY1 });
     put(index, 'h', { sessionId: 's5', at: DAY1 });
-    const state = summarize(index, title, 0, 0);
+    const state = summarize(index, title, NO_TOKENS);
     expect(state).toMatchObject({ prompts: 8, kind: 2, mean: 2, general: 2, scannedAt: 9 });
     expect(state.score).toBe(reputationScore({ kind: 2, mean: 2 }));
     expect(state.byDay).toStrictEqual([
@@ -210,17 +220,17 @@ describe('summarize', () => {
   it('names the agents the prompts were typed into, Claude Code first', () => {
     const index = emptyIndex();
     put(index, 'c:e1', { sessionId: 's1', at: DAY1 });
-    expect(summarize(index, title, 0, 0).tools).toStrictEqual(['copilot']);
+    expect(summarize(index, title, NO_TOKENS).tools).toStrictEqual(['copilot']);
     put(index, 'h:x', { sessionId: 's2', at: DAY1 });
     put(index, 't:u1', { sessionId: 's3', at: DAY1 });
-    expect(summarize(index, title, 0, 0).tools).toStrictEqual(['claude', 'copilot']);
+    expect(summarize(index, title, NO_TOKENS).tools).toStrictEqual(['claude', 'copilot']);
   });
 
   it('breaks session ties by id', () => {
     const index = emptyIndex();
     put(index, 'a', { sessionId: 'zz', at: DAY1 }, { mean: hit('agent', 'x') });
     put(index, 'b', { sessionId: 'aa', at: DAY1 }, { mean: hit('agent', 'x') });
-    expect(summarize(index, title, 0, 0).bySession.map((row) => row.sessionId)).toStrictEqual([
+    expect(summarize(index, title, NO_TOKENS).bySession.map((row) => row.sessionId)).toStrictEqual([
       'aa',
       'zz',
     ]);
@@ -236,7 +246,7 @@ describe('summarize', () => {
         { mean: hit('general', `t${String(count % 12)}`) },
       );
     }
-    const state = summarize(index, title, 0, 0);
+    const state = summarize(index, title, NO_TOKENS);
     expect(state.recent).toHaveLength(RECENT_HITS);
     expect(state.recent[0]?.id).toBe('p50:general');
     expect(state.recent.at(-1)?.id).toBe('p1:general');
@@ -253,6 +263,6 @@ describe('summarize', () => {
     const index = emptyIndex();
     index.hits.set('lost', hit('agent', 'x'));
     index.kind.set('lost', { terms: ['please'], excerpt: 'please' });
-    expect(summarize(index, title, 0, 0)).toMatchObject({ recent: [], mean: 0, kind: 0 });
+    expect(summarize(index, title, NO_TOKENS)).toMatchObject({ recent: [], mean: 0, kind: 0 });
   });
 });

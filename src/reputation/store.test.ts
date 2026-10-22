@@ -17,6 +17,7 @@ import {
   mergeIndex,
   readIndex,
   saveIndex,
+  setTokens,
 } from './store.js';
 
 async function indexFile(): Promise<string> {
@@ -38,6 +39,7 @@ function filled(): ReputationIndex {
   addPrompt(index, prompt('t:a', 'you idiot'));
   addPrompt(index, prompt('t:b', 'fine'));
   addPrompt(index, prompt('t:c', 'thanks, great job'));
+  setTokens(index, 's1', { '2026-10-21': 3000 });
   index.scannedAt = 77;
   return index;
 }
@@ -95,6 +97,19 @@ describe('index file', () => {
       expect(index.hits).toStrictEqual(old.hits);
       expect(index.kind).toStrictEqual(old.kind);
     }
+  });
+
+  it('reads every file again when the index is from before token counts', async () => {
+    const file = await indexFile();
+    const old = filled();
+    await saveIndex(file, old);
+    const saved = z.record(z.string(), z.unknown()).parse(JSON.parse(await readFile(file, 'utf8')));
+    const before = Object.fromEntries(Object.entries(saved).filter(([key]) => key !== 'tokens'));
+    await writeFile(file, JSON.stringify(before));
+    const { index } = await loadIndex(file, 1);
+    expect(index.files.size).toBe(0);
+    expect(index.tokens.size).toBe(0);
+    expect(index.prompts).toStrictEqual(old.prompts);
   });
 
   it('reads a hit saved as aimed at claude as aimed at the agent', async () => {
@@ -200,6 +215,16 @@ describe('addHistoryPrompt', () => {
   });
 });
 
+describe('setTokens', () => {
+  it('replaces what a session counted and drops a session that counted none', () => {
+    const index = filled();
+    setTokens(index, 's1', { '2026-10-22': 10 });
+    expect(index.tokens.get('s1')).toStrictEqual({ '2026-10-22': 10 });
+    setTokens(index, 's1', {});
+    expect(index.tokens.has('s1')).toBe(false);
+  });
+});
+
 describe('mergeIndex', () => {
   it('adds prompts the index lacks and leaves file stamps behind', () => {
     const into = emptyIndex();
@@ -211,7 +236,15 @@ describe('mergeIndex', () => {
     expect([...into.kind.keys()]).toStrictEqual(['t:c']);
     expect(into.sessions.get('s1')).toStrictEqual({ source: 'transcript', title: 'Fix the build' });
     expect(into.files.size).toBe(0);
+    expect(into.tokens.get('s1')).toStrictEqual({ '2026-10-21': 3000 });
     expect(mergeIndex(into, from)).toBe(0);
+  });
+
+  it('keeps the tokens a session already counted', () => {
+    const into = emptyIndex();
+    setTokens(into, 's1', { '2026-10-22': 5 });
+    mergeIndex(into, filled());
+    expect(into.tokens.get('s1')).toStrictEqual({ '2026-10-22': 5 });
   });
 
   it('never counts a session from both its transcript and its history', () => {

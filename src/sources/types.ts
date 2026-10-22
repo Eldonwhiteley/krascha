@@ -22,6 +22,8 @@ export interface PromptFileRead {
   readonly prompts: readonly Prompt[];
   /** The session's title, for a transcript that has one. */
   readonly title: string | null;
+  /** Tokens the session used, by local date, for a transcript that records them. */
+  readonly tokensByDay?: Readonly<Record<string, number>>;
 }
 
 /** Where an agent keeps what the user typed. */

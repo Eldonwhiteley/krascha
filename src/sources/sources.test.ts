@@ -6,6 +6,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { scanInto } from '../reputation/scan.js';
 import { emptyIndex } from '../reputation/store.js';
+import { dayOf } from '../reputation/summarize.js';
 
 import { claudeDir, claudeTitle } from './claude.js';
 import { copilotDir, copilotTitle, copilotUserPrompts } from './copilot.js';
@@ -85,6 +86,26 @@ describe('copilotUserPrompts', () => {
     expect(index.kind.has('c:e1')).toBe(true);
     expect(index.hits.get('c:e4')?.target).toBe('agent');
     expect(index.sessions.get('s1')).toStrictEqual({ source: 'transcript', title: 'Copilot work' });
+  });
+
+  it('counts the tokens every model call used, cached ones once', async () => {
+    const root = await tempDir();
+    const session = path.join(root, 'session-state', 's1');
+    await mkdir(session, { recursive: true });
+    const usage = (inputTokens: number, outputTokens: number): object => ({
+      usage: { model: 'gpt', inputTokens, outputTokens, cacheReadTokens: inputTokens - 1 },
+    });
+    const lines = [
+      event('session.usage_record', 'u1', usage(18_551, 86)),
+      event('session.usage_record', 'u2', usage(19_145, 492)),
+      event('session.usage_record', 'u3', { usage: { inputTokens: 'lots' } }),
+      event('session.shutdown', 'u4', { modelMetrics: { gpt: { usage: usage(1, 1) } } }),
+    ];
+    await writeFile(path.join(session, 'events.jsonl'), `${lines.join('\n')}\n`);
+    const index = emptyIndex();
+    await scanInto(index, { sources: [copilotUserPrompts(root)], now: 1 });
+    const day = dayOf(Date.parse('2026-09-24T15:55:50.092Z'));
+    expect(index.tokens.get('s1')).toStrictEqual({ [day]: 38_274 });
   });
 
   it('finds nothing when Copilot was never run', async () => {

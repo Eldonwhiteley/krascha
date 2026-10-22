@@ -66,6 +66,10 @@ export interface ReputationSummary extends ReputationTally {
   readonly tokensPerDay: number;
   /** Every token Claude Code has counted, from its usage stats. */
   readonly lifetimeTokens: number;
+  /** Average tokens a day over the last TOKEN_WINDOW_DAYS days in Copilot CLI, from its session logs. No achievement reads it. */
+  readonly copilotTokensPerDay: number;
+  /** Every token Copilot CLI's session logs counted. */
+  readonly copilotLifetimeTokens: number;
   /** Hours spent with your agents, worked out from when you typed each prompt. */
   readonly hours: number;
   /** The agents you typed any prompt into, in TOOLS order. */

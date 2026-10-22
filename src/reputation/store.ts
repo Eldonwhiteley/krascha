@@ -44,6 +44,11 @@ export interface ReputationIndex {
   readonly hits: Map<string, HitEntry>;
   /** Prompts with manners or praise in them, by prompt id. */
   readonly kind: Map<string, Kindness>;
+  /**
+   * Tokens each session used, by local date, for transcripts that record them.
+   * Only Copilot CLI's do. Kept after the transcript is gone, like its prompts.
+   */
+  readonly tokens: Map<string, Readonly<Record<string, number>>>;
   scannedAt: number | null;
 }
 
@@ -77,6 +82,8 @@ const fileSchema = z.object({
   kind: z
     .record(z.string(), z.object({ terms: z.array(z.string()), excerpt: z.string() }))
     .default({}),
+  // Indexes from before token counts do not have it.
+  tokens: z.record(z.string(), z.record(z.string(), z.number())).optional(),
 });
 
 export function emptyIndex(): ReputationIndex {
@@ -86,6 +93,7 @@ export function emptyIndex(): ReputationIndex {
     prompts: new Map(),
     hits: new Map(),
     kind: new Map(),
+    tokens: new Map(),
     scannedAt: null,
   };
 }
@@ -103,15 +111,19 @@ function parseIndex(text: string): ReputationIndex | null {
   }
   const data = parsed.data;
   return {
-    // A version 1 index never looked for kind words, and one counted with other
-    // words is out of date, so every file is read again.
+    // A version 1 index never looked for kind words, one counted with other
+    // words is out of date, and one without tokens never counted them, so
+    // every file is read again.
     files: new Map(
-      data.version === 1 || data.detection !== DETECTION_STAMP ? [] : Object.entries(data.files),
+      data.version === 1 || data.detection !== DETECTION_STAMP || data.tokens === undefined
+        ? []
+        : Object.entries(data.files),
     ),
     sessions: new Map(Object.entries(data.sessions)),
     prompts: new Map(Object.entries(data.prompts)),
     hits: new Map(Object.entries(data.hits)),
     kind: new Map(Object.entries(data.kind)),
+    tokens: new Map(Object.entries(data.tokens ?? {})),
     scannedAt: data.scannedAt,
   };
 }
@@ -151,6 +163,7 @@ export async function saveIndex(file: string, index: ReputationIndex): Promise<v
     kind: Object.fromEntries(
       [...index.kind].map(([id, hit]) => [id, { ...hit, terms: [...hit.terms] }]),
     ),
+    tokens: Object.fromEntries([...index.tokens].map(([id, days]) => [id, { ...days }])),
   };
   await writeFileAtomic(file, `${JSON.stringify(data)}\n`);
 }
@@ -203,6 +216,15 @@ export function claimSession(
   index.sessions.set(sessionId, { source: 'transcript', title: title ?? known?.title ?? null });
 }
 
+/** Replaces what a session's transcript counted of its tokens. A session that counted none is dropped. */
+export function setTokens(
+  index: ReputationIndex,
+  sessionId: string,
+  tokensByDay: Readonly<Record<string, number>>,
+): void {
+  setOrDelete(index.tokens, sessionId, Object.keys(tokensByDay).length === 0 ? null : tokensByDay);
+}
+
 /** Counts a history prompt unless its session has a transcript. True when it was new. */
 export function addHistoryPrompt(index: ReputationIndex, prompt: Prompt): boolean {
   const known = index.sessions.get(prompt.sessionId);
@@ -236,6 +258,11 @@ export function mergeIndex(into: ReputationIndex, from: ReputationIndex): number
       claimSession(into, sessionId, entry.title);
     } else if (known.title === null && entry.title !== null) {
       into.sessions.set(sessionId, { ...known, title: entry.title });
+    }
+  }
+  for (const [sessionId, days] of from.tokens) {
+    if (!into.tokens.has(sessionId)) {
+      into.tokens.set(sessionId, days);
     }
   }
   let added = 0;

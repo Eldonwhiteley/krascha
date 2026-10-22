@@ -852,6 +852,9 @@ function totalsOf(machines: readonly MachineCounts[]): ReputationSummary {
     tokensPerDay: sum((machine) => machine.tokensPerDay),
     // Uploads do not carry it, so Cyberdyne's best customer counts when any machine earned it.
     lifetimeTokens: 0,
+    // Uploads do not carry Copilot's tokens, and no rule reads them.
+    copilotTokensPerDay: 0,
+    copilotLifetimeTokens: 0,
     // Uploads do not carry it, so Overtime counts when any machine earned it.
     hours: 0,
     tools: knownTools(machines.flatMap((machine) => machine.tools ?? [])),

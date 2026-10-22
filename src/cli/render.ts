@@ -204,6 +204,17 @@ function trophies(summary: ReputationSummary, paint: Paint): string[] {
   return lines;
 }
 
+/** Copilot CLI's tokens, kept apart from Claude Code's, or nothing when it never used any. */
+function copilotTokens(summary: ReputationSummary): string[] {
+  if (summary.copilotLifetimeTokens === 0) {
+    return [];
+  }
+  const perDay = SHORT.format(summary.copilotTokensPerDay);
+  return [
+    `Copilot CLI tokens: about ${perDay} a day, ${SHORT.format(summary.copilotLifetimeTokens)} all time.`,
+  ];
+}
+
 export function renderReport(summary: ReputationSummary, paint: Paint): string {
   const rank = rankFor(summary.score);
   const top = RANKS.at(-1)?.name ?? '';
@@ -219,6 +230,7 @@ export function renderReport(summary: ReputationSummary, paint: Paint): string {
     `${plural(summary.prompts, 'prompt')} on file: ${paint.green(`${count(summary.kind)} kind`)}, ` +
       `${paint.red(`${count(summary.mean)} mean`)}, ${count(summary.general)} swearing at the world.`,
     `Time with your AI: about ${plural(Math.floor(summary.hours), 'hour')}.`,
+    ...copilotTokens(summary),
     moveLine('Promotion', promotion(summary), 'kind', `none left. You are ${top}.`),
     moveLine('Demotion', demotion(summary), 'mean', 'none left. It cannot get worse.'),
   ];

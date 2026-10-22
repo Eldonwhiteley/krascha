@@ -12,7 +12,7 @@ import { scanInto } from '../reputation/scan.js';
 import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
-import { averageTokensPerDay } from '../reputation/tokens.js';
+import { averageTokensPerDay, indexUsage, totalTokens } from '../reputation/tokens.js';
 import { ACHIEVEMENTS, achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
 import type { Board, BoardEntry, KnownAchievement, Standing } from '../shared/leaderboard.js';
 import { FEATURES, LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
@@ -100,10 +100,16 @@ async function refresh(io: CliIo): Promise<Refreshed> {
   const scan = await scanInto(index, { sources, now });
   await saveIndex(file, index);
   const usage = await loadUsage(claude);
-  const tokensPerDay = averageTokensPerDay(usage.days, now);
+  const copilot = indexUsage(index);
+  const tokens = {
+    tokensPerDay: averageTokensPerDay(usage.days, now),
+    lifetimeTokens: usage.lifetimeTokens,
+    copilotTokensPerDay: averageTokensPerDay(copilot, now),
+    copilotLifetimeTokens: totalTokens(copilot),
+  };
   const titleOf = (sessionId: string): string =>
     index.sessions.get(sessionId)?.title ?? `Session ${sessionId.slice(0, 8)}`;
-  return { summary: summarize(index, titleOf, tokensPerDay, usage.lifetimeTokens), scan };
+  return { summary: summarize(index, titleOf, tokens), scan };
 }
 
 /**

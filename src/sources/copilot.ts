@@ -1,8 +1,10 @@
-// The prompts a person typed to GitHub Copilot CLI. Each session has a folder
-// under ~/.copilot/session-state (or COPILOT_HOME) holding events.jsonl, one
-// event per line. What the person typed is a user.message event's
-// data.content; data.transformedContent is what the model was sent.
-// Checked against Copilot CLI 1.0.102.
+// The prompts a person typed to GitHub Copilot CLI, and the tokens it used.
+// Each session has a folder under ~/.copilot/session-state (or COPILOT_HOME)
+// holding events.jsonl, one event per line. What the person typed is a
+// user.message event's data.content; data.transformedContent is what the model
+// was sent. Every model call leaves a session.usage_record event. Its
+// inputTokens already count the cached tokens, so input plus output is all of
+// it. Checked against Copilot CLI 1.0.102.
 
 import path from 'node:path';
 
@@ -11,6 +13,7 @@ import { z } from 'zod';
 import { readAllLines, readOptional } from '../files.js';
 import type { Prompt } from '../reputation/prompts.js';
 import { typedText } from '../reputation/prompts.js';
+import { dayOf } from '../reputation/summarize.js';
 import { COPILOT_PREFIX } from '../shared/tools.js';
 
 import { shortTitle } from './claude.js';
@@ -30,6 +33,14 @@ const messageSchema = z.object({
   id: z.string().min(1),
   timestamp: z.string(),
   data: z.object({ content: z.string() }),
+});
+
+const usageSchema = z.object({
+  type: z.literal('session.usage_record'),
+  timestamp: z.string(),
+  data: z.object({
+    usage: z.object({ inputTokens: z.number().nonnegative(), outputTokens: z.number().nonnegative() }),
+  }),
 });
 
 function parseJson(line: string): unknown {
@@ -69,6 +80,22 @@ function copilotPrompt(line: string, file: PromptFile): Prompt | null {
   };
 }
 
+/** A model call's tokens and the local date it was made, or null for any other line. */
+function copilotUsage(line: string, file: PromptFile): { day: string; tokens: number } | null {
+  const parsed = line.includes('"session.usage_record"')
+    ? usageSchema.safeParse(parseJson(line))
+    : null;
+  if (parsed?.success !== true) {
+    return null;
+  }
+  const { timestamp, data } = parsed.data;
+  const at = Date.parse(timestamp);
+  return {
+    day: dayOf(Number.isNaN(at) ? (file.stamp?.mtimeMs ?? 0) : at),
+    tokens: data.usage.inputTokens + data.usage.outputTokens,
+  };
+}
+
 const NAME_LINE = /^name:[ \t]*(.*)$/mu;
 
 /** The session's name from workspace.yaml, which is flat key: value lines. */
@@ -80,14 +107,19 @@ export function copilotTitle(yaml: string | null): string | null {
 
 async function read(file: PromptFile): Promise<PromptFileRead> {
   const prompts: Prompt[] = [];
+  const tokensByDay: Record<string, number> = {};
   for await (const line of readAllLines(file.path)) {
     const prompt = copilotPrompt(line, file);
     if (prompt !== null) {
       prompts.push(prompt);
     }
+    const usage = copilotUsage(line, file);
+    if (usage !== null) {
+      tokensByDay[usage.day] = (tokensByDay[usage.day] ?? 0) + usage.tokens;
+    }
   }
   const yaml = await readOptional(path.join(path.dirname(file.path), WORKSPACE_FILE));
-  return { prompts, title: copilotTitle(yaml) };
+  return { prompts, title: copilotTitle(yaml), tokensByDay };
 }
 
 export function copilotUserPrompts(homeDir: string): UserPrompts {

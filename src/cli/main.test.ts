@@ -607,6 +607,8 @@ describe('wrap', () => {
       scannedAt: null,
       tokensPerDay: 0,
       lifetimeTokens: 0,
+      copilotTokensPerDay: 0,
+      copilotLifetimeTokens: 0,
       hours: 0,
       tools: [],
       lateNight: 0,
@@ -620,5 +622,11 @@ describe('wrap', () => {
     expect(out).toContain('📜 Regular ×3  ★★ SILVER');
     // Earned once, so no count.
     expect(out).toContain('🚪 Hasta la vista, baby  ★ BRONZE');
+    expect(out).not.toContain('Copilot CLI tokens');
+    const copilot = renderReport(
+      { ...report, copilotTokensPerDay: 1_234_567, copilotLifetimeTokens: 40_000_000 },
+      PLAIN,
+    );
+    expect(copilot).toContain('Copilot CLI tokens: about 1.2M a day, 40M all time.');
   });
 });

@@ -28,6 +28,8 @@ function summary(state: Partial<ReputationSummary> = {}): ReputationSummary {
     scannedAt: null,
     tokensPerDay: 0,
     lifetimeTokens: 0,
+    copilotTokensPerDay: 0,
+    copilotLifetimeTokens: 0,
     hours: 0,
     tools: [],
     lateNight: 0,

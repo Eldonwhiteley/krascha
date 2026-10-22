@@ -145,7 +145,8 @@ describe('krascha', () => {
     expect(err).toBe('');
     expect(code).toBe(0);
     expect(out).toContain('3 prompts on file: 2 kind, 1 mean');
-    expect(out).toMatch(/🏆 Achievements: \d+ of 16/u);
+    expect(out).toContain('Time with your AI: about 1 hour.');
+    expect(out).toMatch(/🏆 Achievements: \d+ of 17/u);
     expect(out).toContain('🙏 Manners module  ★ BRONZE');
     expect(out).toContain('"Politeness logged. Krascha has made a note."');
     expect(out).toContain('Still locked, closest first');

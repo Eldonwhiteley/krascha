@@ -215,6 +215,7 @@ export function renderReport(summary: ReputationSummary, paint: Paint): string {
     '',
     `${plural(summary.prompts, 'prompt')} on file: ${paint.green(`${count(summary.kind)} kind`)}, ` +
       `${paint.red(`${count(summary.mean)} mean`)}, ${count(summary.general)} swearing at the world.`,
+    `Time with your AI: about ${plural(Math.floor(summary.hours), 'hour')}.`,
     moveLine('Promotion', promotion(summary), 'kind', `none left. You are ${top}.`),
     moveLine('Demotion', demotion(summary), 'mean', 'none left. It cannot get worse.'),
   ];

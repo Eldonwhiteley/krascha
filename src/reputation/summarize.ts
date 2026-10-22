@@ -1,12 +1,14 @@
 // Turns the index into the report: totals, the score, a row per day, a
 // row per session, the most common kind and mean terms and the newest hits.
 // The token average comes from the usage stats, so the caller passes it in.
+// The hours come from when each prompt was typed.
 
 import type { ReputationHit, ReputationSummary } from '../shared/reputation.js';
 import { reputationScore } from '../shared/reputation.js';
 import type { ToolId } from '../shared/tools.js';
 import { knownTools, toolOf } from '../shared/tools.js';
 
+import { hoursSpent } from './hours.js';
 import type { ReputationIndex } from './store.js';
 
 export const TOP_TERMS = 10;
@@ -131,6 +133,7 @@ export function summarize(
     recent: hits.toSorted((left, right) => right.at - left.at).slice(0, RECENT_HITS),
     scannedAt: index.scannedAt,
     tokensPerDay,
+    hours: hoursSpent([...index.prompts.values()].map((prompt) => prompt.at)),
     tools: knownTools([...tools]),
   };
 }

@@ -1,5 +1,5 @@
 // Trophies earned from your counts: the first please, a meltdown day, a
-// thousand prompts, a token habit. Shared so the report can show yours, the upload
+// thousand prompts, five hundred hours, a token habit. Shared so the report can show yours, the upload
 // can send which ones you have, and the leaderboard can show everyone's.
 
 import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
@@ -9,6 +9,8 @@ import { reputationScore } from './reputation.js';
 
 /** The average a day it takes to be a token maxxer. */
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
+/** The hours with your AI it takes to work overtime. */
+const OVERTIME_HOURS = 500;
 
 /** How hard it is to get, from a first please to the far end of the scale. */
 export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
@@ -174,6 +176,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     fromCounts: true,
   },
   {
+    id: 'overtime',
+    name: 'Overtime',
+    icon: '⏱️',
+    tier: 'gold',
+    how: `Spend ${String(OVERTIME_HOURS)} hours with your AI, counted from when you typed each prompt.`,
+    quip: 'Five hundred hours. Krascha has stopped asking about your weekends.',
+    ...reach(OVERTIME_HOURS, (state) => state.hours),
+  },
+  {
     id: 'climate-changer',
     name: 'Climate changer',
     icon: '🌡️',
@@ -268,6 +279,8 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     recent: [],
     scannedAt: null,
     tokensPerDay: sum((machine) => machine.tokensPerDay),
+    // Uploads do not carry it, so Overtime counts when any machine earned it.
+    hours: 0,
     tools: [],
   };
   return ACHIEVEMENTS.filter((rule) =>

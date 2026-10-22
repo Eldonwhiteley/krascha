@@ -47,7 +47,7 @@ That lets Copilot run any `node` command without asking, not only Krascha.
 Pass these after the skill name, `/krascha:krascha json` in Claude Code or
 `/krascha json` in Copilot CLI.
 
-- (nothing) - Rescan your prompts and show your rank, score and achievements
+- (nothing) - Rescan your prompts and show your rank, score, hours with your AI and achievements
 - `json` - The same counts as JSON
 - `board` - The leaderboard at [krascha.com](https://krascha.com). [krascha.com/about](https://krascha.com/about) has his backstory
 - `upload [name]` - Put your counts on the leaderboard under a name

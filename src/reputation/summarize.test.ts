@@ -72,6 +72,7 @@ describe('summarize', () => {
       recent: [],
       scannedAt: null,
       tokensPerDay: 0,
+      hours: 0,
       tools: [],
     });
   });

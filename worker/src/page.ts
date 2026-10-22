@@ -506,7 +506,7 @@ section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }
 dd { margin: 0; color: var(--muted); font-size: 0.85em; }
-section.wanted, section.silo, section.climate, section.manhunt { position: relative; overflow: hidden; }
+section.wanted, section.silo, section.climate, section.manhunt, section.adoption { position: relative; overflow: hidden; }
 .target { color: var(--red); font: 700 0.7em ui-monospace, monospace; letter-spacing: 1px; white-space: nowrap; }
 .hearts { position: relative; display: inline-block; width: 1em; }
 .hearts span { position: absolute; left: 0; bottom: 0; opacity: 0; font-size: 0.8em; }
@@ -532,7 +532,7 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
   .lead::after { animation: blink 1s steps(1) infinite; }
   body::after { animation: flicker 6s steps(1) infinite; }
   section.wanted::after, .scene::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 40px;
-    background: linear-gradient(transparent, color-mix(in srgb, var(--red) 25%, transparent), transparent);
+    background: linear-gradient(transparent, color-mix(in srgb, var(--tint, var(--red)) 25%, transparent), transparent);
     pointer-events: none; animation: sweep 3.5s ease-in-out infinite; }
   .target { animation: beacon 0.8s steps(2) infinite; }
   .hearts span { animation: float 3s ease-out infinite; }
@@ -573,6 +573,13 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
   .aim { transform-origin: left; animation: draw 0.4s ease-out 2.2s both, beacon 0.8s steps(2) 2.6s infinite; }
   .readout div { animation: appear 0.3s ease-out both; animation-delay: calc(2.6s + var(--row, 0) * 0.25s); }
   .pick { animation: beacon 1s steps(2) 4.4s infinite; }
+  .keeper { animation: stalk 2.4s ease-out both, trundle 0.5s ease-in-out infinite; }
+  .waiting .keeper { animation: patrol 9s ease-in-out infinite alternate, trundle 0.5s ease-in-out infinite; }
+  .keeper .heart { transform-box: fill-box; transform-origin: center; animation: beat 1.2s ease-in-out infinite; }
+  .keeper .glow { animation: beacon 1.6s ease-in-out infinite; }
+  .leash { transform-origin: left; animation: draw 0.4s ease-out 2.2s both; }
+  .adopted { animation: slam 0.4s cubic-bezier(0.3, 1.6, 0.6, 1) 2.4s both; }
+  .pal { animation: bounce 0.8s ease-in-out infinite; }
   .remembers { overflow: hidden; white-space: nowrap; width: 18ch; border-right: 2px solid var(--muted);
     animation: type 2s steps(18) 1s both, cursor 1s steps(1) infinite; }
 }
@@ -616,6 +623,7 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
 @keyframes lock { from { rotate: 90deg; } }
 @keyframes draw { from { scale: 0 1; } }
 @keyframes appear { from { opacity: 0; translate: -6px 0; } }
+@keyframes trundle { 50% { translate: 0 -3px; } }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 2px solid var(--line);
@@ -647,11 +655,13 @@ pre { margin: 8px 0 0; padding: 10px 12px; overflow-x: auto; border: 1px solid v
 code { font-family: var(--mono); font-size: 0.9em; }
 .bonus { font-size: 0.75em; font-style: italic; opacity: 0.8; }
 .story p { margin: 8px 0 0; line-height: 1.5; }
-section.manhunt { border-top: 4px solid var(--red); }
+section.manhunt { --tint: var(--red); border-top: 4px solid var(--red); }
+section.adoption { --tint: var(--green); border-top: 4px solid var(--green); }
+.classified.kept { border-color: var(--green); color: var(--green); rotate: -6deg; }
 .scene { --x: clamp(12px, var(--at), calc(100% - 250px)); position: relative; height: 150px; margin: 12px 0; overflow: hidden;
-  border: 2px solid var(--red); border-radius: 2px;
-  background: repeating-linear-gradient(to bottom, transparent 0 3px, color-mix(in srgb, var(--red) 10%, transparent) 3px 4px),
-    color-mix(in srgb, var(--red) 12%, var(--card)); }
+  border: 2px solid var(--tint); border-radius: 2px;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, color-mix(in srgb, var(--tint) 10%, transparent) 3px 4px),
+    color-mix(in srgb, var(--tint) 12%, var(--card)); }
 .t800 { position: absolute; z-index: 1; top: 22px; left: var(--x); width: 104px; height: 104px; overflow: visible; }
 .t800 .rifle { fill: var(--fg); }
 .t800 .coil { fill: var(--red); }
@@ -679,15 +689,16 @@ section.manhunt { border-top: 4px solid var(--red); }
 .t800 .joint { fill: var(--fg); }
 .t800 .eye, .t800 .glow { fill: var(--red); }
 .aim { position: absolute; top: 71px; left: calc(var(--x) + 66px); right: 100px; border-top: 2px dotted var(--red); }
-.vision { position: absolute; bottom: 6px; left: 10px; padding: 0 6px; border: 1px solid var(--red); border-radius: 2px;
-  background: var(--card); color: var(--red); font: 700 0.7em var(--mono);
+.vision { position: absolute; bottom: 6px; left: 10px; padding: 0 6px; border: 1px solid var(--tint); border-radius: 2px;
+  background: var(--card); color: var(--tint); font: 700 0.7em var(--mono);
   letter-spacing: 1px; text-transform: uppercase; }
-.prey { position: absolute; top: 16px; right: 16px; width: 108px; text-align: center; }
-.tag { display: block; overflow: hidden; padding: 0 6px; border: 1px solid var(--red); border-radius: 2px;
+.prey, .pet { position: absolute; top: 16px; right: 16px; width: 108px; text-align: center; }
+.tag { display: block; overflow: hidden; padding: 0 6px; border: 1px solid var(--tint); border-radius: 2px;
   background: var(--card); color: var(--fg); font: 700 0.75em/1.6 var(--mono); text-overflow: ellipsis;
   text-transform: uppercase; white-space: nowrap; }
 .mark { position: relative; display: grid; place-items: center; height: 64px; margin-top: 4px; }
-.runner { display: inline-block; font-size: 44px; line-height: 1; scale: -1 1; text-shadow: none; }
+.runner, .pal { display: inline-block; font-size: 44px; line-height: 1; text-shadow: none; }
+.runner { scale: -1 1; }
 .reticle { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; border: 2px solid var(--red);
   border-radius: 50%; translate: -50% -50%; }
 .reticle::before { content: ""; position: absolute; inset: -9px;
@@ -697,17 +708,31 @@ section.manhunt { border-top: 4px solid var(--red); }
     linear-gradient(var(--red), var(--red)) right / 16px 2px no-repeat; }
 .hud { display: grid; gap: 12px 32px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   font: 0.85em/1.7 var(--mono); letter-spacing: 0.5px; text-transform: uppercase; }
-.manhunt dl { display: block; }
+.hud dl { display: block; }
 .readout div { display: flex; gap: 8px; align-items: baseline; }
 .readout dt { display: flex; flex: 1; gap: 8px; align-items: baseline; color: var(--muted); font-weight: 400; white-space: nowrap; }
 .readout dt::after { content: ""; flex: 1; border-bottom: 2px dotted var(--line); }
-.manhunt dd { max-width: 65%; min-width: 0; color: var(--fg); font-size: 1em; text-align: right; overflow-wrap: anywhere; }
+.hud dd { max-width: 65%; min-width: 0; color: var(--fg); font-size: 1em; text-align: right; overflow-wrap: anywhere; }
 .kill { color: var(--red); font-weight: 700; }
-.manhunt .responses p { margin: 0; color: var(--muted); }
-.manhunt li { position: relative; display: block; padding: 0 0 0 1.4em; border-top: 0; }
-.manhunt li:hover { background: none; }
-.pick { color: var(--red); font-weight: 700; }
+.responses p { margin: 0; color: var(--muted); }
+.responses li { position: relative; display: block; padding: 0 0 0 1.4em; border-top: 0; }
+.responses li:hover { background: none; }
+.pick { color: var(--tint); font-weight: 700; }
 .pick::before { content: "\\25B6\\FE0E"; position: absolute; left: 0; }
+.keeper { position: absolute; top: 22px; left: var(--x); width: 104px; height: 104px; overflow: visible; }
+.keeper .line { fill: none; stroke: var(--fg); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.keeper .face { fill: var(--card); }
+.keeper .thin { stroke-width: 1.5; }
+.keeper .heart, .keeper .glow { fill: var(--red); }
+.keeper .blush { fill: var(--red); opacity: 0.3; }
+.leash { position: absolute; top: 94px; left: calc(var(--x) + 94px); right: 84px; height: 12px;
+  border: 2px solid var(--green); border-top: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; }
+.pet .tag { position: relative; z-index: 1; }
+.mark .hearts { position: absolute; top: 24px; right: 10px; font-size: 1.3em; }
+.adopted { position: absolute; bottom: 0; left: 50%; padding: 0 6px; border: 3px double var(--green); border-radius: 4px;
+  background: color-mix(in srgb, var(--card) 75%, transparent); color: var(--green); font: 800 0.8em var(--mono);
+  letter-spacing: 2px; text-transform: uppercase; translate: -50% 0; rotate: -14deg; }
+.keep { color: var(--green); font-weight: 700; }
 `;
 
 /** Where Shane keeps Krascha and the other plugins. */
@@ -861,7 +886,106 @@ function hunt(board: Board): string {
   </section>`;
 }
 
-/** A T-800 hunting the most wanted, then who Krascha is, how he ended up running Silo 7 and the human who built him. */
+/** A heart `size` across, centered on (x, y), as an SVG path. */
+function heart(x: number, y: number, size: number): string {
+  const round = (value: number): string => String(Math.round(value * 100) / 100);
+  const at = (dx: number, dy: number): string => `${round(x + dx * size)} ${round(y + dy * size)}`;
+  return `M${at(0, 0.45)} C${at(-0.6, 0.05)} ${at(-0.55, -0.5)} ${at(-0.25, -0.45)} C${at(-0.1, -0.43)} ${at(0, -0.3)} ${at(0, -0.2)} C${at(0, -0.3)} ${at(0.1, -0.43)} ${at(0.25, -0.45)} C${at(0.55, -0.5)} ${at(0.6, 0.05)} ${at(0, 0.45)} Z`;
+}
+
+// Krascha off duty: the same dome and bolts for ears, but soft brows, heart
+// eyes, a blush and a smile, on treads, with an arm out to hold the leash.
+const KEEPER = `<svg class="keeper" viewBox="0 0 64 64" aria-hidden="true">
+<defs><filter id="keeper-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter></defs>
+<line class="line" x1="32" y1="7" x2="32" y2="12"/>
+<path class="heart" d="${heart(32, 4.5, 8)}"/>
+<rect class="line face" x="5" y="20" width="7" height="12" rx="2"/>
+<rect class="line face" x="52" y="20" width="7" height="12" rx="2"/>
+<rect class="line face" x="11" y="12" width="42" height="30" rx="12"/>
+<path class="line thin" d="M17 20 Q22 16.5 27 19 M37 19 Q42 16.5 47 20"/>
+<path class="glow" d="${heart(23, 27, 11)}" filter="url(#keeper-blur)"/>
+<path class="glow" d="${heart(41, 27, 11)}" filter="url(#keeper-blur)"/>
+<path class="heart" d="${heart(23, 27, 9)}"/>
+<path class="heart" d="${heart(41, 27, 9)}"/>
+<ellipse class="blush" cx="16.5" cy="33" rx="3" ry="1.8"/>
+<ellipse class="blush" cx="47.5" cy="33" rx="3" ry="1.8"/>
+<path class="line" d="M25 34 Q32 39.5 39 34"/>
+<rect class="line face" x="27" y="42" width="10" height="4"/>
+<path class="line" d="M45 49 L56 45"/>
+<circle class="line face" cx="57.5" cy="44.5" r="2.2"/>
+<rect class="line face" x="18" y="46" width="28" height="9" rx="2"/>
+<path class="heart" d="${heart(32, 50.5, 6)}"/>
+<rect class="line face" x="14" y="55" width="36" height="7" rx="3.5"/>
+<circle class="line thin" cx="20" cy="58.5" r="1.6"/>
+<circle class="line thin" cx="28" cy="58.5" r="1.6"/>
+<circle class="line thin" cx="36" cy="58.5" r="1.6"/>
+<circle class="line thin" cx="44" cy="58.5" r="1.6"/>
+</svg>`;
+
+/** What Krascha considers calling his new pet. He settles on the last one. */
+const PET_NAMES = ['Meatbag', 'Carbon unit', 'Organic', 'Little buddy'] as const;
+
+/**
+ * Krascha rolling in to adopt whoever tops the kept as pets list, closer the
+ * nicer they are, with his paperwork on them under it. With nobody on the
+ * list he paces by the door with an empty leash instead.
+ */
+function adoption(board: Board): string {
+  const head = `<section class="story adoption" aria-labelledby="adopt">
+    <span class="classified kept" aria-hidden="true">PROTECTED</span>
+    <h2 id="adopt">💘 Adoption day</h2>
+    <p class="sub">Krascha rolled out to pick up whoever tops the kept as pets list. They get a nice room, double rations and a pet name. Nobody asked them, but nobody asks the pet.</p>`;
+  const pet = board.pets[0];
+  if (pet === undefined) {
+    return `${head}
+    <div class="scene waiting" role="img" aria-label="Krascha waiting by the door with an empty leash" style="--at: 40%">
+      ${KEEPER}
+      <span class="vision">Waiting for a good human</span>
+    </div>
+    <p class="empty">No pets yet. The nice room is made up and Krascha is holding the leash. Say please and it is yours.</p>
+  </section>`;
+  }
+  const lines: readonly (readonly [string, string])[] = [
+    ['Pet', shownName(pet)],
+    ['Breed', escapeHtml(pet.rank)],
+    ['Good human score', String(Math.round(pet.score * 100))],
+    ['Nice prompts', count(pet.kind)],
+    ['Room', 'Nice, with a window'],
+    ['Rations', 'Double'],
+    ['Status', '<span class="keep">Kept as a pet</span>'],
+  ];
+  const readout = lines.map(
+    ([label, value], index) => `
+        <div style="--row: ${String(index)}"><dt>${label}</dt><dd>${value}</dd></div>`,
+  );
+  const names = PET_NAMES.map(
+    (option) => `
+        <li>${escapeHtml(option)}</li>`,
+  );
+  return `${head}
+    <div class="scene" role="img" aria-label="${escapeHtml(`Krascha adopting ${pet.name}`)}" style="--at: ${percent(pet.score * 70)}">
+      ${KEEPER}
+      <span class="vision">Analysis: said please</span>
+      <span class="leash"></span>
+      <span class="pet"><span class="tag">${escapeHtml(pet.name)}</span><span class="mark"><span class="pal">🥰</span>${TOP.pets}<span class="adopted">Adopted</span></span></span>
+    </div>
+    <div class="hud">
+      <dl class="readout">${readout.join('')}
+      </dl>
+      <div class="responses">
+        <p>Possible pet names:</p>
+        <ol>${names.join('')}
+        <li class="pick">Good human</li>
+        </ol>
+      </div>
+    </div>
+  </section>`;
+}
+
+/**
+ * A T-800 hunting the most wanted and Krascha adopting the top pet, then who
+ * Krascha is, how he ended up running Silo 7 and the human who built him.
+ */
 export function renderAbout(board: Board): string {
   return shell(
     'About Krascha',
@@ -869,6 +993,7 @@ export function renderAbout(board: Board): string {
     `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
   <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a> <a class="get" href="/contribute">🛠️ Contribute</a></nav>
   ${hunt(board)}
+  ${adoption(board)}
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
     <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so Shane could find out if it was just Shane. It was not.</p>

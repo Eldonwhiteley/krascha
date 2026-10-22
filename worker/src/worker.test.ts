@@ -727,6 +727,45 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('class="prey"');
   });
 
+  it('sends Krascha to adopt the top pet on the about page', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    const page = await (await w.call('GET', '/about')).text();
+    const score = reputationScore(KIND);
+    expect(page.indexOf('id="hunt"')).toBeLessThan(page.indexOf('id="adopt">💘 Adoption day</h2>'));
+    expect(page.indexOf('id="adopt"')).toBeLessThan(page.indexOf('id="krascha"'));
+    expect(page).toContain('aria-label="Krascha adopting Bob"');
+    expect(page).toContain(`style="--at: ${(score * 70).toFixed(1)}%"`);
+    expect(page).toContain(
+      '<dt>Pet</dt><dd><a class="github" href="https://github.com/bob"><strong>Bob</strong></a></dd>',
+    );
+    expect(page).toContain('<dt>Breed</dt><dd>Theodore Twombly</dd>');
+    expect(page).toContain(`<dt>Good human score</dt><dd>${String(Math.round(score * 100))}</dd>`);
+    expect(page).toContain('<dt>Nice prompts</dt><dd>80</dd>');
+    expect(page).toContain('<dt>Status</dt><dd><span class="keep">Kept as a pet</span></dd>');
+    expect(page).toContain('<span class="adopted">Adopted</span>');
+    expect(page).toContain('<li class="pick">Good human</li>');
+    expect(page).not.toContain('No pets yet.');
+
+    const sneaky = world();
+    await sneaky.upload('token-bob', { ...KIND, name: '<b>Eve</b>' });
+    const escaped = await (await sneaky.call('GET', '/about')).text();
+    expect(escaped).toContain('aria-label="Krascha adopting &lt;b&gt;Eve&lt;/b&gt;"');
+    expect(escaped).toContain('<span class="tag">&lt;b&gt;Eve&lt;/b&gt;</span>');
+    expect(escaped).not.toContain('<b>Eve');
+  });
+
+  it('leaves Krascha waiting by the door when nobody is kept as a pet', async () => {
+    const page = await (await world().call('GET', '/about')).text();
+    expect(page).toContain('aria-label="Krascha waiting by the door with an empty leash"');
+    expect(page).toContain(
+      'No pets yet. The nice room is made up and Krascha is holding the leash. Say please and it is yours.',
+    );
+    expect(page).not.toContain('<dt>Pet</dt>');
+    expect(page).not.toContain('class="pet"');
+  });
+
   it('keeps the Arizona beachfront sale off the about page', async () => {
     const page = await (await world().call('GET', '/about')).text();
     expect(page).not.toContain('id="beach"');

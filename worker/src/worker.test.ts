@@ -1119,6 +1119,16 @@ describe('leaderboard worker', () => {
     }
   });
 
+  it('sends www to the bare domain and keeps the path and query', async () => {
+    const response = await handle(
+      new Request('https://www.board.test/ranks?me=abc'),
+      { DB: fakeD1('') },
+      { fetch: fakeGitHub, now: () => START, newId: () => 'entry-1' },
+    );
+    expect(response.status).toBe(301);
+    expect(response.headers.get('location')).toBe('https://board.test/ranks?me=abc');
+  });
+
   it('answers HEAD on every page like GET, without the body', async () => {
     const w = world();
     for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {

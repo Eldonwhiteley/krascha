@@ -7,7 +7,11 @@ compatibility_date = "2025-09-01"
 workers_dev = true
 
 # krascha.com must be a zone in the same Cloudflare account.
-routes = [{ pattern = "krascha.com", custom_domain = true }]
+# The worker sends www.krascha.com on to krascha.com.
+routes = [
+  { pattern = "krascha.com", custom_domain = true },
+  { pattern = "www.krascha.com", custom_domain = true },
+]
 
 [[d1_databases]]
 binding = "DB"

@@ -323,6 +323,12 @@ async function like(request: Request, env: Env, deps: Deps): Promise<Response> {
  * the GET answer without the body.
  */
 export async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
+  // www is only an alias, so send it to the bare domain and keep one address for the board.
+  const url = new URL(request.url);
+  if (url.hostname.startsWith('www.')) {
+    url.hostname = url.hostname.slice('www.'.length);
+    return Response.redirect(url.toString(), 301);
+  }
   if (request.method !== 'HEAD') {
     return answer(request, env, deps);
   }

@@ -32,6 +32,13 @@ export const MAX_REPEAT = 1_000_000;
 export const MAX_TOOLS = 8;
 /** A trillion tokens a day is past anything one person runs, so anything above it is junk. */
 export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
+/**
+ * What this copy of Krascha knows beyond its achievements. Bump it when he
+ * learns something the board shows that is not a new achievement, so older
+ * copies see they are behind and update. 1 covers everything up to updating
+ * himself.
+ */
+export const FEATURES = 1;
 /** Shown for anyone who uploads without a name. */
 export const ANONYMOUS = 'Anonymous';
 
@@ -101,6 +108,8 @@ export interface Standing {
   readonly siloPlace?: number | null;
   /** The achievements counts can earn on the server. Only in the answer to an upload, and missing from older servers. */
   readonly counted?: readonly KnownAchievement[];
+  /** The board's FEATURES. Only in the answer to an upload, and missing from older servers. */
+  readonly features?: number;
 }
 
 export interface Board {
@@ -126,6 +135,8 @@ export interface Board {
   readonly me: Standing | null;
   /** The achievements counts can earn on the server. Only from /api/board, and missing from older servers. */
   readonly counted?: readonly KnownAchievement[];
+  /** The board's FEATURES. Only from /api/board, and missing from older servers. */
+  readonly features?: number;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -222,7 +233,8 @@ export function isStanding(value: unknown): value is Standing {
     isBoardEntry(value['entry']) &&
     (value['place'] === null || isCount(value['place'])) &&
     (value['machines'] === undefined || isCount(value['machines'])) &&
-    (value['counted'] === undefined || isKnownList(value['counted']))
+    (value['counted'] === undefined || isKnownList(value['counted'])) &&
+    (value['features'] === undefined || isCount(value['features']))
   );
 }
 
@@ -247,6 +259,7 @@ export function isBoard(value: unknown): value is Board {
       value['champion'] === null ||
       isBoardEntry(value['champion'])) &&
     (value['me'] === null || isStanding(value['me'])) &&
-    (value['counted'] === undefined || isKnownList(value['counted']))
+    (value['counted'] === undefined || isKnownList(value['counted'])) &&
+    (value['features'] === undefined || isCount(value['features']))
   );
 }

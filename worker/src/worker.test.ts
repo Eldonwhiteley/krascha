@@ -18,6 +18,7 @@ import {
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
+  FEATURES,
   isBoard,
   isStanding,
   MAX_ACHIEVEMENTS,
@@ -167,6 +168,7 @@ describe('leaderboard worker', () => {
       champion: null,
       me: null,
       counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
+      features: FEATURES,
     });
   });
 
@@ -227,6 +229,7 @@ describe('leaderboard worker', () => {
       siloPlace: 1,
       machines: 1,
       counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
+      features: FEATURES,
     });
   });
 

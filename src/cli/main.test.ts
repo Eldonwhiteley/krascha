@@ -9,6 +9,7 @@ import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
 import { COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
+import { FEATURES } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 
@@ -26,13 +27,17 @@ interface Run {
 interface Home {
   readonly root: string;
   readonly run: (...args: string[]) => Promise<Run>;
-  /** Swap in a fake board server and a fake gh for the next runs. */
+  /** Swap in a fake board server, a fake gh, a clock or settings for the next runs. */
   readonly use: (fakes: Partial<Fakes>) => void;
+  /** The commands Krascha started in the background, in order. */
+  readonly launched: (readonly string[])[];
 }
 
 interface Fakes {
   readonly fetch: FetchFunction;
   readonly githubToken: () => Promise<string | null>;
+  readonly env: NodeJS.ProcessEnv;
+  readonly now: number;
 }
 
 interface Sent {
@@ -112,7 +117,10 @@ async function makeHome(): Promise<Home> {
   let fakes: Fakes = {
     fetch: () => Promise.reject(new Error('offline')),
     githubToken: () => Promise.resolve(null),
+    env: {},
+    now: Date.parse('2026-10-03T12:00:00.000Z'),
   };
+  const launched: (readonly string[])[] = [];
   const use = (next: Partial<Fakes>): void => {
     fakes = { ...fakes, ...next };
   };
@@ -121,11 +129,14 @@ async function makeHome(): Promise<Home> {
     let err = '';
     const io: CliIo = {
       home: root,
-      env: {},
-      now: () => Date.parse('2026-10-03T12:00:00.000Z'),
+      env: fakes.env,
+      now: () => fakes.now,
       fetch: fakes.fetch,
       githubToken: fakes.githubToken,
       newKey: () => 'k'.repeat(43),
+      launch: (command) => {
+        launched.push(command);
+      },
       color: false,
       out: (text) => {
         out += text;
@@ -137,7 +148,7 @@ async function makeHome(): Promise<Home> {
     const code = await main(args, io);
     return { code, out, err };
   };
-  return { root, run, use };
+  return { root, run, use, launched };
 }
 
 describe('krascha', () => {
@@ -222,6 +233,8 @@ describe('krascha', () => {
       uploadedPrompts: 3,
       uploadedAchievements: expect.arrayContaining(['manners']),
       boardAchievements: null,
+      boardFeatures: null,
+      updateTriedAt: null,
     });
   });
 
@@ -261,7 +274,41 @@ describe('krascha', () => {
     expect((await home.run()).out).not.toContain('Tip:');
   });
 
-  it('says to update when the board can count achievements this copy cannot', async () => {
+  it('updates himself once a day when the board can count achievements this copy cannot', async () => {
+    const home = await makeHome();
+    const here = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name }));
+    const answer =
+      (counted: readonly { id: string; name: string }[], features?: number): FetchFunction =>
+      async (url, init) => {
+        const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
+        return Response.json({ ...Object(standing), counted, features });
+      };
+    const both = [
+      ['claude', 'plugin', 'update', 'krascha@shanep'],
+      ['copilot', 'plugin', 'update', 'krascha@shanep'],
+    ];
+    home.use({ fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]) });
+    await home.run('upload', 'Kyle');
+    expect(home.launched).toStrictEqual(both);
+    const tip =
+      'Tip: Krascha updated himself to count Skynet online. Restart Claude Code and Copilot CLI to use it.';
+    expect((await home.run()).out).toContain(tip);
+    expect((await home.run('silo')).out).toContain(tip);
+    await home.run('upload');
+    expect(home.launched).toStrictEqual(both);
+    home.use({ now: Date.parse('2026-10-04T12:00:00.000Z') });
+    await home.run('upload');
+    expect(home.launched).toStrictEqual([...both, ...both]);
+    home.use({ fetch: answer(here, FEATURES) });
+    await home.run('upload');
+    expect((await home.run()).out).not.toContain('Tip:');
+    home.use({ fetch: answer(here, FEATURES + 1) });
+    await home.run('upload');
+    expect((await home.run()).out).toContain('Tip: Krascha updated himself to a newer copy.');
+    expect(home.launched).toHaveLength(6);
+  });
+
+  it('says how to update when updating himself is turned off', async () => {
     const home = await makeHome();
     const here = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name }));
     const answer =
@@ -270,12 +317,15 @@ describe('krascha', () => {
         const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
         return Response.json({ ...Object(standing), counted });
       };
-    home.use({ fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]) });
+    home.use({
+      fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]),
+      env: { KRASCHA_NO_UPDATE: '1' },
+    });
     await home.run('upload', 'Kyle');
-    const tip = 'Tip: Krascha learned 1 achievement this copy cannot count yet: Skynet online. Run';
-    expect((await home.run()).out).toContain(tip);
-    expect((await home.run('silo')).out).toContain(tip);
-    expect((await home.run()).out).toContain('plugin update krascha@shanep');
+    expect(home.launched).toStrictEqual([]);
+    expect((await home.run()).out).toContain(
+      'Tip: Krascha learned 1 achievement this copy cannot count yet: Skynet online. Run claude plugin update krascha@shanep and copilot plugin update krascha@shanep in a terminal, then restart Claude Code and Copilot CLI.',
+    );
     home.use({ fetch: answer(here) });
     await home.run('upload');
     expect((await home.run()).out).not.toContain('Tip:');

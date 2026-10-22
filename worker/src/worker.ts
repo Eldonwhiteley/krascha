@@ -14,6 +14,7 @@
 import { COUNTED_ACHIEVEMENTS, SHANEP } from '../../src/shared/achievements.js';
 import type { KnownAchievement } from '../../src/shared/leaderboard.js';
 import {
+  FEATURES,
   GITHUB_LOGIN_PATTERN,
   isScoreUpload,
   KEY_PATTERN,
@@ -274,7 +275,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       `You can upload ${String(UPLOADS_PER_DAY)} times a day. Try again tomorrow (UTC).`,
     );
   }
-  return json({ ...saved.standing, counted: COUNTED }, 201);
+  return json({ ...saved.standing, counted: COUNTED, features: FEATURES }, 201);
 }
 
 async function remove(request: Request, env: Env, deps: Deps): Promise<Response> {
@@ -377,7 +378,7 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       const me = url.searchParams.get('me');
       const board = await readBoard(env.DB, me === '' ? null : me);
       const cache = me === null ? 'public, max-age=60' : 'no-store';
-      return json({ ...board, counted: COUNTED }, 200, cache);
+      return json({ ...board, counted: COUNTED, features: FEATURES }, 200, cache);
     }
     case 'POST /api/scores': {
       return upload(request, env, deps);

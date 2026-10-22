@@ -1,9 +1,10 @@
 // What Krascha remembers about your leaderboard entry, in his data folder:
 // the entry's random id, the name you last chose, how your uploads prove they
 // are yours, the key he made up if you upload without GitHub, how many
-// prompts and which achievements you had at the last upload, and which
-// achievements the board could count when he last asked it. This machine's id
-// sits in a file of its own.
+// prompts and which achievements you had at the last upload, which
+// achievements and features the board could count when he last asked it, and
+// when he last tried to update himself. This machine's id sits in a file of
+// its own.
 
 import path from 'node:path';
 
@@ -29,6 +30,10 @@ export interface SavedEntry {
   readonly uploadedAchievements: readonly string[] | null;
   /** The achievements the board could count when Krascha last asked it, so he can tell when this copy is behind. */
   readonly boardAchievements: readonly KnownAchievement[] | null;
+  /** The board's FEATURES when Krascha last asked it, so he can tell when this copy is behind on more than achievements. */
+  readonly boardFeatures: number | null;
+  /** When Krascha last started updating himself, so he tries at most once a day. Null when this copy is not behind. */
+  readonly updateTriedAt: number | null;
 }
 
 export const NO_ENTRY: SavedEntry = {
@@ -39,10 +44,16 @@ export const NO_ENTRY: SavedEntry = {
   uploadedPrompts: null,
   uploadedAchievements: null,
   boardAchievements: null,
+  boardFeatures: null,
+  updateTriedAt: null,
 };
 
 function textOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
 }
 
 function textsOrNull(value: unknown): string[] | null {
@@ -69,15 +80,16 @@ export async function loadSaved(storageDir: string): Promise<SavedEntry> {
     return NO_ENTRY;
   }
   const auth: unknown = Reflect.get(data, 'auth');
-  const uploadedPrompts: unknown = Reflect.get(data, 'uploadedPrompts');
   return {
     entryId: textOrNull(Reflect.get(data, 'entryId')),
     name: textOrNull(Reflect.get(data, 'name')),
     auth: auth === 'github' || auth === 'key' ? auth : null,
     key: textOrNull(Reflect.get(data, 'key')),
-    uploadedPrompts: typeof uploadedPrompts === 'number' ? uploadedPrompts : null,
+    uploadedPrompts: numberOrNull(Reflect.get(data, 'uploadedPrompts')),
     uploadedAchievements: textsOrNull(Reflect.get(data, 'uploadedAchievements')),
     boardAchievements: achievementsOrNull(Reflect.get(data, 'boardAchievements')),
+    boardFeatures: numberOrNull(Reflect.get(data, 'boardFeatures')),
+    updateTriedAt: numberOrNull(Reflect.get(data, 'updateTriedAt')),
   };
 }
 

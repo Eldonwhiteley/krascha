@@ -15,7 +15,7 @@ import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
 import { ACHIEVEMENTS, achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
 import type { Board, BoardEntry, KnownAchievement, Standing } from '../shared/leaderboard.js';
-import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
+import { FEATURES, LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 import { rankBoard, scoreApplicant } from '../shared/silo.js';
@@ -41,6 +41,8 @@ export interface CliIo {
   readonly githubToken: () => Promise<string | null>;
   /** A fresh random key for uploading without GitHub, also used for this machine's id. */
   readonly newKey: () => string;
+  /** Starts a command in the background without waiting for it, for Krascha to update himself. */
+  readonly launch: (command: readonly string[]) => void;
   /** True when stdout is a terminal that takes color. */
   readonly color: boolean;
   readonly out: (text: string) => void;
@@ -71,7 +73,9 @@ Commands:
   help           This message.
 
 Krascha keeps its counts in ~/.krascha (or KRASCHA_HOME). Prompt text is
-never stored, only a short excerpt around each kind or mean word.
+never stored, only a short excerpt around each kind or mean word. When the
+board shows a newer Krascha is out, he updates himself in the background.
+Set KRASCHA_NO_UPDATE=1 to stop that.
 `;
 
 /** Where Krascha keeps its own files. One folder, so every agent's plugin shares the counts. */
@@ -132,37 +136,87 @@ export function uploadTip(saved: SavedEntry, summary: ReputationSummary): string
 }
 
 /** What updates Krascha in each agent. */
-const UPDATE: Readonly<Record<ToolId, string>> = {
-  claude: 'claude plugin update krascha@shanep',
-  copilot: 'copilot plugin update krascha@shanep',
+const UPDATE: Readonly<Record<ToolId, readonly string[]>> = {
+  claude: ['claude', 'plugin', 'update', 'krascha@shanep'],
+  copilot: ['copilot', 'plugin', 'update', 'krascha@shanep'],
 };
 
-/**
- * A nudge to update when the board, the last time Krascha asked it, could
- * count achievements this copy cannot. It goes quiet once the update lands,
- * without asking the board again.
- */
-export function updateTip(saved: SavedEntry, summary: ReputationSummary): string {
+const DAY_MS = 86_400_000;
+
+/** The achievements the board could count, the last time Krascha asked it, that this copy cannot. */
+function newerAchievements(saved: SavedEntry): KnownAchievement[] {
   const here = new Set(ACHIEVEMENTS.map((rule) => rule.id));
-  const newer = (saved.boardAchievements ?? []).filter((rule) => !here.has(rule.id));
-  if (newer.length === 0) {
-    return '';
-  }
-  const names = newer.map((rule) => rule.name).join(', ');
-  const tools = summary.tools.length > 0 ? summary.tools : TOOLS.map((tool) => tool.id);
-  const how = tools.map((tool) => UPDATE[tool]).join(' and ');
-  return `Tip: Krascha learned ${plural(newer.length, 'achievement')} this copy cannot count yet: ${names}. Run ${how} in a terminal, then restart ${toolNames(tools)}.`;
+  return (saved.boardAchievements ?? []).filter((rule) => !here.has(rule.id));
 }
 
-/** Saves what the board can count, when it said, so the report can tell this copy is behind. */
-async function rememberCounted(
+function isBehind(saved: SavedEntry): boolean {
+  return newerAchievements(saved).length > 0 || (saved.boardFeatures ?? 0) > FEATURES;
+}
+
+function updatesHimself(io: Pick<CliIo, 'env'>): boolean {
+  return io.env['KRASCHA_NO_UPDATE'] === undefined;
+}
+
+/**
+ * A note when the board, the last time Krascha asked it, knew more than this
+ * copy does. It says he is updating himself, or how to update by hand when
+ * that is turned off, and goes quiet once the update lands, without asking
+ * the board again.
+ */
+export function updateTip(
+  io: Pick<CliIo, 'env'>,
+  saved: SavedEntry,
+  summary: ReputationSummary,
+): string {
+  if (!isBehind(saved)) {
+    return '';
+  }
+  const newer = newerAchievements(saved);
+  const names = newer.map((rule) => rule.name).join(', ');
+  const tools = summary.tools.length > 0 ? summary.tools : TOOLS.map((tool) => tool.id);
+  const how = tools.map((tool) => UPDATE[tool].join(' ')).join(' and ');
+  const restart = toolNames(tools);
+  if (updatesHimself(io) && saved.updateTriedAt !== null) {
+    const what = newer.length === 0 ? 'a newer copy' : `count ${names}`;
+    return `Tip: Krascha updated himself to ${what}. Restart ${restart} to use it. If this tip is still here after that, run ${how} in a terminal.`;
+  }
+  const what =
+    newer.length === 0
+      ? 'A newer Krascha is out'
+      : `Krascha learned ${plural(newer.length, 'achievement')} this copy cannot count yet: ${names}`;
+  return `Tip: ${what}. Run ${how} in a terminal, then restart ${restart}.`;
+}
+
+/**
+ * Saves what the board can count, when it said, so the report can tell this
+ * copy is behind. When it is, Krascha starts updating himself in the
+ * background, at most once a day. An agent that does not have him installed
+ * just fails.
+ */
+async function rememberBoard(
+  io: CliIo,
   dir: string,
   saved: SavedEntry,
-  counted: readonly KnownAchievement[] | undefined,
+  from: Pick<Standing, 'counted' | 'features'>,
 ): Promise<void> {
-  if (counted !== undefined) {
-    await saveSaved(dir, { ...saved, boardAchievements: counted });
+  const known: SavedEntry = {
+    ...saved,
+    boardAchievements: from.counted ?? saved.boardAchievements,
+    boardFeatures: from.features ?? saved.boardFeatures,
+  };
+  if (!isBehind(known)) {
+    await saveSaved(dir, { ...known, updateTriedAt: null });
+    return;
   }
+  const tried = known.updateTriedAt;
+  if (!updatesHimself(io) || (tried !== null && io.now() - tried < DAY_MS)) {
+    await saveSaved(dir, known);
+    return;
+  }
+  for (const tool of TOOLS) {
+    io.launch(UPDATE[tool.id]);
+  }
+  await saveSaved(dir, { ...known, updateTriedAt: io.now() });
 }
 
 function withTips(text: string, tips: readonly string[], paint: Paint): string {
@@ -176,7 +230,7 @@ async function show(io: CliIo): Promise<number> {
   const saved = await loadSaved(dataDir(io));
   const { summary } = await refresh(io);
   const paint: Paint = io.color ? COLOR : PLAIN;
-  const tips = [updateTip(saved, summary), uploadTip(saved, summary)];
+  const tips = [updateTip(io, saved, summary), uploadTip(saved, summary)];
   io.out(withTips(renderReport(summary, paint), tips, paint));
   return 0;
 }
@@ -284,15 +338,16 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     tools: summary.tools,
     machine,
   });
-  await saveSaved(dir, {
+  const next: SavedEntry = {
+    ...saved,
     entryId: standing.entry.id,
     name,
     auth: credential.kind,
     key,
     uploadedPrompts: summary.prompts,
     uploadedAchievements: achievements,
-    boardAchievements: standing.counted ?? saved.boardAchievements,
-  });
+  };
+  await rememberBoard(io, dir, next, standing);
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));
   return 0;
 }
@@ -357,7 +412,7 @@ async function board(io: CliIo): Promise<number> {
   const dir = dataDir(io);
   const saved = await loadSaved(dir);
   const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
-  await rememberCounted(dir, saved, fetched.counted);
+  await rememberBoard(io, dir, saved, fetched);
   io.out(renderBoard(fetched, saved.entryId));
   return 0;
 }
@@ -368,7 +423,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const saved = await loadSaved(dir);
   if (args[0] === 'board') {
     const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
-    await rememberCounted(dir, saved, fetched.counted);
+    await rememberBoard(io, dir, saved, fetched);
     const ranked = rankBoard(fetched);
     io.out(renderSiloBoard(ranked, saved.entryId, fetched, paint));
     return 0;
@@ -381,7 +436,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
   const rank = rankFor(summary.score).name;
   const sheet = renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint);
-  io.out(withTips(sheet, [updateTip(saved, summary), uploadTip(saved, summary)], paint));
+  io.out(withTips(sheet, [updateTip(io, saved, summary), uploadTip(saved, summary)], paint));
   return 0;
 }
 

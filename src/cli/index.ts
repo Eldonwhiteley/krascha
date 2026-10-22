@@ -1,6 +1,6 @@
 // The entry point esbuild bundles into dist/cli.js.
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import os from 'node:os';
 
@@ -18,6 +18,16 @@ async function githubToken(): Promise<string | null> {
   });
 }
 
+/** Starts a command on its own, so Krascha can exit while it runs. A command that is not installed is ignored. */
+function launch([command, ...args]: readonly string[]): void {
+  if (command === undefined) {
+    return;
+  }
+  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+  child.on('error', () => undefined);
+  child.unref();
+}
+
 process.exitCode = await main(process.argv.slice(2), {
   home: os.homedir(),
   env: process.env,
@@ -25,6 +35,7 @@ process.exitCode = await main(process.argv.slice(2), {
   fetch: async (url, init) => fetch(url, init),
   githubToken,
   newKey: () => randomBytes(32).toString('base64url'),
+  launch,
   color,
   out: (text) => process.stdout.write(text),
   err: (text) => process.stderr.write(text),

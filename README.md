@@ -79,9 +79,11 @@ update itself, so the verdict and the silo sheet end with a tip to upload if
 you never have, or if you typed more prompts since your last upload. When you
 earn an achievement the board does not have yet, including a new one Krascha
 just learned, the tip names it. After a `remove` the tip goes quiet. When
-the board can count achievements your copy of Krascha cannot, the next
-`board`, `silo board` or `upload` notes it, and the verdict names them with
-the command to update.
+`board`, `silo board` or `upload` finds the board knows something your copy
+of Krascha does not, like an achievement it cannot count yet, Krascha
+updates himself in the background, at most once a day, and the verdict tells
+you to restart. Set `KRASCHA_NO_UPDATE=1` to stop that, and the verdict gives
+you the command to run instead.
 
 Some achievements you can earn again, like each meltdown day, each session
 you rage quit or every 1,000 prompts. The report shows how many times next to

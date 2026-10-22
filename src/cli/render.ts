@@ -185,8 +185,10 @@ function trophies(summary: ReputationSummary, paint: Paint): string[] {
     lines.push('', paint.bold('Trophy case'));
     // The rarest first, so a legendary one sits on the top shelf.
     for (const rule of earned.toSorted((a, b) => TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier))) {
+      const times = rule.times?.(summary) ?? 1;
+      const repeated = times > 1 ? ` ${paint.yellow(`×${count(times)}`)}` : '';
       lines.push(
-        `  ${rule.icon} ${paint.bold(rule.name)}  ${medal(rule.tier, paint)}`,
+        `  ${rule.icon} ${paint.bold(rule.name)}${repeated}  ${medal(rule.tier, paint)}`,
         paint.dim(`     "${rule.quip}"`),
       );
     }

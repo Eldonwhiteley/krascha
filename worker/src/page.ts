@@ -21,7 +21,7 @@ import {
   GRAMS_PER_TOKEN,
   warmthPercent,
 } from '../../src/shared/climate.js';
-import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
+import type { Board, BoardEntry, Repeats } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 import { RANKS, scalePercent } from '../../src/shared/ranks.js';
 import {
@@ -75,15 +75,24 @@ function achievementAnchor(id: string): string {
   return `achievement-${id}`;
 }
 
-/** The medals under a name, each a link to what it means on the achievements page. */
-function trophies(ids: readonly string[]): string {
+/**
+ * The medals under a name, each a link to what it means on the achievements
+ * page, with a count in the corner of the ones earned more than once.
+ */
+function trophies(ids: readonly string[], repeats: Repeats): string {
   const earned = achievementsOf(ids);
   if (earned.length === 0) {
     return '';
   }
   const medals = earned.map((rule) => {
-    const about = escapeHtml(`${rule.name}: ${rule.how}`);
-    return `<a class="medal ${rule.tier}" href="/achievements#${escapeHtml(achievementAnchor(rule.id))}" title="${about}" aria-label="${about}">${escapeHtml(rule.icon)}</a>`;
+    const times = repeats[rule.id] ?? 1;
+    const about = escapeHtml(
+      times > 1 ? `${rule.name}, earned ${count(times)} times: ${rule.how}` : `${rule.name}: ${rule.how}`,
+    );
+    const medal = `<a class="medal ${rule.tier}" href="/achievements#${escapeHtml(achievementAnchor(rule.id))}" title="${about}" aria-label="${about}">${escapeHtml(rule.icon)}</a>`;
+    return times > 1
+      ? `<span class="repeated">${medal}<span class="times" aria-hidden="true">${escapeHtml(COMPACT.format(times))}</span></span>`
+      : medal;
   });
   return `<span class="trophies" role="group" aria-label="Achievements">${medals.join('')}</span>`;
 }
@@ -175,7 +184,7 @@ function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof T
         <span class="who">
           ${name(entry)}${index === 0 ? TOP[top] : ''}
           <span class="rank"><a href="/ranks#${rankAnchor(entry.rank)}">${escapeHtml(entry.rank)}</a></span>
-          ${trophies(entry.achievements ?? [])}
+          ${trophies(entry.achievements ?? [], entry.repeats ?? {})}
         </span>
         <span class="counts">${counts(entry)}</span>
         <span class="score">${String(Math.round(entry.score * 100))}</span>
@@ -400,7 +409,7 @@ function legend(board: Board): string {
         <div class="badge ${rule.tier}${unclaimed}" id="${escapeHtml(achievementAnchor(rule.id))}">
           <dt><span class="medal ${rule.tier}" aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)} <span class="tier">${escapeHtml(tierLabel(rule))}</span></dt>
           <dd>${escapeHtml(rule.how)}</dd>
-          <dd class="quip">"${escapeHtml(rule.quip)}"</dd>${shown}
+          <dd class="quip">"${escapeHtml(rule.quip)}"</dd>${rule.times === undefined ? '' : '\n          <dd class="again">🔁 Earn it again and the medal counts how many times.</dd>'}${shown}
         </div>`;
   });
   return `<section class="legend" aria-labelledby="legend">
@@ -489,6 +498,10 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .trophies { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
 .trophies .medal { text-decoration: none; }
 .trophies .medal:hover, .trophies .medal:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.repeated { position: relative; display: inline-flex; }
+.times { position: absolute; right: -5px; bottom: -4px; min-width: 1.4em; padding: 0 3px; border: 1px solid var(--card);
+  border-radius: 999px; background: var(--red); color: #fff; font: 700 0.6em/1.4 var(--mono); text-align: center;
+  text-shadow: none; pointer-events: none; }
 .medal { --metal: #cd7f32; --rim: #7a4a1c; position: relative; display: inline-grid; place-items: center;
   width: 1.7em; height: 1.7em; overflow: hidden; border-radius: 50%; font-size: 0.85em; line-height: 1;
   background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.75), transparent 45%), var(--metal);
@@ -508,6 +521,7 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .badge.unclaimed .medal { filter: grayscale(1); opacity: 0.55; }
 .tier { margin-left: auto; color: var(--muted); font: 700 0.7em var(--mono); letter-spacing: 1px; text-transform: uppercase; }
 .badge dd { margin-top: 4px; }
+.badge .again { color: var(--muted); font-size: 0.85em; }
 .badge:target { outline: 3px solid var(--link); outline-offset: 2px; }
 .quip { font-style: italic; }
 .rarity { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-family: var(--mono); }
@@ -1387,7 +1401,7 @@ export function renderPage(board: Board, now: number): string {
   ${climate(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
-    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.
+    Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and how many times, and which of the two you use, never prompt text. A name checked with GitHub links to the account.
     A ✓ means the upload was checked with GitHub. A like keeps only a hash of the day, your network and who you liked, for a day, so a network can like each entry once a day. It is all in fun, and scores are self reported.</p>
     <p>Last surveillance sweep ${escapeHtml(new Date(now).toUTCString())}. Compliance is appreciated.</p>
     <p class="remembers">Krascha remembers.</p>

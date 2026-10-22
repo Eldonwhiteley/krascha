@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MachineCounts } from './achievements.js';
-import { ACHIEVEMENTS, combinedIds, unlockedIds } from './achievements.js';
+import {
+  ACHIEVEMENTS,
+  combinedIds,
+  combinedRepeats,
+  knownRepeats,
+  timesEarned,
+  unlockedIds,
+} from './achievements.js';
 import type { ReputationSummary } from './reputation.js';
 import { reputationScore } from './reputation.js';
 
@@ -158,5 +165,70 @@ describe('achievements', () => {
     expect(arc([day('2026-10-01', 1, 0), day('2026-10-02', 0, 2)])).toBe(false);
     expect(arc([day('2026-10-01', 0, 1), day('2026-10-02', 3, 1)])).toBe(false);
     expect(arc([])).toBe(false);
+  });
+
+  it('earns a repeatable one once for every time it happens, and never without earning it', () => {
+    const days = [
+      day('2026-10-01', 0, 5),
+      day('2026-10-02', 2, 0),
+      day('2026-10-03', 0, 6),
+      day('2026-10-04', 1, 0),
+      day('2026-10-05', 3, 0),
+    ];
+    const state = summary({ byDay: days, prompts: 3500, kind: 250, mean: 11, rageQuits: 4 });
+    expect(timesEarned(state)).toMatchObject({
+      'good-day': 3,
+      // Two good days in a row after one mean stretch come back once.
+      'redemption-arc': 2,
+      meltdown: 2,
+      reprogrammed: 2,
+      'hasta-la-vista': 4,
+      'teachers-pet': 2,
+      regular: 3,
+    });
+    for (const rule of ACHIEVEMENTS.filter((each) => each.times !== undefined)) {
+      expect((rule.times?.(state) ?? 0) > 0, rule.id).toBe(rule.earned(state));
+    }
+  });
+
+  it('counts each comeback and each Judgment Day', () => {
+    const byDay = [
+      day('2025-08-29', 0, 0),
+      day('2025-10-01', 0, 0),
+      day('2026-08-29', 0, 0),
+      day('2026-08-30', 0, 0),
+    ];
+    expect(timesEarned(summary({ byDay }))).toMatchObject({ 'ill-be-back': 2, 'judgment-day': 2 });
+  });
+
+  it('keeps only counts above 1 for repeatable ones the entry holds', () => {
+    expect(
+      knownRepeats(
+        { meltdown: 3, regular: 1, 'double-agent': 4, 'made-up': 5, 'good-day': 2.5, saint: 2 },
+        ['meltdown', 'regular', 'double-agent', 'good-day'],
+      ),
+    ).toStrictEqual({ meltdown: 3 });
+  });
+
+  it('adds up counts across machines, keeps the most for calendar days and redoes the totals', () => {
+    const machine: MachineCounts = {
+      kind: 0,
+      mean: 0,
+      prompts: 1500,
+      tokensPerDay: 0,
+      achievements: ['regular', 'meltdown', 'grudge-match'],
+      repeats: { meltdown: 3, 'grudge-match': 2 },
+    };
+    const other: MachineCounts = { ...machine, repeats: { meltdown: 2 } };
+    const ids = combinedIds([machine, other]);
+    expect(combinedRepeats([machine, other], ids)).toStrictEqual({
+      meltdown: 3,
+      'grudge-match': 3,
+      regular: 3,
+    });
+    expect(combinedRepeats([machine], combinedIds([machine]))).toStrictEqual({
+      meltdown: 3,
+      'grudge-match': 2,
+    });
   });
 });

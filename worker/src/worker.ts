@@ -220,7 +220,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
   if (!isScoreUpload(body)) {
     return fail(
       400,
-      'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements, a short list of agents and a machine id that looks like a Krascha key.',
+      'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements and how many times each was earned, a short list of agents and a machine id that looks like a Krascha key.',
     );
   }
   // Only these fields are kept, whatever else the body holds.
@@ -230,6 +230,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
     mean,
     prompts,
     achievements = [],
+    repeats = {},
     tokensPerDay = 0,
     tools = [],
     machine,
@@ -245,6 +246,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       mean,
       prompts,
       achievements,
+      repeats,
       tokensPerDay,
       tools,
       ...(machine === undefined ? {} : { machine }),

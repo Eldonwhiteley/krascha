@@ -64,9 +64,9 @@ checkout without either tool.
 
 ## The leaderboard
 
-`upload` sends your counts, rank, achievements, average tokens a day, which
-of Claude Code and Copilot CLI you typed into, the name you pick and a random
-id for the machine. It never sends your prompts. The board tags each name with
+`upload` sends your counts, rank, achievements and how many times you earned
+each, average tokens a day, which of Claude Code and Copilot CLI you typed
+into, the name you pick and a random id for the machine. It never sends your prompts. The board tags each name with
 the tools it uses, from every machine that uploads to it.
 Leave the name off to stay Anonymous, and later uploads reuse the last name
 you gave. You show on the board once you have 100 prompts. The board does not
@@ -74,6 +74,12 @@ update itself, so the verdict and the silo sheet end with a tip to upload if
 you never have, or if you typed more prompts since your last upload. When you
 earn an achievement the board does not have yet, including a new one Krascha
 just learned, the tip names it. After a `remove` the tip goes quiet.
+
+Some achievements you can earn again, like each meltdown day, each session
+you rage quit or every 1,000 prompts. The report shows how many times next to
+the name (Meltdown ×12), and the board puts the count in the corner of the
+medal. Most decorated still counts each achievement once, so farming
+meltdowns will not win it.
 
 If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
@@ -118,8 +124,10 @@ nobody floods the board.
 Run `upload` on each machine and the board adds them up into one entry. The
 counts and the tokens a day are summed, the tools are combined, and the
 achievements are worked out from the totals, except the ones about a single
-day, session or prompt, which count if either machine earned them. Each
-upload replaces only that machine's last one.
+day, session or prompt, which count if either machine earned them. Counts
+for the ones you can earn again add up across machines, except the ones about
+a calendar day, which keep the most any one machine has, since two machines
+can share a day. Each upload replaces only that machine's last one.
 With gh, sign in to the same GitHub account on both. Without gh, copy
 `~/.krascha/leaderboard.json` to the second machine so they share the key. Do
 not also `import` one machine's counts into the other, or the board counts

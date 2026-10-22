@@ -249,6 +249,44 @@ describe('leaderboard worker', () => {
     expect(again.entry.achievements).toStrictEqual([CROWN, BUNK_ASSIGNED]);
   });
 
+  it('keeps how many times each was earned, shows it on the medal and leaves the crown to distinct ones', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', {
+      ...MEAN,
+      achievements: ['first-strike', 'meltdown'],
+      // Only repeatable ones Ann holds, earned more than once, are kept.
+      repeats: { meltdown: 12, 'first-strike': 3, 'grudge-match': 4 },
+    });
+    expect(ann.entry.repeats).toStrictEqual({ meltdown: 12 });
+    expect((await w.board()).mostWanted[0]?.repeats).toStrictEqual({ meltdown: 12 });
+    const html = await (await w.call('GET', '/')).text();
+    expect(html).toContain(
+      '<span class="repeated"><a class="medal silver" href="/achievements#achievement-meltdown" title="Meltdown, earned 12 times: Be mean to your AI 5 times in one day." aria-label="Meltdown, earned 12 times: Be mean to your AI 5 times in one day.">🌋</a><span class="times" aria-hidden="true">12</span></span>',
+    );
+    // Ann's 12 meltdowns count once, so Bob's 4 pass her 3 with the bunk.
+    await w.upload('token-bob', { ...KIND, achievements: ['manners', 'charm', 'saint', 'diplomat'] });
+    expect((await w.board()).crown?.name).toBe('Bob');
+    // Two machines that share a calendar day keep the most either one sent.
+    const laptop = 'b'.repeat(32);
+    await w.upload('token-ann', {
+      ...MEAN,
+      achievements: ['first-strike', 'meltdown'],
+      repeats: { meltdown: 5 },
+      machine: laptop,
+    });
+    expect((await w.board()).mostWanted[0]?.repeats).toStrictEqual({ meltdown: 5 });
+    await w.upload('token-ann', {
+      ...MEAN,
+      achievements: ['first-strike', 'meltdown'],
+      repeats: { meltdown: 9 },
+      machine: 'c'.repeat(32),
+    });
+    expect((await w.board()).mostWanted[0]?.repeats).toStrictEqual({ meltdown: 9 });
+    expect(
+      await w.status('POST', '/api/scores', 'token-cat', { ...KIND, repeats: { meltdown: -1 } }),
+    ).toBe(400);
+  });
+
   it('keeps the token average, shows it on the page and resets it when an upload leaves it out', async () => {
     const w = world();
     const standing = await w.upload('token-ann', { ...MEAN, tokensPerDay: 187_537_200 });

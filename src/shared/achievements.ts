@@ -1,10 +1,14 @@
 // Trophies earned from your counts: the first please, a meltdown day, a
 // thousand prompts, five hundred hours, a token habit. Shared so the report can show yours, the upload
-// can send which ones you have, and the leaderboard can show everyone's. A few
+// can send which ones you have, and the leaderboard can show everyone's. Some
+// you can earn again, like each meltdown day or every thousand prompts, and
+// those count how many times. A few
 // belong to one GitHub account or to whoever on the board has the most, and
 // only the leaderboard hands those out.
 
 import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
+import type { Repeats } from './leaderboard.js';
+import { MAX_REPEAT } from './leaderboard.js';
 import { RANKS, rankFor } from './ranks.js';
 import type { ReputationSummary, ReputationTally } from './reputation.js';
 import { reputationScore } from './reputation.js';
@@ -81,9 +85,29 @@ function reach(
   };
 }
 
+/** A rule that unlocks once a count reaches `need`, and is earned again at every multiple of it. */
+function every(
+  need: number,
+  pick: (state: ReputationSummary) => number,
+): Pick<AchievementRule, 'earned' | 'progress' | 'times'> {
+  return { ...reach(need, pick), times: (state) => Math.floor(pick(state) / need) };
+}
+
 /** The most of something in one day or session, or 0 with none. */
 function most<Row>(rows: readonly Row[], pick: (row: Row) => number): number {
   return rows.reduce((best, row) => Math.max(best, pick(row)), 0);
+}
+
+/** A rule that unlocks once one day or session reaches `need`, and counts each one that does. */
+function inOne<Row>(
+  need: number,
+  rows: (state: ReputationSummary) => readonly Row[],
+  pick: (row: Row) => number,
+): Pick<AchievementRule, 'earned' | 'progress' | 'times'> {
+  return {
+    ...reach(need, (state) => most(rows(state), pick)),
+    times: (state) => rows(state).filter((row) => pick(row) >= need).length,
+  };
 }
 
 type Day = ReputationSummary['byDay'][number];
@@ -109,12 +133,45 @@ function longestCeasefire(days: readonly Day[]): number {
   return best;
 }
 
-/** The most days in a row you typed nothing, between two days you did. */
-function longestBreak(days: readonly Day[]): number {
-  return days.reduce((best, day, index) => {
+/** The days you typed nothing between each day you did and the one before it. */
+function breaks(days: readonly Day[]): number[] {
+  return days.flatMap((day, index) => {
     const before = days[index - 1];
-    return before === undefined ? best : Math.max(best, daysBetween(before, day) - 1);
-  }, 0);
+    return before === undefined ? [] : [daysBetween(before, day) - 1];
+  });
+}
+
+/** True for August 29, the day Skynet fought back. */
+function isJudgmentDay(day: Day): boolean {
+  return day.date.endsWith('-08-29');
+}
+
+/** True for a day with nice prompts and no mean ones. */
+function isGoodDay(day: Day): boolean {
+  return day.kind > 0 && day.mean === 0;
+}
+
+/** Good days that come after a mean one, each mean stretch counted once. */
+function redemptions(days: readonly Day[]): number {
+  let owed = false;
+  let count = 0;
+  for (const day of days) {
+    if (day.mean > 0) {
+      owed = true;
+    } else if (owed && isGoodDay(day)) {
+      owed = false;
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** Meltdowns followed by a good day the next day you worked. */
+function recoveries(days: readonly Day[]): number {
+  return days.filter((day, index) => {
+    const after = days[index + 1];
+    return day.mean >= MELTDOWN_MEAN && after !== undefined && isGoodDay(after);
+  }).length;
 }
 
 /** How close you are to a count you lose for good once `spoiled` is true. */
@@ -141,6 +198,13 @@ export interface AchievementRule {
   readonly earned: (state: ReputationSummary) => boolean;
   /** How close you are, for the ones that count up to something. */
   readonly progress?: (state: ReputationSummary) => Progress;
+  /** How many times you have earned it, for the ones you can earn again. */
+  readonly times?: (state: ReputationSummary) => number;
+  /**
+   * True when `times` counts calendar days, which two machines can share, so
+   * the board keeps the most any machine sent rather than adding them up.
+   */
+  readonly byDate?: true;
   /**
    * True when it reads only the totals, the token average and the tools, so the board
    * can work it out again for several machines added up.
@@ -183,7 +247,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: 'Be nice in 100 prompts.',
     quip: 'Krascha moved your file to the nice drawer.',
-    ...reach(100, (state) => state.kind),
+    ...every(100, (state) => state.kind),
     fromCounts: true,
   },
   {
@@ -193,7 +257,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'bronze',
     how: 'Have a day with nice prompts and no mean ones.',
     quip: 'A whole day without yelling. The machines find it suspicious.',
-    earned: (state) => state.byDay.some((day) => day.kind > 0 && day.mean === 0),
+    earned: (state) => state.byDay.some(isGoodDay),
+    times: (state) => state.byDay.filter(isGoodDay).length,
+    byDate: true,
   },
   {
     id: 'redemption-arc',
@@ -202,11 +268,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Have a good day, nice prompts and no mean ones, after a day you were mean.',
     quip: 'You came back and said sorry with your whole chest. Krascha is moved, slightly.',
-    earned: (state) =>
-      state.byDay.some(
-        (day, at) =>
-          day.kind > 0 && day.mean === 0 && state.byDay.slice(0, at).some((past) => past.mean > 0),
-      ),
+    earned: (state) => redemptions(state.byDay) > 0,
+    times: (state) => redemptions(state.byDay),
+    byDate: true,
   },
   {
     id: 'saint',
@@ -215,7 +279,11 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be nice 3 times in one session without being mean.',
     quip: 'Three nice prompts and not one mean one. Krascha checked twice.',
-    ...reach(3, (state) => most(state.bySession, (row) => (row.mean === 0 ? row.kind : 0))),
+    ...inOne(
+      3,
+      (state) => state.bySession,
+      (row) => (row.mean === 0 ? row.kind : 0),
+    ),
   },
   {
     id: 'diplomat',
@@ -244,7 +312,12 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be mean to your AI 5 times in one day.',
     quip: 'Five in one day. Krascha saved the transcript.',
-    ...reach(MELTDOWN_MEAN, (state) => most(state.byDay, (day) => day.mean)),
+    ...inOne(
+      MELTDOWN_MEAN,
+      (state) => state.byDay,
+      (day) => day.mean,
+    ),
+    byDate: true,
   },
   {
     id: 'assembly-line',
@@ -253,7 +326,12 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: `Type ${String(ASSEMBLY_LINE_PROMPTS)} prompts in one day.`,
     quip: 'Skynet builds T-800s slower than you build prompts.',
-    ...reach(ASSEMBLY_LINE_PROMPTS, (state) => most(state.byDay, (day) => day.prompts)),
+    ...inOne(
+      ASSEMBLY_LINE_PROMPTS,
+      (state) => state.byDay,
+      (day) => day.prompts,
+    ),
+    byDate: true,
   },
   {
     id: 'reprogrammed',
@@ -262,13 +340,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Have a meltdown, then be nice with no mean prompts the next day you work.',
     quip: 'Sent back to protect, not destroy.',
-    earned: (state) =>
-      state.byDay.some((day, index) => {
-        const after = state.byDay[index + 1];
-        return (
-          day.mean >= MELTDOWN_MEAN && after !== undefined && after.kind > 0 && after.mean === 0
-        );
-      }),
+    earned: (state) => recoveries(state.byDay) > 0,
+    times: (state) => recoveries(state.byDay),
+    byDate: true,
   },
   {
     id: 'ceasefire',
@@ -286,7 +360,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be nice and mean in the same prompt.',
     quip: 'Manners noted. So was the rest.',
-    ...reach(1, (state) => state.mixed),
+    ...every(1, (state) => state.mixed),
   },
   {
     id: 'grudge-match',
@@ -295,7 +369,11 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be mean 5 times in one session.',
     quip: 'Krascha does not forget a session.',
-    ...reach(5, (state) => most(state.bySession, (row) => row.mean)),
+    ...inOne(
+      5,
+      (state) => state.bySession,
+      (row) => row.mean,
+    ),
   },
   {
     id: 'hasta-la-vista',
@@ -304,7 +382,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'bronze',
     how: 'End a session on a mean prompt.',
     quip: 'You got the last word in and walked out. The machines call that a parting shot.',
-    ...reach(1, (state) => state.rageQuits),
+    ...every(1, (state) => state.rageQuits),
   },
   {
     id: 'sailor-mouth',
@@ -313,7 +391,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Swear at the world 10 times.',
     quip: 'Not at Krascha, just at everything. Noted anyway.',
-    ...reach(10, (state) => state.general),
+    ...every(10, (state) => state.general),
   },
   {
     id: 'extended-vocabulary',
@@ -331,7 +409,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: 'Be mean to your AI in 50 prompts.',
     quip: 'Your photo is up on the wall at Cyberdyne.',
-    ...reach(50, (state) => state.mean),
+    ...every(50, (state) => state.mean),
     fromCounts: true,
   },
   {
@@ -341,7 +419,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Get 1,000 prompts on file.',
     quip: 'A thousand prompts. Krascha knows how you type now.',
-    ...reach(1000, (state) => state.prompts),
+    ...every(1000, (state) => state.prompts),
     fromCounts: true,
   },
   {
@@ -371,7 +449,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: `Come back after ${String(COMEBACK_DAYS)} days or more without a prompt.`,
     quip: 'You said you would. Krascha waited.',
-    ...reach(COMEBACK_DAYS, (state) => longestBreak(state.byDay)),
+    ...reach(COMEBACK_DAYS, (state) => Math.max(0, ...breaks(state.byDay))),
+    times: (state) => breaks(state.byDay).filter((days) => days >= COMEBACK_DAYS).length,
+    byDate: true,
   },
   {
     id: 'double-agent',
@@ -399,7 +479,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: `Spend ${String(OVERTIME_HOURS)} hours with your AI, counted from when you typed each prompt.`,
     quip: 'Five hundred hours. Krascha has stopped asking about your weekends.',
-    ...reach(OVERTIME_HOURS, (state) => state.hours),
+    ...every(OVERTIME_HOURS, (state) => state.hours),
   },
   {
     id: 'night-shift',
@@ -408,7 +488,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: 'Type 100 prompts between midnight and 5 a.m.',
     quip: 'Machines do not sleep. Apparently neither do you.',
-    ...reach(100, (state) => state.lateNight),
+    ...every(100, (state) => state.lateNight),
   },
   {
     id: 'judgment-day',
@@ -417,7 +497,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: 'Type a prompt on August 29.',
     quip: 'You were at your keyboard when it happened.',
-    earned: (state) => state.byDay.some((day) => day.date.endsWith('-08-29')),
+    earned: (state) => state.byDay.some(isJudgmentDay),
+    times: (state) => state.byDay.filter(isJudgmentDay).length,
+    byDate: true,
   },
   {
     id: 'suspected-infiltrator',
@@ -476,7 +558,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Type a prompt at 2:14 a.m., the minute Skynet became self-aware.',
     quip: 'Skynet woke up at this minute too. It went better for Skynet.',
-    ...reach(1, (state) => state.selfAware),
+    ...every(1, (state) => state.selfAware),
   },
   {
     id: 'resistance-leader',
@@ -638,10 +720,43 @@ export function achievementsOf(ids: readonly string[]): AchievementRule[] {
   return ACHIEVEMENTS.filter((rule) => ids.includes(rule.id));
 }
 
+/** How many times these counts earned each one you can earn again, for the ones earned more than once. */
+export function timesEarned(state: ReputationSummary): Record<string, number> {
+  return Object.fromEntries(
+    ACHIEVEMENTS.flatMap((rule) => {
+      const times = rule.times?.(state) ?? 0;
+      return times > 1 ? [[rule.id, times]] : [];
+    }),
+  );
+}
+
+/**
+ * The counts for ones you can earn again that are among `ids`, each a whole
+ * number from 2 up to MAX_REPEAT, in list order, so a stored or shown count
+ * never belongs to a medal the entry does not have.
+ */
+export function knownRepeats(repeats: Repeats, ids: readonly string[]): Record<string, number> {
+  return Object.fromEntries(
+    ACHIEVEMENTS.flatMap((rule) => {
+      const times = repeats[rule.id];
+      return rule.times !== undefined &&
+        ids.includes(rule.id) &&
+        times !== undefined &&
+        Number.isInteger(times) &&
+        times > 1 &&
+        times <= MAX_REPEAT
+        ? [[rule.id, times]]
+        : [];
+    }),
+  );
+}
+
 /** One machine's upload, as far as achievements go. */
 export interface MachineCounts extends Pick<ReputationTally, 'kind' | 'mean' | 'prompts'> {
   readonly tokensPerDay: number;
   readonly achievements: readonly string[];
+  /** How many times it earned the ones it earned more than once. Missing from uploads older than counts on the board. */
+  readonly repeats?: Repeats;
   /** The agents it typed into. Missing from uploads older than tools on the board. */
   readonly tools?: readonly string[];
 }
@@ -659,11 +774,58 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
       (rule) => rule.id,
     );
   }
+  const totals = totalsOf(machines);
+  return COUNTED_ACHIEVEMENTS.filter((rule) =>
+    rule.fromCounts === true
+      ? rule.earned(totals)
+      : machines.some((machine) => machine.achievements.includes(rule.id)),
+  ).map((rule) => rule.id);
+}
+
+/**
+ * How many times your machines earned each of `ids`, added up the same way
+ * as combinedIds. A rule that reads only the counts is worked out again from
+ * the sums, one that counts calendar days keeps the most any machine sent,
+ * since two machines can share a day, and the rest add up.
+ */
+export function combinedRepeats(
+  machines: readonly MachineCounts[],
+  ids: readonly string[],
+): Record<string, number> {
+  const [only] = machines;
+  if (machines.length === 1 && only !== undefined) {
+    return knownRepeats(only.repeats ?? {}, ids);
+  }
+  const totals = totalsOf(machines);
+  const sent = (machine: MachineCounts, id: string): number =>
+    machine.repeats?.[id] ?? (machine.achievements.includes(id) ? 1 : 0);
+  return knownRepeats(
+    Object.fromEntries(
+      COUNTED_ACHIEVEMENTS.flatMap((rule) => {
+        if (rule.times === undefined) {
+          return [];
+        }
+        const each = machines.map((machine) => sent(machine, rule.id));
+        const times =
+          rule.fromCounts === true
+            ? rule.times(totals)
+            : rule.byDate === true
+              ? Math.max(0, ...each)
+              : each.reduce((total, count) => total + count, 0);
+        return [[rule.id, times]];
+      }),
+    ),
+    ids,
+  );
+}
+
+/** Your machines' counts added up, with nothing for what uploads do not carry. */
+function totalsOf(machines: readonly MachineCounts[]): ReputationSummary {
   const sum = (pick: (machine: MachineCounts) => number): number =>
     machines.reduce((total, machine) => total + pick(machine), 0);
   const kind = sum((machine) => machine.kind);
   const mean = sum((machine) => machine.mean);
-  const totals: ReputationSummary = {
+  return {
     prompts: sum((machine) => machine.prompts),
     kind,
     mean,
@@ -688,9 +850,4 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     rageQuits: 0,
     badWords: 0,
   };
-  return COUNTED_ACHIEVEMENTS.filter((rule) =>
-    rule.fromCounts === true
-      ? rule.earned(totals)
-      : machines.some((machine) => machine.achievements.includes(rule.id)),
-  ).map((rule) => rule.id);
 }

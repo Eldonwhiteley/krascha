@@ -11,17 +11,25 @@ import {
   BUNK_ASSIGNED,
   CHAMPION,
   combinedIds,
+  combinedRepeats,
   CROWD_FAVORITE,
   CROWD_FAVORITE_LIKES,
   CROWN,
   knownIds,
+  knownRepeats,
   machineIds,
   MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
   OBSOLETE_MODEL,
 } from '../../src/shared/achievements.js';
-import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
+import type {
+  Board,
+  BoardEntry,
+  Repeats,
+  ScoreUpload,
+  Standing,
+} from '../../src/shared/leaderboard.js';
 import {
   ANONYMOUS,
   BOARD_SIZE,
@@ -66,7 +74,7 @@ export interface Owner {
 }
 
 const COLUMNS =
-  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools, github, likes';
+  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, repeats, tokens_per_day, tools, github, likes';
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -85,10 +93,30 @@ function number_(row: Row, key: string): number {
   return value;
 }
 
+/** Counts stored as "meltdown:12,regular:3". Anything that does not parse is dropped. */
+function repeatsOf(stored: string): Record<string, number> {
+  return Object.fromEntries(
+    stored
+      .split(',')
+      .map((pair) => pair.split(':'))
+      .flatMap(([id, times]) => (id === undefined || times === undefined ? [] : [[id, Number(times)]])),
+  );
+}
+
+/** Counts in the form repeatsOf reads. */
+function repeatsText(repeats: Repeats): string {
+  return Object.entries(repeats)
+    .map(([id, times]) => `${id}:${String(times)}`)
+    .join(',');
+}
+
 function entryOf(row: Row): BoardEntry {
   const name = text(row, 'name');
   const score = number_(row, 'score');
   const github = text(row, 'github');
+  // Dropping unknown ids means a retired achievement just stops showing.
+  const achievements = knownIds(text(row, 'achievements').split(','));
+  const repeats = knownRepeats(repeatsOf(text(row, 'repeats')), achievements);
   return {
     id: text(row, 'entry_id'),
     name: name === '' ? ANONYMOUS : name,
@@ -100,8 +128,8 @@ function entryOf(row: Row): BoardEntry {
     mean: number_(row, 'mean'),
     prompts: number_(row, 'prompts'),
     uploadedAt: number_(row, 'uploaded_at'),
-    // Dropping unknown ids means a retired achievement just stops showing.
-    achievements: knownIds(text(row, 'achievements').split(',')),
+    achievements,
+    ...(Object.keys(repeats).length === 0 ? {} : { repeats }),
     tokensPerDay: number_(row, 'tokens_per_day'),
     tools: knownTools(text(row, 'tools').split(',')),
     likes: number_(row, 'likes'),
@@ -482,6 +510,7 @@ function machineOf(row: Row): SavedMachine {
     prompts: number_(row, 'prompts'),
     tokensPerDay: number_(row, 'tokens_per_day'),
     achievements: text(row, 'achievements').split(','),
+    repeats: repeatsOf(text(row, 'repeats')),
     tools: text(row, 'tools').split(','),
   };
 }
@@ -508,12 +537,12 @@ async function saveMachine(
     .run();
   await database
     .prepare(
-      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, tokens_per_day, tools)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, repeats, tokens_per_day, tools)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner, machine) DO UPDATE SET
          kind = excluded.kind, mean = excluded.mean, prompts = excluded.prompts,
-         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
-         tools = excluded.tools`,
+         achievements = excluded.achievements, repeats = excluded.repeats,
+         tokens_per_day = excluded.tokens_per_day, tools = excluded.tools`,
     )
     .bind(
       owner.id,
@@ -522,13 +551,14 @@ async function saveMachine(
       upload.mean,
       upload.prompts,
       knownIds(upload.achievements ?? []).join(','),
+      repeatsText(knownRepeats(upload.repeats ?? {}, upload.achievements ?? [])),
       upload.tokensPerDay ?? 0,
       knownTools(upload.tools ?? []).join(','),
     )
     .run();
   const { results } = await database
     .prepare(
-      'SELECT kind, mean, prompts, achievements, tokens_per_day, tools FROM machines WHERE owner = ?',
+      'SELECT kind, mean, prompts, achievements, repeats, tokens_per_day, tools FROM machines WHERE owner = ?',
     )
     .bind(owner.id)
     .all();
@@ -598,16 +628,24 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   const mean = sum((machine) => machine.mean);
   const prompts = sum((machine) => machine.prompts);
   const tokensPerDay = sum((machine) => machine.tokensPerDay);
+  const achievements = knownIds([
+    ...combinedIds(machines),
+    ...accountIds(githubIdOf(owner)),
+    ...machineIds(machines),
+    ...githubIds(owner, found),
+    ...(beta ? [BETA_TESTER] : []),
+  ]);
   await database
     .prepare(
-      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, tokens_per_day, silo, tools, github)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO scores (owner, verified, entry_id, name, kind, mean, prompts, score, uploaded_at, upload_day, uploads_today, achievements, repeats, tokens_per_day, silo, tools, github)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner) DO UPDATE SET
          name = excluded.name, kind = excluded.kind, mean = excluded.mean,
          prompts = excluded.prompts, score = excluded.score, uploaded_at = excluded.uploaded_at,
          upload_day = excluded.upload_day, uploads_today = excluded.uploads_today,
-         achievements = excluded.achievements, tokens_per_day = excluded.tokens_per_day,
-         silo = excluded.silo, tools = excluded.tools, github = excluded.github`,
+         achievements = excluded.achievements, repeats = excluded.repeats,
+         tokens_per_day = excluded.tokens_per_day, silo = excluded.silo, tools = excluded.tools,
+         github = excluded.github`,
     )
     .bind(
       owner.id,
@@ -621,13 +659,8 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       now,
       day,
       uploadsToday + 1,
-      knownIds([
-        ...combinedIds(machines),
-        ...accountIds(githubIdOf(owner)),
-        ...machineIds(machines),
-        ...githubIds(owner, found),
-        ...(beta ? [BETA_TESTER] : []),
-      ]).join(','),
+      achievements.join(','),
+      repeatsText(combinedRepeats(machines, achievements)),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),
       tools.join(','),

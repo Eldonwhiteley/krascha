@@ -13,7 +13,7 @@ import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
-import { achievementsOf, unlockedIds } from '../shared/achievements.js';
+import { achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
 import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
 import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
@@ -147,6 +147,7 @@ async function json(io: CliIo): Promise<number> {
   const report = {
     rank: { name: rank.name, title: rank.title, source: rank.source, hunted: rank.hunted },
     achievements: unlockedIds(summary),
+    repeats: timesEarned(summary),
     scan,
     ...summary,
   };
@@ -238,6 +239,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     mean: summary.mean,
     prompts: summary.prompts,
     achievements,
+    repeats: timesEarned(summary),
     tokensPerDay: summary.tokensPerDay,
     tools: summary.tools,
     machine,

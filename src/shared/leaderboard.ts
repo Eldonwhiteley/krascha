@@ -1,8 +1,9 @@
 // The global Reputation leaderboard, shared by the Cloudflare Worker that
 // serves it and the CLI that uploads to it and shows it.
 // An upload carries a display name, three counts, your average tokens a day,
-// the ids of the achievements you have unlocked, the agents you use and a
-// random id for the machine they came from, nothing else.
+// the ids of the achievements you have unlocked and how many times you earned
+// the ones you can earn again, the agents you use and a random id for the
+// machine they came from, nothing else.
 
 /** The Cloudflare Worker that serves the board. */
 export const LEADERBOARD_URL = 'https://krascha.com';
@@ -25,12 +26,17 @@ export const GITHUB_LOGIN_PATTERN = /^[a-z\d][a-z\d-]{0,38}$/iu;
  * it back would make a cycle. achievements.test.ts keeps the list under it.
  */
 export const MAX_ACHIEVEMENTS = 64;
+/** Past anything one person does, so a higher count of one achievement is junk. */
+export const MAX_REPEAT = 1_000_000;
 /** Agent ids one upload may carry, with room for agents Krascha reads later. */
 export const MAX_TOOLS = 8;
 /** A trillion tokens a day is past anything one person runs, so anything above it is junk. */
 export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
 /** Shown for anyone who uploads without a name. */
 export const ANONYMOUS = 'Anonymous';
+
+/** How many times each achievement was earned, by id, for the ones earned more than once. */
+export type Repeats = Readonly<Record<string, number>>;
 
 /** What an upload sends, and all it sends. An empty name shows as Anonymous. */
 export interface ScoreUpload {
@@ -40,6 +46,8 @@ export interface ScoreUpload {
   readonly prompts: number;
   /** Ids from ACHIEVEMENTS. Missing from builds older than achievements on the board. */
   readonly achievements?: readonly string[];
+  /** How many times you earned the ones you earned more than once. Missing from builds older than counts on the board. */
+  readonly repeats?: Repeats;
   /** Average tokens a day over the last 60 days. Missing from builds older than tokens on the board. */
   readonly tokensPerDay?: number;
   /** Ids from TOOLS for the agents you typed into. Missing from builds older than tools on the board. */
@@ -67,6 +75,8 @@ export interface BoardEntry {
   readonly uploadedAt: number;
   /** Unlocked achievement ids, in list order. Missing from a server older than achievements on the board. */
   readonly achievements?: readonly string[];
+  /** How many times it earned the ones it earned more than once. Missing when none were, and from a server older than counts on the board. */
+  readonly repeats?: Repeats;
   /** 0 for an upload without it. Missing from a server older than tokens on the board. */
   readonly tokensPerDay?: number;
   /** Ids from TOOLS, in list order. Empty for an upload without them, and missing from a server older than tools on the board. */
@@ -133,6 +143,19 @@ function isIdList(value: unknown, max: number): value is readonly string[] {
   );
 }
 
+function isRepeats(value: unknown, max: number): value is Repeats {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const entries = Object.entries(value);
+  return (
+    entries.length <= max &&
+    entries.every(
+      ([id, times]) => id.length <= MAX_NAME_LENGTH && isCount(times) && times <= MAX_REPEAT,
+    )
+  );
+}
+
 export function isScoreUpload(value: unknown): value is ScoreUpload {
   return (
     isRecord(value) &&
@@ -143,6 +166,7 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     isCount(value['prompts']) &&
     value['kind'] + value['mean'] <= value['prompts'] &&
     (value['achievements'] === undefined || isIdList(value['achievements'], MAX_ACHIEVEMENTS)) &&
+    (value['repeats'] === undefined || isRepeats(value['repeats'], MAX_ACHIEVEMENTS)) &&
     isTokens(value['tokensPerDay'], MAX_TOKENS_PER_DAY) &&
     (value['tools'] === undefined || isIdList(value['tools'], MAX_TOOLS)) &&
     (value['machine'] === undefined ||
@@ -165,6 +189,7 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     isCount(value['prompts']) &&
     typeof value['uploadedAt'] === 'number' &&
     (value['achievements'] === undefined || isIdList(value['achievements'], Infinity)) &&
+    (value['repeats'] === undefined || isRepeats(value['repeats'], Infinity)) &&
     isTokens(value['tokensPerDay'], Infinity) &&
     (value['tools'] === undefined || isIdList(value['tools'], Infinity)) &&
     (value['likes'] === undefined || isCount(value['likes']))

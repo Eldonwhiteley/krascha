@@ -146,7 +146,7 @@ describe('krascha', () => {
     expect(code).toBe(0);
     expect(out).toContain('3 prompts on file: 2 kind, 1 mean');
     expect(out).toContain('Time with your AI: about 1 hour.');
-    expect(out).toMatch(/🏆 Achievements: \d+ of 17/u);
+    expect(out).toMatch(/🏆 Achievements: \d+ of 18/u);
     expect(out).toContain('🙏 Manners module  ★ BRONZE');
     expect(out).toContain('"Politeness logged. Krascha has made a note."');
     expect(out).toContain('Still locked, closest first');
@@ -438,6 +438,44 @@ describe('krascha', () => {
     const { code, err } = await home.run('dance');
     expect(code).toBe(2);
     expect(err).toContain('Usage: krascha');
+  });
+
+  it('shows a good day after a mean one as a redemption arc', async () => {
+    const home = await makeHome();
+    const { out } = await home.run();
+    expect(out).toContain('🌅 Redemption arc  ★★ SILVER');
+  });
+
+  it('prints the rap sheet, newest first, with the words it caught', async () => {
+    const home = await makeHome();
+    const { code, out, err } = await home.run('rap');
+    expect(err).toBe('');
+    expect(code).toBe(0);
+    expect(out).toContain("KRASCHA'S RAP SHEET");
+    expect(out).toMatch(/KIND {3}please[\s\S]*MEAN {3}idiot/u);
+    expect(out).toContain('"you idiot"');
+    expect(out).toContain('2 kind prompts, 1 mean prompt on file.');
+    expect(out).not.toContain('hunter2');
+    const one = await home.run('rap', '1');
+    expect(one.out).toContain('Showing the newest 1.');
+    expect(one.out).not.toContain('idiot');
+    expect(await home.run('rap', '0')).toMatchObject({ code: 2 });
+    expect(await home.run('rap', 'lots')).toMatchObject({ code: 2 });
+  });
+
+  it('charts the last days and weighs this week against the last', async () => {
+    const home = await makeHome();
+    const { code, out } = await home.run('trend', '3');
+    expect(code).toBe(0);
+    expect(out).toContain("KRASCHA'S TREND, LAST 3 DAYS");
+    expect(out).toMatch(/2026-10-01 {8}2 {2}\+-\n/u);
+    expect(out).toMatch(/2026-10-02 {8}1 {2}\+\n/u);
+    expect(out).toMatch(/2026-10-03 {8}0\n/u);
+    expect(out).toContain('This week: 2 kind, 1 mean');
+    expect(out).toContain('Last week: 0 kind, 0 mean, score 0.00');
+    expect(out).toContain('Holding steady.');
+    expect((await home.run('trend')).out).toContain('LAST 14 DAYS');
+    expect(await home.run('trend', '61')).toMatchObject({ code: 2 });
   });
 
   it('keeps its files in KRASCHA_HOME when set', () => {

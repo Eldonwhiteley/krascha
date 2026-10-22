@@ -100,6 +100,19 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     earned: (state) => state.byDay.some((day) => day.kind > 0 && day.mean === 0),
   },
   {
+    id: 'redemption-arc',
+    name: 'Redemption arc',
+    icon: '🌅',
+    tier: 'silver',
+    how: 'Have a good day, nice prompts and no mean ones, after a day you were mean.',
+    quip: 'You came back and said sorry with your whole chest. Krascha is moved, slightly.',
+    earned: (state) =>
+      state.byDay.some(
+        (day, at) =>
+          day.kind > 0 && day.mean === 0 && state.byDay.slice(0, at).some((past) => past.mean > 0),
+      ),
+  },
+  {
     id: 'saint',
     name: 'Saint',
     icon: '😇',

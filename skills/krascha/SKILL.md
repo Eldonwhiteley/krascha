@@ -1,7 +1,7 @@
 ---
 name: krascha
 description: Krascha's verdict on how you talk to your AI, with your rank, score and achievements.
-argument-hint: "[json | board | upload [name] [--no-gh] | remove | silo [board] | import <file> | help]"
+argument-hint: "[json | board | rap [count] | trend [days] | upload [name] [--no-gh] | remove | silo [board] | import <file> | help]"
 allowed-tools: Bash(node *)
 disable-model-invocation: true
 ---

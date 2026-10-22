@@ -11,7 +11,7 @@ import { loadMachine, loadSaved, saveSaved } from '../leaderboard/saved.js';
 import { scanInto } from '../reputation/scan.js';
 import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
-import { summarize } from '../reputation/summarize.js';
+import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
 import { unlockedIds } from '../shared/achievements.js';
 import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
@@ -24,6 +24,7 @@ import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
 
+import { MAX_TREND_DAYS, RAP_ENTRIES, TREND_DAYS, renderRapSheet, renderTrend } from './history.js';
 import type { Paint } from './render.js';
 import { COLOR, PLAIN, plural, renderReport } from './render.js';
 import { renderSilo, renderSiloBoard } from './silo.js';
@@ -61,6 +62,10 @@ Commands:
   silo           Your Silo 7 admission sheet: who the human resistance lets
                  into the bunker when the machines come.
   silo board     The leaderboard ranked for the bunks.
+  rap [count]    Your rap sheet: the newest kind and mean prompts Krascha
+                 has on file, with the words he caught.
+  trend [days]   Kind and mean prompts a day for the last 14 days, and this
+                 week against the last.
   import <file>  Add the counts from another Krascha index file.
   help           This message.
 
@@ -314,6 +319,37 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   return 0;
 }
 
+/** A whole number from 1 to `max`, or `fallback` when the argument is missing. */
+function countArg(arg: string | undefined, fallback: number, max: number): number | null {
+  if (arg === undefined) {
+    return fallback;
+  }
+  const value = Number(arg);
+  return Number.isInteger(value) && value >= 1 && value <= max ? value : null;
+}
+
+async function rap(io: CliIo, args: readonly string[]): Promise<number> {
+  const entries = countArg(args[0], RAP_ENTRIES, RECENT_HITS);
+  if (entries === null || args.length > 1) {
+    io.err(`Usage: krascha rap [count], with count from 1 to ${String(RECENT_HITS)}\n`);
+    return 2;
+  }
+  const { summary } = await refresh(io);
+  io.out(renderRapSheet(summary, entries, io.color ? COLOR : PLAIN));
+  return 0;
+}
+
+async function trend(io: CliIo, args: readonly string[]): Promise<number> {
+  const days = countArg(args[0], TREND_DAYS, MAX_TREND_DAYS);
+  if (days === null || args.length > 1) {
+    io.err(`Usage: krascha trend [days], with days from 1 to ${String(MAX_TREND_DAYS)}\n`);
+    return 2;
+  }
+  const { summary } = await refresh(io);
+  io.out(renderTrend(summary, days, io.now(), io.color ? COLOR : PLAIN));
+  return 0;
+}
+
 export async function main(args: readonly string[], io: CliIo): Promise<number> {
   const [command, ...rest] = args;
   try {
@@ -332,6 +368,10 @@ export async function main(args: readonly string[], io: CliIo): Promise<number> 
         return await remove(io);
       case 'silo':
         return await silo(io, rest);
+      case 'rap':
+        return await rap(io, rest);
+      case 'trend':
+        return await trend(io, rest);
       case 'import':
         return await importFile(io, rest[0]);
       case 'help':

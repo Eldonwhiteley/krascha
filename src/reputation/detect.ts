@@ -4,7 +4,7 @@
 
 import { stripIgnored } from './clean.js';
 import type { LexiconEntry } from './lexicon.js';
-import { DETERMINERS, LEXICON, SECOND_PERSON } from './lexicon.js';
+import { DETERMINERS, LEXICON, NOT_TYPOS, SECOND_PERSON } from './lexicon.js';
 
 /** Aimed at the agent the prompt was typed to, or swearing at the world. */
 export type FrustrationTarget = 'agent' | 'general';
@@ -56,6 +56,22 @@ const BOUNDARY = /[.!?;\n]/u;
 const SPACES = /\s+/gu;
 const AFTER_FIRST_WORD = / .*/u;
 const STARS = /\*+/gu;
+const LETTERS = /^\p{L}+$/u;
+const HAS_LETTER = /\p{L}/u;
+const LEET = /[013457]/gu;
+const DIGIT_LETTERS: Readonly<Record<string, string>> = {
+  '0': 'o',
+  '1': 'i',
+  '3': 'e',
+  '4': 'a',
+  '5': 's',
+  '7': 't',
+};
+
+/** Shortest form that gets typo spellings. Shorter ones are too close to real words (duck, as). */
+export const TYPO_MIN = 4;
+/** Dropping a letter from a short word lands on a real one too often, so only longer forms get it. */
+export const DROP_MIN = 5;
 
 /**
  * Lowercase, apostrophes removed, runs of stars made one, a star at either
@@ -103,7 +119,58 @@ export function buildForms<E extends Term>(entries: readonly E[]): Forms<E> {
   return byFirst;
 }
 
-const FORMS = buildForms(LEXICON);
+/**
+ * Spellings one slip from `form`: two letters next to each other swapped
+ * (fcuk), a letter doubled (idiiot) or, in longer words, a letter dropped
+ * (stupd).
+ */
+export function typosOf(form: string): string[] {
+  if (form.length < TYPO_MIN || !LETTERS.test(form)) {
+    return [];
+  }
+  const typos = new Set<string>();
+  for (let at = 0; at < form.length; at += 1) {
+    const letter = form.charAt(at);
+    const next = form.charAt(at + 1);
+    if (next !== '' && next !== letter) {
+      typos.add(form.slice(0, at) + next + letter + form.slice(at + 2));
+    }
+    // Doubling a letter that is already doubled would fold back to one.
+    if (next !== letter && form.charAt(at - 1) !== letter) {
+      typos.add(form.slice(0, at + 1) + form.slice(at));
+    }
+    if (form.length >= DROP_MIN) {
+      typos.add(form.slice(0, at) + form.slice(at + 1));
+    }
+  }
+  typos.delete(form);
+  return [...typos];
+}
+
+/** Each entry again with the typos of its one word forms, minus real words and spellings a term already has. */
+export function typoEntries(entries: readonly LexiconEntry[]): LexiconEntry[] {
+  const taken = new Set(
+    entries.flatMap((entry) => entry.forms.map((form) => form.replace(AFTER_FIRST_WORD, ''))),
+  );
+  return entries.map((entry) => ({
+    ...entry,
+    forms: [
+      ...new Set(
+        entry.forms.flatMap(typosOf).filter((typo) => !taken.has(typo) && !NOT_TYPOS.has(typo)),
+      ),
+    ],
+  }));
+}
+
+/** sh1t reads as shit. Only in words that also have a letter, so plain numbers stay numbers. */
+export function unleet(word: string): string {
+  return HAS_LETTER.test(word)
+    ? word.replaceAll(LEET, (digit) => DIGIT_LETTERS[digit] ?? digit)
+    : word;
+}
+
+// Exact forms come first, so a typo never beats a real spelling.
+const FORMS = buildForms([...LEXICON, ...typoEntries(LEXICON)]);
 
 function formAt<E extends Term>(
   forms: Forms<E>,
@@ -165,7 +232,7 @@ export function excerptAround(text: string, start: number): string {
 /** The frustration in a prompt, or null when there is none. */
 export function detectFrustration(text: string): Detection | null {
   const cleaned = stripIgnored(text);
-  const tokens = tokenize(cleaned);
+  const tokens = tokenize(cleaned).map((token) => ({ ...token, word: unleet(token.word) }));
   const matches = findMatches(FORMS, tokens);
   const [first] = matches;
   if (first === undefined) {

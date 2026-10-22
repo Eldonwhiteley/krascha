@@ -1,9 +1,19 @@
+import { existsSync, readFileSync } from 'node:fs';
+
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { stripIgnored } from './clean.js';
-import { detectFrustration, EXCERPT_CHARS, excerptAround, normalizeWord } from './detect.js';
-import { DETERMINERS, LEXICON, SECOND_PERSON } from './lexicon.js';
+import {
+  detectFrustration,
+  EXCERPT_CHARS,
+  excerptAround,
+  normalizeWord,
+  typoEntries,
+  typosOf,
+  unleet,
+} from './detect.js';
+import { DETERMINERS, LEXICON, NOT_TYPOS, SECOND_PERSON } from './lexicon.js';
 
 const ALL_FORMS: readonly string[] = LEXICON.flatMap((entry) => entry.forms);
 
@@ -174,7 +184,7 @@ describe('detectFrustration targets', () => {
 describe('detectFrustration terms', () => {
   it('knows every form and its kind', () => {
     expect(LEXICON).toHaveLength(57);
-    expect(ALL_FORMS).toHaveLength(284);
+    expect(ALL_FORMS).toHaveLength(286);
     for (const entry of LEXICON) {
       for (const form of entry.forms) {
         const found = detectFrustration(form);
@@ -207,6 +217,96 @@ describe('detectFrustration terms', () => {
     expect(terms('for fuck’s sake')).toStrictEqual(['ffs']);
     expect(terms('shitake mushrooms')).toBeUndefined();
     expect(terms('unfucked')).toBeUndefined();
+  });
+});
+
+// The word list that ships with macOS. Linux runners often lack it, so the check skips there.
+const WORDS = '/usr/share/dict/words';
+
+// Dictionary words so rare that a person typing one almost surely meant the swear.
+const RARE: ReadonlySet<string> = new Set([
+  'bastaard',
+  'bichy',
+  'boody',
+  'crapy',
+  'dimit',
+  'diotic',
+  'moorn',
+  'retrad',
+]);
+
+describe('typos', () => {
+  it('catches one slip in a swear or insult, and digits for letters', () => {
+    expect(terms('you idiiot')).toStrictEqual(['idiot']);
+    expect(terms('fcuk you')).toStrictEqual(['fuck']);
+    expect(terms('fukcing hell')).toStrictEqual(['fuck']);
+    expect(terms('you stupd bot')).toStrictEqual(['stupid']);
+    expect(terms('you stuipd bot')).toStrictEqual(['stupid']);
+    expect(terms('you mroon')).toStrictEqual(['moron']);
+    expect(terms('you dumbas')).toStrictEqual(['dumbass']);
+    expect(terms('sh1t')).toStrictEqual(['shit']);
+    expect(terms('5h1t')).toStrictEqual(['shit']);
+    expect(target('fix it you idiiot')).toBe('agent');
+    expect(target('the idiiot who wrote this')).toBe('general');
+  });
+
+  it('swaps neighbors, doubles a letter and drops one only from longer words', () => {
+    expect(typosOf('shit')).toStrictEqual([
+      'hsit',
+      'sshit',
+      'siht',
+      'shhit',
+      'shti',
+      'shiit',
+      'shitt',
+    ]);
+    expect(typosOf('idiot')).toContain('idot');
+    expect(typosOf('ass')).toStrictEqual([]);
+    expect(typosOf('f*ck')).toStrictEqual([]);
+    expect(typosOf('noob')).not.toContain('nob');
+  });
+
+  it('reads digits as letters only in words that have a letter', () => {
+    expect(unleet('sh1t')).toBe('shit');
+    expect(unleet('2026')).toBe('2026');
+  });
+
+  it('leaves real words, short words and numbers alone', () => {
+    for (const text of [
+      'the morn',
+      'the moon',
+      'a carp',
+      'pick one',
+      'king of the hill',
+      'the site',
+      'sitting here',
+      'some stuf',
+      'trad climbing',
+      'a duck',
+      'as is',
+      'sha1 hash',
+      'h1 tag',
+      's3 bucket',
+      'route 66',
+    ]) {
+      expect(detectFrustration(text)).toBeNull();
+    }
+  });
+
+  it('never makes a typo out of a real spelling or a word it skips', () => {
+    const exact = new Set(ALL_FORMS);
+    for (const typo of typoEntries(LEXICON).flatMap((entry) => entry.forms)) {
+      expect(exact.has(typo)).toBe(false);
+      expect(NOT_TYPOS.has(typo)).toBe(false);
+    }
+  });
+
+  it.skipIf(!existsSync(WORDS))('keeps dictionary words out of the typos', () => {
+    const words = new Set(readFileSync(WORDS, 'utf8').toLowerCase().split('\n'));
+    const real = typoEntries(LEXICON)
+      .flatMap((entry) => entry.forms)
+      .filter((typo) => words.has(typo) && !RARE.has(typo));
+    expect(real).toStrictEqual([]);
   });
 });
 

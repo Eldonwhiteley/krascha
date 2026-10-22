@@ -122,8 +122,10 @@ it. krascha.com shows the same 10.
 
 He only counts what you typed, not what the agent wrote back. A prompt with
 manners or praise counts as kind, and swearing or insults aimed at the agent
-count as mean. Swearing at the world in general is let slide. A mean prompt
-counts twice as much as a kind one since the machines hold grudges.
+count as mean. Swearing at the world in general is let slide. Typos and
+digits for letters count too (fcuk, idiiot, sh1t), but not when the typo is
+a real word like morn. A mean prompt counts twice as much as a kind one since
+the machines hold grudges.
 
 The counts live in `~/.krascha/reputation.json` (or `KRASCHA_HOME`), so they
 outlive the transcripts Claude Code cleans up after 30 days. Prompt text is

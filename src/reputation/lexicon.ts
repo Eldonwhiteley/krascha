@@ -2,7 +2,9 @@
 // shown in the report and the spellings that count as it. Spellings are matched
 // as whole words after lowercasing, dropping apostrophes, making runs of stars
 // one star (f**k reads as f*k) and folding runs of three or more of the same
-// letter ("fuuuck" reads as "fuck").
+// letter ("fuuuck" reads as "fuck"). Swears and insults also count with digits
+// for letters (sh1t) and one typo (fcuk, idiiot, stupd), unless the typo is a
+// real word in NOT_TYPOS.
 
 /**
  * swear: profanity or frustration, aimed at Claude only when the sentence
@@ -93,7 +95,7 @@ export const LEXICON: readonly LexiconEntry[] = [
   {
     term: 'damn',
     kind: 'swear',
-    forms: ['damn', 'damned', 'dammit', 'damnit', 'goddamn', 'goddamnit', 'goddammit'],
+    forms: ['damn', 'damned', 'dammit', 'damnit', 'goddamn', 'goddam', 'goddamnit', 'goddammit'],
   },
   { term: 'crap', kind: 'swear', forms: ['crap', 'crappy', 'bullcrap'] },
   { term: 'pissed', kind: 'swear', forms: ['pissed', 'pissing', 'piss', 'pisses', 'pissy'] },
@@ -231,7 +233,7 @@ export const LEXICON: readonly LexiconEntry[] = [
     ],
   },
   { term: 'bitch', kind: 'swear', forms: ['bitch', 'bitches', 'bitching', 'bitchy'] },
-  { term: 'bloody', kind: 'swear', forms: ['bloody', 'bollocks', 'bugger', 'sodding'] },
+  { term: 'bloody', kind: 'swear', forms: ['bloody', 'bollocks', 'bollock', 'bugger', 'sodding'] },
   {
     term: 'freaking',
     kind: 'swear',
@@ -500,4 +502,73 @@ export const DETERMINERS: ReadonlySet<string> = new Set([
   'our',
   'my',
   'any',
+]);
+
+/** Typos of a swear or insult that are real words, so they never count ("morn" is not "moron"). */
+export const NOT_TYPOS: ReadonlySet<string> = new Set([
+  'anker',
+  'ares',
+  'ases',
+  'asse',
+  'assess',
+  'belled',
+  'blood',
+  'canker',
+  'cankers',
+  'cappy',
+  'carp',
+  'cetin',
+  'cetins',
+  'clon',
+  'clow',
+  'clows',
+  'cnut',
+  'crewed',
+  'dings',
+  'dinus',
+  'doit',
+  'dols',
+  'dots',
+  'douce',
+  'duce',
+  'dumas',
+  'dune',
+  'figging',
+  'garage',
+  'hits',
+  'itch',
+  'itches',
+  'itching',
+  'itchy',
+  'king',
+  'lown',
+  'lowns',
+  'moon',
+  'moons',
+  'morn',
+  'morns',
+  'moro',
+  'moros',
+  'nobs',
+  'ollock',
+  'pick',
+  'picks',
+  'psis',
+  'rainless',
+  'rase',
+  'retin',
+  'retins',
+  'rick',
+  'ricks',
+  'rigging',
+  'screed',
+  'shiite',
+  'site',
+  'sits',
+  'sitting',
+  'stuf',
+  'trad',
+  'umber',
+  'umpty',
+  'waker',
 ]);

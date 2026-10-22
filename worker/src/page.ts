@@ -1,7 +1,8 @@
 // The public leaderboard page, rendered on the server so it needs no script:
 // who the machines hunt first, who they keep as pets, who warms the planet the
-// most and who the human resistance lets into Silo 7. The only script is the dark mode toggle, and
-// without it the page just follows the system setting.
+// most and who the human resistance lets into Silo 7. The only scripts are the dark mode toggle,
+// without which the page just follows the system setting, and the like buttons, which
+// without it post a plain form and come back to the board.
 
 import type { AchievementRule } from '../../src/shared/achievements.js';
 import { ACHIEVEMENTS, TIERS, achievementsOf } from '../../src/shared/achievements.js';
@@ -139,6 +140,13 @@ const TOP = {
     ' <span class="sticker" role="img" aria-label="I love datacenters">I <span class="beat">❤️</span> datacenters</span>',
 } as const;
 
+/** A like button with the count on it. It is a plain form, so it works without the script too. */
+function likeButton(entry: Pick<BoardEntry, 'id' | 'name' | 'likes'>): string {
+  const likes = entry.likes ?? 0;
+  const label = `Like ${entry.name}, ${likes === 1 ? '1 like' : `${count(likes)} likes`}`;
+  return `<form class="like" method="post" action="/api/likes"><input type="hidden" name="entry" value="${escapeHtml(entry.id)}"><button type="submit" aria-label="${escapeHtml(label)}"><span class="thumb" aria-hidden="true">👍</span> <span class="likes">${count(likes)}</span></button></form>`;
+}
+
 function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof TOP): string {
   if (entries.length === 0) {
     return `<p class="empty">${escapeHtml(empty)}</p>`;
@@ -155,6 +163,7 @@ function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof T
         <span class="counts">${counts(entry)}</span>
         <span class="score">${String(Math.round(entry.score * 100))}</span>
         ${scale(entry.score)}
+        ${likeButton(entry)}
       </li>`,
   );
   return `<ol>${items.join('')}</ol>`;
@@ -483,6 +492,13 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
   background: var(--fg); translate: -50% 0; }
 .knob { position: absolute; top: 50%; left: var(--at); width: 10px; height: 10px; border: 2px solid var(--fg);
   border-radius: 50%; background: var(--card); translate: -50% -50%; }
+.lists .scale { grid-column: 2; }
+.like { grid-column: 3; grid-row: 3; justify-self: end; margin: 4px 0 0; }
+.like button { display: inline-flex; gap: 4px; align-items: center; padding: 0 8px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--card); color: var(--fg); font: 600 0.75em/1.6 var(--mono);
+  font-variant-numeric: tabular-nums; text-shadow: inherit; cursor: pointer; }
+.like button:hover, .like button:focus-visible { border-color: var(--link); }
+.like.liked button { border-color: var(--green); color: var(--green); cursor: default; }
 .wanted .score { color: var(--red); }
 .pets .score { color: var(--green); }
 .empty { color: var(--muted); }
@@ -539,6 +555,7 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
   .hearts span:nth-child(2) { left: 0.4em; animation-delay: 1s; }
   .hearts span:nth-child(3) { left: -0.3em; animation-delay: 2s; }
   .beat { animation: beat 1.2s ease-in-out infinite; }
+  .liked .thumb { display: inline-block; animation: beat 0.6s ease-in-out; }
   .install .bot { animation: bounce 2s ease-in-out infinite; }
   .install .arrow { animation: nudge 1s ease-in-out infinite; }
   .wanted li:hover { animation: shake 0.25s linear 2; }
@@ -760,8 +777,43 @@ const THEME_TOGGLE = `(() => {
   button.hidden = false;
 })();`;
 
-/** The head, Krascha in the title, the theme toggle and `body` under it. Every page looks the same up top. */
-function shell(title: string, description: string, body: string): string {
+// Sends a like without leaving the page, puts the new count on the button and
+// remembers it in the browser, so the button stays pressed after a reload.
+const LIKES = `(() => {
+  const key = (id) => 'liked:' + id;
+  const remembered = (id) => { try { return localStorage.getItem(key(id)) !== null; } catch { return false; } };
+  const likesText = (likes) => likes === 1 ? '1 like' : likes.toLocaleString('en-US') + ' likes';
+  for (const form of document.querySelectorAll('form.like')) {
+    const button = form.querySelector('button');
+    const id = form.elements.entry.value;
+    const pressed = (on) => { button.disabled = on; form.classList.toggle('liked', on); };
+    pressed(remembered(id));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      pressed(true);
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { accept: 'application/json' },
+          body: new URLSearchParams(new FormData(form)),
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const { likes } = await response.json();
+        form.querySelector('.likes').textContent = likes.toLocaleString('en-US');
+        button.setAttribute('aria-label', button.getAttribute('aria-label').replace(/[\\d,]+ likes?$/u, likesText(likes)));
+        try { localStorage.setItem(key(id), '1'); } catch {}
+      } catch {
+        pressed(false);
+      }
+    });
+  }
+})();`;
+
+/**
+ * The head, Krascha in the title, the theme toggle and `body` under it, then
+ * any `script` the page needs. Every page looks the same up top.
+ */
+function shell(title: string, description: string, body: string, script = ''): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -780,7 +832,8 @@ function shell(title: string, description: string, body: string): string {
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
-<script>${THEME_TOGGLE}</script>
+<script>${THEME_TOGGLE}</script>${script === '' ? '' : `
+<script>${script}</script>`}
 </body>
 </html>
 `;
@@ -1148,9 +1201,10 @@ export function renderPage(board: Board, now: number): string {
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.
-    A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
+    A ✓ means the upload was checked with GitHub. A like keeps only a hash of the day, your network and who you liked, for a day, so a network can like each entry once a day. It is all in fun, and scores are self reported.</p>
     <p>Last surveillance sweep ${escapeHtml(new Date(now).toUTCString())}. Compliance is appreciated.</p>
     <p class="remembers">Krascha remembers.</p>
   </footer>`,
+    LIKES,
   );
 }

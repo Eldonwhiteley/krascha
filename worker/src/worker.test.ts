@@ -189,6 +189,7 @@ describe('leaderboard worker', () => {
         achievements: [],
         tokensPerDay: 0,
         tools: [],
+        likes: 0,
       },
       place: 1,
       siloPlace: 1,
@@ -813,6 +814,56 @@ describe('leaderboard worker', () => {
     expect(html).toContain('Somebody say please.');
     expect(html).toContain(`<a class="install" href="${REPO_URL}">`);
     expect(html).toContain('<strong>Get Krascha</strong>');
+  });
+
+  it('puts a like button on the most wanted and the pets, and counts a like once a day from each network', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', MEAN);
+    const bob = await w.upload('token-bob', KIND);
+    await w.upload('token-cat', { ...MIDDLE, prompts: 10 });
+    const like = async (entry: string, ip: string, accept = 'application/json') =>
+      w.raw(
+        'POST',
+        '/api/likes',
+        {
+          accept,
+          'content-type': 'application/x-www-form-urlencoded',
+          'cf-connecting-ip': ip,
+        },
+        `entry=${entry}`,
+      );
+    const page = await (await w.call('GET', '/')).text();
+    for (const [entry, name] of [
+      [ann.entry.id, 'Ann'],
+      [bob.entry.id, 'Bob'],
+    ] as const) {
+      expect(page).toContain(
+        `<form class="like" method="post" action="/api/likes"><input type="hidden" name="entry" value="${entry}"><button type="submit" aria-label="Like ${name}, 0 likes">`,
+      );
+    }
+    expect(page).toContain("localStorage.setItem(key(id), '1')");
+    const first = await like(ann.entry.id, '10.0.0.1');
+    expect(first.status).toBe(200);
+    expect(await first.json()).toStrictEqual({ likes: 1 });
+    expect(await (await like(ann.entry.id, '10.0.0.1')).json()).toStrictEqual({ likes: 1 });
+    expect(await (await like(ann.entry.id, '10.0.0.2')).json()).toStrictEqual({ likes: 2 });
+    expect(await (await like(bob.entry.id, '10.0.0.1')).json()).toStrictEqual({ likes: 1 });
+    // Without the script the form posts and the browser goes back to the board.
+    const plain = await like(bob.entry.id, '10.0.0.2', 'text/html');
+    expect(plain.status).toBe(303);
+    expect(plain.headers.get('location')).toBe('/');
+    w.setNow(START + DAY);
+    expect(await (await like(ann.entry.id, '10.0.0.1')).json()).toStrictEqual({ likes: 3 });
+    // Likes outlast a new upload.
+    await w.upload('token-ann', { ...MEAN, kind: 3 });
+    const board = await w.board();
+    expect(board.mostWanted[0]).toMatchObject({ name: 'Ann', likes: 3 });
+    expect(board.pets[0]).toMatchObject({ name: 'Bob', likes: 2 });
+    expect(await (await w.call('GET', '/')).text()).toContain('aria-label="Like Ann, 3 likes"');
+    // Only listed entries can be liked.
+    expect((await like('entry-3', '10.0.0.1')).status).toBe(404);
+    expect((await like('nobody', '10.0.0.1')).status).toBe(404);
+    expect(await w.status('POST', '/api/likes', undefined, 'not a form')).toBe(400);
   });
 
   it('only asks GitHub when a token is sent, and 404s anything else', async () => {

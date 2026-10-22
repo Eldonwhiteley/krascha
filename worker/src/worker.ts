@@ -1,6 +1,6 @@
 // The Cloudflare Worker behind Krascha's List. It serves the public page at
-// /, the board as JSON at /api/board, and takes uploads and removals at
-// /api/scores. An upload proves who it belongs to one of two ways. A GitHub
+// /, the board as JSON at /api/board, takes uploads and removals at
+// /api/scores and likes at /api/likes. An upload proves who it belongs to one of two ways. A GitHub
 // token is checked once with GitHub and then dropped, never stored or logged,
 // and its entry shows as verified and links to the account, so only the user
 // id and login are kept. A key the CLI made up is stored only as a hash, so it
@@ -16,7 +16,7 @@ import {
 
 import { renderAbout, renderContribute, renderPage } from './page.js';
 import type { D1Database, Owner } from './store.js';
-import { readBoard, removeScore, saveScore, utcDay } from './store.js';
+import { likeEntry, readBoard, removeScore, saveScore, utcDay } from './store.js';
 
 export interface Env {
   readonly DB: D1Database;
@@ -166,6 +166,37 @@ async function remove(request: Request, env: Env, deps: Deps): Promise<Response>
   return new Response(null, { status: 204 });
 }
 
+/**
+ * Likes an entry on the board, named by the form's entry field. The page's
+ * script asks for JSON and gets the new count. A plain form post goes back to
+ * the board.
+ */
+async function like(request: Request, env: Env, deps: Deps): Promise<Response> {
+  let entry: unknown;
+  try {
+    entry = (await request.formData()).get('entry');
+  } catch {
+    return fail(400, 'Send the entry to like as a form.');
+  }
+  if (typeof entry !== 'string') {
+    return fail(400, 'Send the entry to like as a form.');
+  }
+  const day = utcDay(deps.now());
+  // The address is only hashed with the day and the entry, so a network likes each entry once a day.
+  const address = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const likes = await likeEntry(env.DB, {
+    entry,
+    day,
+    liker: await sha256(`${day} ${address} ${entry}`),
+  });
+  if (likes === null) {
+    return fail(404, 'Nobody on the board has that id.');
+  }
+  return (request.headers.get('accept') ?? '').includes('application/json')
+    ? json({ likes })
+    : new Response(null, { status: 303, headers: { location: '/' } });
+}
+
 export async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
   const url = new URL(request.url);
   const route = `${request.method} ${url.pathname}`;
@@ -206,6 +237,9 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     }
     case 'DELETE /api/scores': {
       return remove(request, env, deps);
+    }
+    case 'POST /api/likes': {
+      return like(request, env, deps);
     }
     default: {
       return fail(404, 'Nothing here.');

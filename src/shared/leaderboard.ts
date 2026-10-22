@@ -71,6 +71,8 @@ export interface BoardEntry {
   readonly tokensPerDay?: number;
   /** Ids from TOOLS, in list order. Empty for an upload without them, and missing from a server older than tools on the board. */
   readonly tools?: readonly string[];
+  /** How many likes visitors to the board gave it. Missing from a server older than likes on the board. */
+  readonly likes?: number;
 }
 
 /** Where one entry stands. Place is counted from the most wanted, and is null below MIN_PROMPTS. */
@@ -160,7 +162,8 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     typeof value['uploadedAt'] === 'number' &&
     (value['achievements'] === undefined || isIdList(value['achievements'], Infinity)) &&
     isTokens(value['tokensPerDay'], Infinity) &&
-    (value['tools'] === undefined || isIdList(value['tools'], Infinity))
+    (value['tools'] === undefined || isIdList(value['tools'], Infinity)) &&
+    (value['likes'] === undefined || isCount(value['likes']))
   );
 }
 

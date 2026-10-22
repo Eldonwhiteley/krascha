@@ -1,6 +1,6 @@
 // The leaderboard's tables in Cloudflare D1: a row per owner, each of the
-// owner's machines that row adds up, and a count of the unverified entries
-// each network started today. The D1 types here are the few calls this file makes, so the Worker needs no
+// owner's machines that row adds up, a count of the unverified entries each
+// network started today and the likes each network gave today. The D1 types here are the few calls this file makes, so the Worker needs no
 // Cloudflare type package.
 
 import type { MachineCounts } from '../../src/shared/achievements.js';
@@ -41,7 +41,7 @@ export interface Owner {
 }
 
 const COLUMNS =
-  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools, github';
+  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, tokens_per_day, tools, github, likes';
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -79,6 +79,7 @@ function entryOf(row: Row): BoardEntry {
     achievements: knownIds(text(row, 'achievements').split(',')),
     tokensPerDay: number_(row, 'tokens_per_day'),
     tools: knownTools(text(row, 'tools').split(',')),
+    likes: number_(row, 'likes'),
   };
 }
 
@@ -395,6 +396,44 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     ok: true,
     standing: { ...(await standingOf(database, row)), machines: machines.length },
   };
+}
+
+/** A like for one entry, from a network on a day. */
+export interface Like {
+  readonly entry: string;
+  readonly day: string;
+  /** A hash of the day, the network and the entry, so a network can like each entry once a day. */
+  readonly liker: string;
+}
+
+/**
+ * Counts a like for a listed entry and returns how many it has. A second like
+ * from the same network on the same day is not counted. Null when nobody
+ * listed has the id.
+ */
+export async function likeEntry(database: D1Database, like: Like): Promise<number | null> {
+  const found = await database
+    .prepare(`SELECT likes FROM scores WHERE ${LISTED} AND entry_id = ?`)
+    .bind(like.entry)
+    .first();
+  if (found === null) {
+    return null;
+  }
+  const likes = number_(found, 'likes');
+  await database.prepare('DELETE FROM likes WHERE day <> ?').bind(like.day).run();
+  const seen = await database.prepare('SELECT day FROM likes WHERE liker = ?').bind(like.liker).first();
+  if (seen !== null) {
+    return likes;
+  }
+  await database
+    .prepare('INSERT INTO likes (liker, day) VALUES (?, ?)')
+    .bind(like.liker, like.day)
+    .run();
+  await database
+    .prepare('UPDATE scores SET likes = likes + 1 WHERE entry_id = ?')
+    .bind(like.entry)
+    .run();
+  return likes + 1;
 }
 
 export async function removeScore(database: D1Database, owner: Owner): Promise<void> {

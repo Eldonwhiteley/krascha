@@ -2,7 +2,7 @@
 // under ~/.copilot/session-state (or COPILOT_HOME) holding events.jsonl, one
 // event per line. What the person typed is a user.message event's
 // data.content; data.transformedContent is what the model was sent.
-// Checked against Copilot CLI 1.0.100.
+// Checked against Copilot CLI 1.0.102.
 
 import path from 'node:path';
 

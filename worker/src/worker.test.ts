@@ -459,7 +459,7 @@ describe('leaderboard worker', () => {
     const capped = await w.call('POST', '/api/scores', 'token-ann', MEAN);
     expect(capped.status).toBe(429);
     expect(await capped.json()).toStrictEqual({
-      error: 'You can upload 5 times a day. Try again tomorrow (UTC).',
+      error: 'You can upload 8 times a day. Try again tomorrow (UTC).',
     });
     w.setNow(START + DAY);
     expect(await w.upload('token-ann', MEAN)).toMatchObject({ entry: { uploadedAt: START + DAY } });

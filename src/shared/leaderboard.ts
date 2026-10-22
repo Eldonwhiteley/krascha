@@ -12,7 +12,7 @@ export const MIN_PROMPTS = 100;
 /** Rows in each list. */
 export const BOARD_SIZE = 10;
 /** Uploads one person may make in a UTC day. */
-export const UPLOADS_PER_DAY = 5;
+export const UPLOADS_PER_DAY = 8;
 /** Entries without a GitHub check one network may start in a UTC day, so nobody fills the board with made-up keys. */
 export const NEW_ENTRIES_PER_DAY = 3;
 /** A key the CLI makes up for uploading without GitHub: random base64url text. */

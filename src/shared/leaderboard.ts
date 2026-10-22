@@ -85,6 +85,12 @@ export interface BoardEntry {
   readonly likes?: number;
 }
 
+/** An achievement counts can earn, as the server names it, so an older CLI can say what it is missing. */
+export interface KnownAchievement {
+  readonly id: string;
+  readonly name: string;
+}
+
 /** Where one entry stands. Place is counted from the most wanted, and is null below MIN_PROMPTS. */
 export interface Standing {
   readonly entry: BoardEntry;
@@ -93,6 +99,8 @@ export interface Standing {
   readonly machines?: number;
   /** Place in the line for the Silo 7 bunks, the best first. Missing from a server older than the silo on the board. */
   readonly siloPlace?: number | null;
+  /** The achievements counts can earn on the server. Only in the answer to an upload, and missing from older servers. */
+  readonly counted?: readonly KnownAchievement[];
 }
 
 export interface Board {
@@ -116,6 +124,8 @@ export interface Board {
   readonly champion?: BoardEntry | null;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
+  /** The achievements counts can earn on the server. Only from /api/board, and missing from older servers. */
+  readonly counted?: readonly KnownAchievement[];
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -152,6 +162,16 @@ function isRepeats(value: unknown, max: number): value is Repeats {
     entries.length <= max &&
     entries.every(
       ([id, times]) => id.length <= MAX_NAME_LENGTH && isCount(times) && times <= MAX_REPEAT,
+    )
+  );
+}
+
+function isKnownList(value: unknown): value is readonly KnownAchievement[] {
+  return (
+    isList(value) &&
+    value.every(
+      (rule) =>
+        isRecord(rule) && typeof rule['id'] === 'string' && typeof rule['name'] === 'string',
     )
   );
 }
@@ -201,7 +221,8 @@ export function isStanding(value: unknown): value is Standing {
     isRecord(value) &&
     isBoardEntry(value['entry']) &&
     (value['place'] === null || isCount(value['place'])) &&
-    (value['machines'] === undefined || isCount(value['machines']))
+    (value['machines'] === undefined || isCount(value['machines'])) &&
+    (value['counted'] === undefined || isKnownList(value['counted']))
   );
 }
 
@@ -225,6 +246,7 @@ export function isBoard(value: unknown): value is Board {
     (value['champion'] === undefined ||
       value['champion'] === null ||
       isBoardEntry(value['champion'])) &&
-    (value['me'] === null || isStanding(value['me']))
+    (value['me'] === null || isStanding(value['me'])) &&
+    (value['counted'] === undefined || isKnownList(value['counted']))
   );
 }

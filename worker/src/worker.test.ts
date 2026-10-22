@@ -8,6 +8,7 @@ import {
   BETA_TESTERS,
   BUNK_ASSIGNED,
   CHAMPION,
+  COUNTED_ACHIEVEMENTS,
   CROWD_FAVORITE,
   CROWN,
   MACHINE_COLLABORATOR,
@@ -165,6 +166,7 @@ describe('leaderboard worker', () => {
       crown: null,
       champion: null,
       me: null,
+      counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
     });
   });
 
@@ -224,6 +226,7 @@ describe('leaderboard worker', () => {
       place: 1,
       siloPlace: 1,
       machines: 1,
+      counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
     });
   });
 

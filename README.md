@@ -20,6 +20,10 @@ Then ask Krascha for his verdict:
 /krascha:krascha
 ```
 
+Claude Code only updates a plugin from this marketplace on its own if you turn
+on auto-update for `shanep` under `/plugin`. To update by hand, run
+`claude plugin update krascha@shanep` and restart Claude Code.
+
 ## Install in Copilot CLI
 
 ```
@@ -41,6 +45,7 @@ copilot --allow-tool='shell(node:*)'
 ```
 
 That lets Copilot run any `node` command without asking, not only Krascha.
+To update, run `copilot plugin update krascha@shanep` and restart Copilot.
 
 ## Commands
 
@@ -73,7 +78,10 @@ you gave. You show on the board once you have 100 prompts. The board does not
 update itself, so the verdict and the silo sheet end with a tip to upload if
 you never have, or if you typed more prompts since your last upload. When you
 earn an achievement the board does not have yet, including a new one Krascha
-just learned, the tip names it. After a `remove` the tip goes quiet.
+just learned, the tip names it. After a `remove` the tip goes quiet. When
+the board can count achievements your copy of Krascha cannot, the next
+`board`, `silo board` or `upload` notes it, and the verdict names them with
+the command to update.
 
 Some achievements you can earn again, like each meltdown day, each session
 you rage quit or every 1,000 prompts. The report shows how many times next to

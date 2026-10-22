@@ -1,12 +1,14 @@
 // What Krascha remembers about your leaderboard entry, in his data folder:
 // the entry's random id, the name you last chose, how your uploads prove they
-// are yours, the key he made up if you upload without GitHub, and how many
-// prompts and which achievements you had at the last upload. This machine's id
+// are yours, the key he made up if you upload without GitHub, how many
+// prompts and which achievements you had at the last upload, and which
+// achievements the board could count when he last asked it. This machine's id
 // sits in a file of its own.
 
 import path from 'node:path';
 
 import { readJsonOrUndefined, readOptional, writeFileAtomic } from '../files.js';
+import type { KnownAchievement } from '../shared/leaderboard.js';
 import { KEY_PATTERN } from '../shared/leaderboard.js';
 
 export const SAVED_FILE = 'leaderboard.json';
@@ -25,6 +27,8 @@ export interface SavedEntry {
   readonly uploadedPrompts: number | null;
   /** Your achievement ids at the last upload, so Krascha can tell when the board is missing new ones. */
   readonly uploadedAchievements: readonly string[] | null;
+  /** The achievements the board could count when Krascha last asked it, so he can tell when this copy is behind. */
+  readonly boardAchievements: readonly KnownAchievement[] | null;
 }
 
 export const NO_ENTRY: SavedEntry = {
@@ -34,6 +38,7 @@ export const NO_ENTRY: SavedEntry = {
   key: null,
   uploadedPrompts: null,
   uploadedAchievements: null,
+  boardAchievements: null,
 };
 
 function textOrNull(value: unknown): string | null {
@@ -42,6 +47,20 @@ function textOrNull(value: unknown): string | null {
 
 function textsOrNull(value: unknown): string[] | null {
   return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : null;
+}
+
+function achievementsOrNull(value: unknown): KnownAchievement[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const known = value.flatMap((rule: unknown): KnownAchievement[] => {
+    const field = (key: string): string | null =>
+      typeof rule === 'object' && rule !== null ? textOrNull(Reflect.get(rule, key)) : null;
+    const id = field('id');
+    const name = field('name');
+    return id === null || name === null ? [] : [{ id, name }];
+  });
+  return known.length === value.length ? known : null;
 }
 
 export async function loadSaved(storageDir: string): Promise<SavedEntry> {
@@ -58,6 +77,7 @@ export async function loadSaved(storageDir: string): Promise<SavedEntry> {
     key: textOrNull(Reflect.get(data, 'key')),
     uploadedPrompts: typeof uploadedPrompts === 'number' ? uploadedPrompts : null,
     uploadedAchievements: textsOrNull(Reflect.get(data, 'uploadedAchievements')),
+    boardAchievements: achievementsOrNull(Reflect.get(data, 'boardAchievements')),
   };
 }
 

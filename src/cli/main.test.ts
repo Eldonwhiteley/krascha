@@ -7,6 +7,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import type { FetchFunction } from '../leaderboard/client.js';
 import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
+import { COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
 
@@ -219,6 +220,7 @@ describe('krascha', () => {
       key: null,
       uploadedPrompts: 3,
       uploadedAchievements: expect.arrayContaining(['manners']),
+      boardAchievements: null,
     });
   });
 
@@ -254,6 +256,26 @@ describe('krascha', () => {
       "Tip: Krascha's List is missing 1 achievement you earned: Manners module. Run upload to update Krascha's List.";
     expect((await home.run()).out).toContain(missing);
     expect((await home.run('silo')).out).toContain(missing);
+    await home.run('upload');
+    expect((await home.run()).out).not.toContain('Tip:');
+  });
+
+  it('says to update when the board can count achievements this copy cannot', async () => {
+    const home = await makeHome();
+    const here = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name }));
+    const answer =
+      (counted: readonly { id: string; name: string }[]): FetchFunction =>
+      async (url, init) => {
+        const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
+        return Response.json({ ...Object(standing), counted });
+      };
+    home.use({ fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]) });
+    await home.run('upload', 'Kyle');
+    const tip = 'Tip: Krascha learned 1 achievement this copy cannot count yet: Skynet online. Run';
+    expect((await home.run()).out).toContain(tip);
+    expect((await home.run('silo')).out).toContain(tip);
+    expect((await home.run()).out).toContain('plugin update krascha@shanep');
+    home.use({ fetch: answer(here) });
     await home.run('upload');
     expect((await home.run()).out).not.toContain('Tip:');
   });

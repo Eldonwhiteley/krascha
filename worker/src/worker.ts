@@ -11,7 +11,8 @@
 // made up is stored only as a hash, so it ties uploads together without saying
 // who anyone is.
 
-import { SHANEP } from '../../src/shared/achievements.js';
+import { COUNTED_ACHIEVEMENTS, SHANEP } from '../../src/shared/achievements.js';
+import type { KnownAchievement } from '../../src/shared/leaderboard.js';
 import {
   GITHUB_LOGIN_PATTERN,
   isScoreUpload,
@@ -37,6 +38,12 @@ export interface Env {
 
 /** Where a merged pull request earns Miles Dyson. */
 const REPO = 'shanep/krascha';
+
+/** Sent with the board and each upload, so a CLI older than this deploy can tell it is behind. */
+const COUNTED: readonly KnownAchievement[] = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({
+  id,
+  name,
+}));
 
 /** What the handler needs from the outside, so tests can stand in for GitHub and the clock. */
 export interface Deps {
@@ -267,7 +274,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       `You can upload ${String(UPLOADS_PER_DAY)} times a day. Try again tomorrow (UTC).`,
     );
   }
-  return json(saved.standing, 201);
+  return json({ ...saved.standing, counted: COUNTED }, 201);
 }
 
 async function remove(request: Request, env: Env, deps: Deps): Promise<Response> {
@@ -369,7 +376,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     case 'GET /api/board': {
       const me = url.searchParams.get('me');
       const board = await readBoard(env.DB, me === '' ? null : me);
-      return json(board, 200, me === null ? 'public, max-age=60' : 'no-store');
+      const cache = me === null ? 'public, max-age=60' : 'no-store';
+      return json({ ...board, counted: COUNTED }, 200, cache);
     }
     case 'POST /api/scores': {
       return upload(request, env, deps);

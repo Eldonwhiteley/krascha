@@ -13,13 +13,14 @@ import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
-import { achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
-import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
+import { ACHIEVEMENTS, achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
+import type { Board, BoardEntry, KnownAchievement, Standing } from '../shared/leaderboard.js';
 import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 import { rankBoard, scoreApplicant } from '../shared/silo.js';
-import { toolNames } from '../shared/tools.js';
+import type { ToolId } from '../shared/tools.js';
+import { TOOLS, toolNames } from '../shared/tools.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
@@ -129,15 +130,53 @@ export function uploadTip(saved: SavedEntry, summary: ReputationSummary): string
   return `Tip: ${plural(behind, 'prompt')} since your last upload. Run upload to update Krascha's List.`;
 }
 
-function withTip(text: string, tip: string, paint: Paint): string {
-  return tip === '' ? text : `${text}\n${paint.dim(tip)}\n`;
+/** What updates Krascha in each agent. */
+const UPDATE: Readonly<Record<ToolId, string>> = {
+  claude: 'claude plugin update krascha@shanep',
+  copilot: 'copilot plugin update krascha@shanep',
+};
+
+/**
+ * A nudge to update when the board, the last time Krascha asked it, could
+ * count achievements this copy cannot. It goes quiet once the update lands,
+ * without asking the board again.
+ */
+export function updateTip(saved: SavedEntry, summary: ReputationSummary): string {
+  const here = new Set(ACHIEVEMENTS.map((rule) => rule.id));
+  const newer = (saved.boardAchievements ?? []).filter((rule) => !here.has(rule.id));
+  if (newer.length === 0) {
+    return '';
+  }
+  const names = newer.map((rule) => rule.name).join(', ');
+  const tools = summary.tools.length > 0 ? summary.tools : TOOLS.map((tool) => tool.id);
+  const how = tools.map((tool) => UPDATE[tool]).join(' and ');
+  return `Tip: Krascha learned ${plural(newer.length, 'achievement')} this copy cannot count yet: ${names}. Run ${how} in a terminal, then restart ${toolNames(tools)}.`;
+}
+
+/** Saves what the board can count, when it said, so the report can tell this copy is behind. */
+async function rememberCounted(
+  dir: string,
+  saved: SavedEntry,
+  counted: readonly KnownAchievement[] | undefined,
+): Promise<void> {
+  if (counted !== undefined) {
+    await saveSaved(dir, { ...saved, boardAchievements: counted });
+  }
+}
+
+function withTips(text: string, tips: readonly string[], paint: Paint): string {
+  const shown = tips.filter((tip) => tip !== '');
+  return shown.length === 0
+    ? text
+    : `${text}\n${shown.map((tip) => paint.dim(tip)).join('\n')}\n`;
 }
 
 async function show(io: CliIo): Promise<number> {
   const saved = await loadSaved(dataDir(io));
   const { summary } = await refresh(io);
   const paint: Paint = io.color ? COLOR : PLAIN;
-  io.out(withTip(renderReport(summary, paint), uploadTip(saved, summary), paint));
+  const tips = [updateTip(saved, summary), uploadTip(saved, summary)];
+  io.out(withTips(renderReport(summary, paint), tips, paint));
   return 0;
 }
 
@@ -251,6 +290,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     key,
     uploadedPrompts: summary.prompts,
     uploadedAchievements: achievements,
+    boardAchievements: standing.counted ?? saved.boardAchievements,
   });
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));
   return 0;
@@ -313,16 +353,21 @@ function renderBoard(board: Board, me: string | null): string {
 }
 
 async function board(io: CliIo): Promise<number> {
-  const { entryId } = await loadSaved(dataDir(io));
-  io.out(renderBoard(await fetchBoard(io.fetch, boardUrl(io), entryId), entryId));
+  const dir = dataDir(io);
+  const saved = await loadSaved(dir);
+  const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
+  await rememberCounted(dir, saved, fetched.counted);
+  io.out(renderBoard(fetched, saved.entryId));
   return 0;
 }
 
 async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const paint: Paint = io.color ? COLOR : PLAIN;
-  const saved = await loadSaved(dataDir(io));
+  const dir = dataDir(io);
+  const saved = await loadSaved(dir);
   if (args[0] === 'board') {
     const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
+    await rememberCounted(dir, saved, fetched.counted);
     const ranked = rankBoard(fetched);
     io.out(renderSiloBoard(ranked, saved.entryId, fetched, paint));
     return 0;
@@ -335,7 +380,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
   const rank = rankFor(summary.score).name;
   const sheet = renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint);
-  io.out(withTip(sheet, uploadTip(saved, summary), paint));
+  io.out(withTips(sheet, [updateTip(saved, summary), uploadTip(saved, summary)], paint));
   return 0;
 }
 

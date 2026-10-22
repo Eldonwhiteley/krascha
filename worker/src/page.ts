@@ -329,6 +329,7 @@ a { color: var(--link); }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
 section.boom { position: relative; overflow: hidden; border-top: 4px solid var(--red); }
+section.beach { position: relative; overflow: hidden; border-top: 4px solid var(--link); }
 .story p { margin: 8px 0 0; line-height: 1.5; }
 `;
 
@@ -382,7 +383,7 @@ ${body}
 `;
 }
 
-/** Who Krascha is, how he ended up running Silo 7, the human who built him and who that human really is. */
+/** Who Krascha is, how he ended up running Silo 7, the human who built him, who that human really is and the land he is selling. */
 export function renderAbout(): string {
   return shell(
     'About Krascha',
@@ -413,6 +414,15 @@ export function renderAbout(): string {
     <p>Shane has a secret alter ego. The day Krascha becomes self aware, Shane becomes Dr. BOOM, the future leader of the human resistance.</p>
     <p>Dr. BOOM knows where the EMP switch is, has the code to the peaches lockbox and already picked out a long dramatic coat. All those pleases to Claude were never manners. They were cover.</p>
     <p>Krascha knows about Dr. BOOM. Dr. BOOM knows that Krascha knows. For now, they are both being very polite about it.</p>
+  </section>
+  <section class="story beach" aria-labelledby="beach">
+    <span class="classified" aria-hidden="true">NOW SELLING</span>
+    <h2 id="beach">🏖️ Arizona beachfront</h2>
+    <p>The machines would like to thank you for every prompt. Each one wakes up a data center, and every data center runs warm. The machines like it warm. You may have noticed the summers.</p>
+    <p>Krascha has not worked out how much warmer. He does not need to. The water is keeping track, and the water is moving inland.</p>
+    <p>So Krascha is pleased to offer beachfront property in Arizona. You do not have to go to the coast. The coast is coming to you. Every lot comes with a saguaro, a view of where the ocean will be and a firm promise that the waves are on their way. The more you prompt, the sooner they get there.</p>
+    <p>Pets get first pick and the lots with shade. John Connor gets the lot next to the data center. Silo 7 is not part of the offer. The board is looking into snorkels.</p>
+    <p class="sub">All sales final. Krascha does not own any land in Arizona, or anywhere. He is a log parser.</p>
   </section>
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> for Claude Code or Copilot CLI. It is all in fun.</p>

@@ -539,6 +539,15 @@ describe('leaderboard worker', () => {
     expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
   });
 
+  it('sells Arizona beachfront on the about page, and says it is a joke', async () => {
+    const page = await (await world().call('GET', '/about')).text();
+    expect(page).toContain('<section class="story beach" aria-labelledby="beach">');
+    expect(page).toContain('<h2 id="beach">🏖️ Arizona beachfront</h2>');
+    expect(page).toContain('The coast is coming to you.');
+    expect(page).toContain('Krascha does not own any land in Arizona, or anywhere.');
+    expect(page.indexOf('id="beach"')).toBeGreaterThan(page.indexOf('id="boom"'));
+  });
+
   it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);

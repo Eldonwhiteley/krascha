@@ -28,7 +28,12 @@
         "claude",
         "copilot"
       ],
-      "likes": 2
+      "likes": 2,
+      "repeats": {
+        "meltdown": 7,
+        "grudge-match": 12,
+        "regular": 3
+      }
     },
     {
       "id": "00000000-0000-4000-8000-000000000002",
@@ -730,7 +735,12 @@
       "claude",
       "copilot"
     ],
-    "likes": 2
+    "likes": 2,
+    "repeats": {
+      "meltdown": 7,
+      "grudge-match": 12,
+      "regular": 3
+    }
   },
   "me": null
 }

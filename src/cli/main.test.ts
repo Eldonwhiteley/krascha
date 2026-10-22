@@ -10,11 +10,12 @@ import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
 import { COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
+import type { ReputationSummary } from '../shared/reputation.js';
 
 import { faceFor } from './face.js';
 import type { CliIo } from './main.js';
 import { INDEX_FILE, dataDir, main } from './main.js';
-import { wrap } from './render.js';
+import { PLAIN, renderReport, wrap } from './render.js';
 
 interface Run {
   readonly code: number;
@@ -539,5 +540,34 @@ describe('wrap', () => {
     expect(wrap('one two three four', 9)).toStrictEqual(['one two', 'three', 'four']);
     expect(wrap('  ', 9)).toStrictEqual([]);
     expect(wrap('abcdefghijk x', 5)).toStrictEqual(['abcdefghijk', 'x']);
+  });
+
+  it('shows how many times you earned the ones you can earn again', () => {
+    const report: ReputationSummary = {
+      prompts: 3200,
+      kind: 0,
+      mean: 0,
+      general: 0,
+      score: 0,
+      byDay: [],
+      bySession: [],
+      topKind: [],
+      topMean: [],
+      recent: [],
+      scannedAt: null,
+      tokensPerDay: 0,
+      hours: 0,
+      tools: [],
+      lateNight: 0,
+      selfAware: 0,
+      mixed: 0,
+      swarm: 0,
+      rageQuits: 1,
+      badWords: 0,
+    };
+    const out = renderReport(report, PLAIN);
+    expect(out).toContain('📜 Regular ×3  ★★ SILVER');
+    // Earned once, so no count.
+    expect(out).toContain('🚪 Hasta la vista, baby  ★ BRONZE');
   });
 });

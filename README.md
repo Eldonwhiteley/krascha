@@ -31,8 +31,16 @@ Copilot is dropping installs straight from a repo, so if you installed with
 `copilot plugin install shanep/krascha`, run `copilot plugin uninstall krascha`
 first. Your counts live in `~/.krascha` and stay put.
 
-Then run `/krascha` in a Copilot session. Copilot will ask before it runs
-`node` the first time.
+Then run `/krascha` in a Copilot session. Copilot asks before it runs `node`,
+and asks again for each new command (`/krascha json`, `/krascha board` and so
+on), since Copilot has no setting that always allows one command. To skip the
+question, start Copilot with:
+
+```
+copilot --allow-tool='shell(node:*)'
+```
+
+That lets Copilot run any `node` command without asking, not only Krascha.
 
 ## Commands
 

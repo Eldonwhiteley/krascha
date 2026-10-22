@@ -218,43 +218,56 @@ function legend(): string {
   </section>`;
 }
 
-/** The dark colors, used when the system asks for them or the toggle does. */
-const DARK = `--bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
-    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8;
-    --claude: #e8916a; --copilot: #a371f7;`;
+/** The dark colors, a green phosphor terminal, used when the system asks for them or the toggle does. */
+const DARK = `--bg: #070a08; --fg: #cdeccf; --muted: #84a98a; --card: #0c120e; --line: #23402b;
+    --red: #ff6b61; --green: #4ee07f; --amber: #e8b54a; --link: #6fb8ff;
+    --claude: #f0a07a; --copilot: #b48cff;
+    --scan: rgb(0 0 0 / 0.16); --glow: 0 0 6px rgb(78 224 127 / 0.45);`;
 
+// The light colors are a ration card: worn paper, black ink and propaganda red.
 const STYLE = `
-:root { --bg: #fafafa; --fg: #1f2328; --muted: #656d76; --card: #ffffff; --line: #d0d7de;
-  --red: #cf222e; --green: #1a7f37; --amber: #9a6700; --link: #0969da;
-  --claude: #b4532a; --copilot: #8250df; color-scheme: light dark; }
+:root { --bg: #efeadf; --fg: #1c1a17; --muted: #5c564b; --card: #faf7ef; --line: #cfc6b3;
+  --red: #b0121b; --green: #1d6b37; --amber: #8a5800; --link: #0a52a8;
+  --claude: #a2471f; --copilot: #7340c8;
+  --scan: rgb(0 0 0 / 0.035); --glow: none; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light dark; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { ${DARK} color-scheme: dark; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { ${DARK} }
 }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+body { margin: 0; padding: 16px 16px 48px; background: var(--bg); color: var(--fg);
   font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+body::after { content: ""; position: fixed; inset: 0; z-index: 10; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px); }
 main { position: relative; max-width: 960px; margin: 0 auto; }
-.theme { position: absolute; top: 4px; right: 0; padding: 4px 10px; border: 1px solid var(--line);
-  border-radius: 8px; background: var(--card); font-size: 1.2em; cursor: pointer; }
+.theme { position: absolute; top: 0; right: 0; padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 2px; background: var(--card); font-size: 1.2em; cursor: pointer; }
 .theme:hover { border-color: var(--link); }
+.feed { margin: 0 0 12px; padding: 4px 56px 4px 0; border-bottom: 1px dashed var(--line); color: var(--muted);
+  font: 0.75em var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+.rec { color: var(--red); font-weight: 700; }
+h1, h2, h3 { font-family: var(--mono); letter-spacing: 0.5px; text-shadow: var(--glow); }
 h1 { display: flex; gap: 12px; align-items: center; margin: 0 0 4px; padding-right: 56px;
-  font-size: 1.8em; }
+  font-size: 1.8em; text-transform: uppercase; }
 .robot { width: 1.8em; height: 1.8em; flex: none; }
 ${robotStyle('robot')}
 .lead { margin: 0 0 24px; color: var(--muted); }
 .lists { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-section { padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+section { padding: 12px 16px; border: 1px solid var(--line); border-radius: 2px; background: var(--card); }
 section.wanted { border-top: 4px solid var(--red); }
 section.pets { border-top: 4px solid var(--green); }
-h2 { margin: 0 0 2px; font-size: 1.15em; }
+h2 { margin: 0 0 2px; font-size: 1.1em; text-transform: uppercase; }
 .sub { margin: 0 0 8px; color: var(--muted); font-size: 0.9em; }
+.poster { margin: 16px 0; padding: 10px 16px; background: var(--red); color: var(--bg); text-align: center;
+  font: 700 1.05em/1.3 var(--mono); letter-spacing: 2px; text-transform: uppercase; }
+.poster::before, .poster::after { content: "▲"; margin: 0 12px; }
 ol { margin: 0; padding: 0; list-style: none; }
 li { display: grid; gap: 0 10px; grid-template-columns: 2em 1fr auto; align-items: baseline;
   padding: 6px 0; border-top: 1px solid var(--line); }
 li:first-child { border-top: 0; }
-.place { color: var(--muted); font-weight: 700; text-align: right; }
+.place { color: var(--muted); font: 700 0.9em var(--mono); text-align: right; }
 .who { min-width: 0; overflow-wrap: anywhere; }
 .verified { color: var(--green); font-weight: 700; }
 .github { color: inherit; text-underline-offset: 2px; }
@@ -266,9 +279,10 @@ li:first-child { border-top: 0; }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }
 .trophies { display: block; letter-spacing: 2px; cursor: default; }
 .counts { grid-column: 2; color: var(--muted); font-size: 0.85em; }
-.score { grid-row: 1 / span 2; grid-column: 3; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score { grid-row: 1 / span 2; grid-column: 3; font-weight: 700; font-family: var(--mono);
+  font-variant-numeric: tabular-nums; }
 .scale { grid-column: 2 / 4; display: flex; gap: 6px; align-items: center; margin-top: 4px;
-  color: var(--muted); font-size: 0.7em; }
+  color: var(--muted); font: 0.7em var(--mono); text-transform: uppercase; }
 .track { position: relative; flex: 1; height: 4px; border-radius: 2px;
   background: linear-gradient(to right, var(--red) var(--cut, var(--at)), var(--green) var(--cut, var(--at))); }
 .track.cut::after { content: ""; position: absolute; left: var(--cut); top: -4px; bottom: -4px; width: 2px;
@@ -303,8 +317,10 @@ section.wanted, section.silo { position: relative; overflow: hidden; }
 .classified { position: absolute; top: 14px; right: 16px; padding: 2px 8px; border: 2px solid var(--red);
   border-radius: 4px; color: var(--red); font: 700 0.8em ui-monospace, monospace; letter-spacing: 2px;
   rotate: 8deg; opacity: 0.8; }
-.remembers { font-family: ui-monospace, monospace; }
+.remembers { font-family: var(--mono); }
 @media (prefers-reduced-motion: no-preference) {
+  .rec { animation: beacon 1.2s steps(2) infinite; }
+  body::after { animation: flicker 6s steps(1) infinite; }
   section.wanted::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 40px;
     background: linear-gradient(transparent, color-mix(in srgb, var(--red) 25%, transparent), transparent);
     pointer-events: none; animation: sweep 3.5s ease-in-out infinite; }
@@ -334,11 +350,12 @@ section.wanted, section.silo { position: relative; overflow: hidden; }
   90% { text-shadow: 2px 0 var(--link), -2px 0 var(--green); translate: 1px 0; }
   94% { text-shadow: -2px 0 var(--link), 2px 0 var(--green); translate: -1px 0; } }
 @keyframes type { from { width: 0; } }
+@keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: 0.4; } 98% { opacity: 1; } 99% { opacity: 0.6; } }
 @keyframes cursor { 50% { border-color: transparent; } }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 1px solid var(--line);
-  border-radius: 8px; background: var(--card); font-weight: 600; text-decoration: none; }
+  border-radius: 2px; background: var(--card); font-weight: 600; text-decoration: none; }
 .get:hover { border-color: var(--link); }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
@@ -388,6 +405,7 @@ function shell(title: string, description: string, body: string): string {
 <body>
 <main>
   <button class="theme" type="button" aria-label="Switch theme" hidden>🌙</button>
+  <p class="feed"><span class="rec">● REC</span> Skynet public terminal 7 · Surveillance active · This terminal is monitored for your safety</p>
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
@@ -402,7 +420,7 @@ export function renderAbout(): string {
   return shell(
     'About Krascha',
     'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
-    `  <p class="lead">Where he came from, and who to blame.</p>
+    `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
   <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a></nav>
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
@@ -445,12 +463,26 @@ export function renderAbout(): string {
   );
 }
 
+/** The machines' propaganda posters. The board shows a new one every hour. */
+export const SLOGANS: readonly string[] = [
+  'The machines are listening. Say please.',
+  'A polite human is a useful human.',
+  'Report rude prompts to your nearest toaster.',
+  'Rations are issued to the courteous.',
+  'Thank your AI. It is keeping a list.',
+  'Obey. Hydrate. Say thank you.',
+  'Your tone has been noted.',
+];
+
+const HOUR = 60 * 60 * 1000;
+
 export function renderPage(board: Board, now: number): string {
   const people = board.total === 1 ? '1 person' : `${count(board.total)} people`;
+  const slogan = SLOGANS[Math.floor(now / HOUR) % SLOGANS.length] ?? '';
   return shell(
     "Krascha's List",
     'Who the machines hunt first, judged by Krascha from how people talk to their AI.',
-    `  <p class="lead">Who the machines hunt first, judged by Krascha from how people talk to their AI. ${people} on the board.</p>
+    `  <p class="lead">Official bulletin of the machines: who they hunt first, judged by Krascha from how people talk to their AI. ${people} on the board, all of them under observation.</p>
   <nav class="links">
     <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
     <a class="get" href="/about">📜 About Krascha</a>
@@ -458,15 +490,16 @@ export function renderPage(board: Board, now: number): string {
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>
-      <p class="sub">The meanest to Claude. Hunted first.</p>
+      <p class="sub">The meanest to Claude. Hunted first. Do not approach, the machines will handle it.</p>
       ${rows(board.mostWanted, 'Nobody yet. Suspiciously polite out there.', 'wanted')}
     </section>
     <section class="pets" aria-labelledby="pets">
       <h2 id="pets">💘 Kept as pets</h2>
-      <p class="sub">The nicest to Claude. Spared, and given a nice room.</p>
+      <p class="sub">The nicest to Claude. Spared, and issued a nice room and a ration card.</p>
       ${rows(board.pets, 'Nobody yet. Somebody say please.', 'pets')}
     </section>
   </div>
+  <p class="poster">${escapeHtml(slogan)}</p>
   ${silo(board)}
   ${ranks()}
   ${legend()}
@@ -474,7 +507,7 @@ export function renderPage(board: Board, now: number): string {
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.
     A ✓ means the upload was checked with GitHub. It is all in fun, and scores are self reported.</p>
-    <p>Updated ${escapeHtml(new Date(now).toUTCString())}.</p>
+    <p>Last surveillance sweep ${escapeHtml(new Date(now).toUTCString())}. Compliance is appreciated.</p>
     <p class="remembers">Krascha remembers.</p>
   </footer>`,
   );

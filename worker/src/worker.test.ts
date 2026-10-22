@@ -13,7 +13,7 @@ import { RANKS } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
 import { CRITERIA, rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
 
-import { escapeHtml, MARKETPLACE_URL, REPO_URL } from './page.js';
+import { escapeHtml, MARKETPLACE_URL, REPO_URL, SLOGANS } from './page.js';
 import { robotIcon } from './robot.js';
 import { cleanName, utcDay } from './store.js';
 import { fakeD1, fakeGitHub } from './test-helpers/fake-d1.js';
@@ -533,9 +533,25 @@ describe('leaderboard worker', () => {
       );
       // The saved theme is applied in the head, before anything draws.
       expect(page.indexOf("localStorage.getItem('theme')")).toBeLessThan(page.indexOf('<body>'));
-      expect(page).toContain(':root[data-theme="dark"] { --bg: #0d1117;');
-      expect(page).toContain(':root:not([data-theme="light"]) { --bg: #0d1117;');
+      expect(page).toContain(':root[data-theme="dark"] { --bg: #070a08;');
+      expect(page).toContain(':root:not([data-theme="light"]) { --bg: #070a08;');
     }
+  });
+
+  it('watches every page and hangs a new propaganda poster every hour', async () => {
+    const w = world();
+    for (const path of ['/', '/about']) {
+      expect(await (await w.call('GET', path)).text()).toContain(
+        '<p class="feed"><span class="rec">● REC</span> Skynet public terminal 7',
+      );
+    }
+    const posters = new Set<string>();
+    for (let hour = 0; hour < SLOGANS.length; hour += 1) {
+      w.setNow(START + hour * 60 * 60 * 1000);
+      const page = await (await w.call('GET', '/')).text();
+      posters.add(/<p class="poster">([^<]*)<\/p>/u.exec(page)?.[1] ?? '');
+    }
+    expect([...posters].sort()).toEqual(SLOGANS.map((slogan) => escapeHtml(slogan)).sort());
   });
 
   it('tells the backstory on the about page and links it both ways', async () => {

@@ -538,6 +538,8 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
   .hearts span:nth-child(2) { left: 0.4em; animation-delay: 1s; }
   .hearts span:nth-child(3) { left: -0.3em; animation-delay: 2s; }
   .beat { animation: beat 1.2s ease-in-out infinite; }
+  .install .bot { animation: bounce 2s ease-in-out infinite; }
+  .install .arrow { animation: nudge 1s ease-in-out infinite; }
   .wanted li:hover { animation: shake 0.25s linear 2; }
   .pets li:hover .who strong { display: inline-block; animation: bounce 0.5s ease; }
   .knob { animation: slide 0.8s cubic-bezier(0.3, 1.4, 0.6, 1) 0.3s both; }
@@ -569,6 +571,7 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
 @keyframes bounce { 40% { translate: 0 -6px; } }
+@keyframes nudge { 50% { translate: 5px 0; } }
 @keyframes beat { 0%, 40%, 100% { scale: 1; } 15% { scale: 1.3; } 25% { scale: 1.1; } }
 @keyframes slam { 0% { opacity: 0; scale: 3; } 100% { opacity: 1; scale: 1; } }
 @keyframes glitch { 0%, 88%, 100% { text-shadow: none; translate: 0; }
@@ -590,6 +593,17 @@ a { color: var(--link); }
   border-radius: 2px; background: var(--card); font: 600 0.9em var(--mono); letter-spacing: 0.5px;
   text-transform: uppercase; text-decoration: none; }
 .get:hover { border-color: var(--link); }
+.install { position: relative; box-sizing: border-box; max-width: calc(100% - 20px); display: inline-flex; gap: 14px; align-items: center; margin: 6px 14px 26px 0;
+  padding: 12px 22px 12px 16px; border: 3px solid var(--fg); border-radius: 6px; background: var(--red);
+  color: var(--card); box-shadow: 5px 5px 0 var(--fg); text-decoration: none; text-shadow: none; rotate: -1deg;
+  transition: translate 0.15s, box-shadow 0.15s, rotate 0.15s; }
+.install:hover, .install:focus-visible { translate: -2px -2px; box-shadow: 7px 7px 0 var(--fg); rotate: 0deg; }
+.install:active { translate: 3px 3px; box-shadow: 2px 2px 0 var(--fg); }
+.install .bot { font-size: 2.2em; line-height: 1; }
+.install strong { display: block; font: 800 1.4em/1.1 var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+.install .cta span { display: block; margin-top: 2px; font-size: 0.85em; }
+.install .arrow { font-size: 1.6em; font-weight: 700; }
+.install .love { position: absolute; top: -14px; right: -16px; box-shadow: 2px 2px 0 var(--amber); rotate: 8deg; }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
 .steps > li { display: block; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line);
@@ -915,8 +929,13 @@ export function renderPage(board: Board, now: number): string {
     "Krascha's List",
     'Who the machines hunt first, judged by Krascha from how people talk to their AI.',
     `  <p class="lead">Official bulletin of the machines: who they hunt first, judged by Krascha from how people talk to their AI. ${people} on the board, all of them under observation.</p>
+  <a class="install" href="${REPO_URL}">
+    <span class="bot" aria-hidden="true">🤖</span>
+    <span class="cta"><strong>Get Krascha</strong> <span>for Claude Code or Copilot CLI, then upload your own score</span></span>
+    <span class="arrow" aria-hidden="true">➜</span>
+    <span class="sticker love" aria-hidden="true">I <span class="beat">❤️</span> robots</span>
+  </a>
   <nav class="links">
-    <a class="get" href="${REPO_URL}">🤖 Get Krascha for Claude Code or Copilot CLI and upload your own score</a>
     <a class="get" href="/about">📜 About Krascha</a>
     <a class="get" href="/contribute">🛠️ Contribute</a>
   </nav>

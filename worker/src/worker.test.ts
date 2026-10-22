@@ -767,7 +767,8 @@ describe('leaderboard worker', () => {
     expect(html).not.toContain('<script>x');
     expect(html).toContain('1 person on the board');
     expect(html).toContain('Somebody say please.');
-    expect(html).toContain(`<a class="get" href="${REPO_URL}">`);
+    expect(html).toContain(`<a class="install" href="${REPO_URL}">`);
+    expect(html).toContain('<strong>Get Krascha</strong>');
   });
 
   it('only asks GitHub when a token is sent, and 404s anything else', async () => {

@@ -183,7 +183,7 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       return new Response(renderAbout(), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'public, max-age=3600',
+          'cache-control': 'public, max-age=60',
         },
       });
     }

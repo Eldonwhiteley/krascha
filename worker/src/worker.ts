@@ -1,6 +1,7 @@
 // The Cloudflare Worker behind Krascha's List. It serves the public page at
-// /, the board as JSON at /api/board, takes uploads and removals at
-// /api/scores and likes at /api/likes. An upload proves who it belongs to one of two ways. A GitHub
+// /, every rank at /ranks, every achievement at /achievements, the board as
+// JSON at /api/board, takes uploads and removals at /api/scores and likes at
+// /api/likes. An upload proves who it belongs to one of two ways. A GitHub
 // token is checked once with GitHub and then dropped, never stored or logged,
 // and its entry shows as verified and links to the account, so only the user
 // id and login are kept. A key the CLI made up is stored only as a hash, so it
@@ -14,7 +15,13 @@ import {
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 
-import { renderAbout, renderContribute, renderPage } from './page.js';
+import {
+  renderAbout,
+  renderAchievements,
+  renderContribute,
+  renderPage,
+  renderRanks,
+} from './page.js';
 import type { D1Database, Owner } from './store.js';
 import { likeEntry, readBoard, removeScore, saveScore, utcDay } from './store.js';
 
@@ -213,6 +220,24 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     case 'GET /about': {
       const board = await readBoard(env.DB, null);
       return new Response(renderAbout(board), {
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'public, max-age=60',
+        },
+      });
+    }
+    case 'GET /ranks': {
+      const board = await readBoard(env.DB, null);
+      return new Response(renderRanks(board), {
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'public, max-age=60',
+        },
+      });
+    }
+    case 'GET /achievements': {
+      const board = await readBoard(env.DB, null);
+      return new Response(renderAchievements(board), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'public, max-age=60',

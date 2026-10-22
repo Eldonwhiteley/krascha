@@ -208,9 +208,9 @@ describe('leaderboard worker', () => {
     expect(board.mostWanted[0]?.achievements).toStrictEqual(['first-strike', 'meltdown']);
     const page = await w.call('GET', '/');
     const html = await page.text();
-    expect(html).toContain('aria-label="Achievements: First strike, Meltdown"');
+    expect(html).toContain('<span class="trophies" role="group" aria-label="Achievements">');
     expect(html).toContain(
-      '<span class="medal silver" title="Meltdown: Be mean to your AI 5 times in one day.">🌋</span>',
+      '<a class="medal silver" href="/achievements#achievement-meltdown" title="Meltdown: Be mean to your AI 5 times in one day." aria-label="Meltdown: Be mean to your AI 5 times in one day.">🌋</a>',
     );
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.achievements).toStrictEqual([]);
@@ -490,7 +490,7 @@ describe('leaderboard worker', () => {
     expect(page).toContain(
       '<p class="poster">The machines like it hot.</p>\n  <section class="climate"',
     );
-    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('id="ranks"'));
+    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('<footer>'));
     expect(section).toContain(
       '<span class="rank">Arizona beachfront, The coast is on its way to you.</span>',
     );
@@ -515,7 +515,7 @@ describe('leaderboard worker', () => {
     await w.upload('token-ann', { ...MEAN, tokensPerDay: 100_000_000 });
     await w.upload('token-bob', { ...KIND, tokensPerDay: 200_000_000 });
     const page = await (await w.call('GET', '/')).text();
-    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('id="ranks"'));
+    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('<footer>'));
     const check = '<span class="verified" title="Checked with GitHub">✓</span>';
     expect(section).toContain(
       `<strong>Bob</strong></a> ${check} <span class="sticker" role="img" aria-label="I love datacenters">I <span class="beat">❤️</span> datacenters</span>`,
@@ -528,11 +528,17 @@ describe('leaderboard worker', () => {
     expect(page).toContain('Nobody yet. The planet is holding steady');
   });
 
-  it('explains every achievement on the page, earned or not', async () => {
+  it('explains every achievement on its own page, earned or not', async () => {
     const w = world();
-    const page = await (await w.call('GET', '/')).text();
+    const response = await w.call('GET', '/achievements');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=60');
+    const page = await response.text();
+    expect(page).toContain('<title>Krascha&#39;s Achievements</title>');
     expect(page).toContain('<h2 id="legend">🏆 Achievements</h2>');
     for (const rule of ACHIEVEMENTS) {
+      expect(page).toContain(`id="achievement-${rule.id}"`);
       expect(page).toContain(`${escapeHtml(rule.name)} <span class="tier">`);
       expect(page).toContain(`<dd>${escapeHtml(rule.how)}</dd>`);
       expect(page).toContain(`"${escapeHtml(rule.quip)}"`);
@@ -545,17 +551,24 @@ describe('leaderboard worker', () => {
     await w.upload('token-ann', { ...MEAN, achievements: ['first-strike', 'meltdown'] });
     await w.upload('token-bob', { ...KIND, achievements: ['first-strike', 'manners'] });
     expect((await w.board()).held).toStrictEqual({ 'first-strike': 2, meltdown: 1, manners: 1 });
-    const page = await (await w.call('GET', '/')).text();
+    const page = await (await w.call('GET', '/achievements')).text();
     expect(page).toContain('2 of 2 hold it (100%)');
     expect(page).toContain('1 of 2 hold it (50%) <span class="rarest">Rarest on the board</span>');
     expect(page.split('class="rarest"')).toHaveLength(3);
   });
 
-  it('lists every rank on the scale in order, from hunted first to kept as a pet', async () => {
+  it('lists every rank on the scale in order on its own page, from hunted first to kept as a pet', async () => {
     const w = world();
-    const page = await (await w.call('GET', '/')).text();
+    const response = await w.call('GET', '/ranks');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=60');
+    const page = await response.text();
+    expect(page).toContain('<title>Krascha&#39;s Ranks</title>');
     expect(page).toContain('<h2 id="ranks">🎖️ Ranks</h2>');
-    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('id="legend"'));
+    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('<footer>'));
+    expect(ladder).toContain('<div class="badge rung" id="rank-john-connor"');
+    expect(ladder).toContain('<div class="badge rung" id="rank-theodore-twombly"');
     const spots = RANKS.map((rank, index) => {
       expect(ladder).toContain(
         `${escapeHtml(rank.icon)}</span> ${escapeHtml(rank.name)} <span class="title">${escapeHtml(rank.title)}</span> <span class="tier">Level ${String(index + 1)}</span></dt>`,
@@ -580,12 +593,41 @@ describe('leaderboard worker', () => {
     const pet = RANKS.at(-1)?.name ?? '';
     const hunted = RANKS[0]?.name ?? '';
     expect((await w.board()).ranks).toStrictEqual({ [hunted]: 1, [pet]: 2 });
-    const page = await (await w.call('GET', '/')).text();
-    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('id="legend"'));
+    const page = await (await w.call('GET', '/ranks')).text();
+    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('<footer>'));
     expect(ladder).toContain('1 of 3 are here (33%)</dd>');
     expect(ladder).toContain('2 of 3 are here (67%) <span class="crowded">Most crowded</span>');
     expect(ladder.split('class="crowded"')).toHaveLength(2);
     expect(ladder.split('Nobody here yet.')).toHaveLength(RANKS.length - 1);
+  });
+
+  it('links every medal and rank on the board to its entry, and leaves the full lists to their pages', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, achievements: ['first-strike', 'meltdown'] });
+    await w.upload('token-bob', { ...KIND, achievements: ['manners'] });
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).not.toContain('id="ranks"');
+    expect(page).not.toContain('id="legend"');
+    const lists = page.slice(page.indexOf('<div class="lists">'), page.indexOf('id="silo"'));
+    const ranks = await (await w.call('GET', '/ranks')).text();
+    const achievements = await (await w.call('GET', '/achievements')).text();
+    for (const [rank, anchor] of [
+      [RANKS[0]?.name ?? '', 'rank-john-connor'],
+      [RANKS.at(-1)?.name ?? '', 'rank-theodore-twombly'],
+    ] as const) {
+      expect(lists).toContain(
+        `<span class="rank"><a href="/ranks#${anchor}">${escapeHtml(rank)}</a></span>`,
+      );
+      expect(ranks).toContain(`id="${anchor}"`);
+    }
+    for (const id of ['first-strike', 'meltdown', 'manners']) {
+      expect(lists).toContain(`href="/achievements#achievement-${id}"`);
+      expect(achievements).toContain(`id="achievement-${id}"`);
+    }
+    expect(lists.split('<a class="medal ')).toHaveLength(4);
+    // Each medal is its own link, so none hide inside one big image for screen readers.
+    expect(lists).not.toContain('class="trophies" role="img"');
+    expect(page).toContain('.badge:target {');
   });
 
   it('ranks everyone on the board for Silo 7, like krascha silo board', async () => {
@@ -595,7 +637,7 @@ describe('leaderboard worker', () => {
     await w.upload('token-bob', KIND);
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<h2 id="silo">🛡️ Silo 7 admissions</h2>');
-    const silo = page.slice(page.indexOf('id="silo"'), page.indexOf('id="legend"'));
+    const silo = page.slice(page.indexOf('id="silo"'), page.indexOf('id="climate"'));
     const ranked = rankBoard(await w.board());
     expect(ranked.map(({ score }) => score.name)).toStrictEqual(['Ann', 'Bob']);
     for (const { score } of ranked) {
@@ -617,7 +659,7 @@ describe('leaderboard worker', () => {
 
   it('puts a dark mode toggle on every page that only shows when the script runs', async () => {
     const w = world();
-    for (const path of ['/', '/about', '/contribute']) {
+    for (const path of ['/', '/ranks', '/achievements', '/about', '/contribute']) {
       const page = await (await w.call('GET', path)).text();
       expect(page).toContain(
         '<button class="theme" type="button" aria-label="Switch theme" hidden>',
@@ -631,7 +673,7 @@ describe('leaderboard worker', () => {
 
   it('watches every page and hangs a new propaganda poster every hour', async () => {
     const w = world();
-    for (const path of ['/', '/about', '/contribute']) {
+    for (const path of ['/', '/ranks', '/achievements', '/about', '/contribute']) {
       expect(await (await w.call('GET', path)).text()).toContain(
         '<p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7',
       );
@@ -661,6 +703,23 @@ describe('leaderboard worker', () => {
     expect(page).not.toContain('shanep is');
     expect(page).toContain('<a class="get" href="/">');
     expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
+  });
+
+  it('links every page from every other page', async () => {
+    const w = world();
+    const paths = ['/', '/ranks', '/achievements', '/about', '/contribute'];
+    for (const path of paths) {
+      const page = await (await w.call('GET', path)).text();
+      const nav = page.slice(page.indexOf('<nav class="links">'), page.indexOf('</nav>'));
+      for (const other of paths) {
+        const link = `<a class="get" href="${other}">`;
+        if (other === path) {
+          expect(nav).not.toContain(link);
+        } else {
+          expect(nav).toContain(link);
+        }
+      }
+    }
   });
 
   it('explains how to contribute and links it from the other pages', async () => {

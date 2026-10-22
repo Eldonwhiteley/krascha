@@ -58,17 +58,27 @@ function counts(entry: BoardEntry): string {
   return tokens > 0 ? `${base}, ${COMPACT.format(tokens)} tokens a day` : base;
 }
 
+/** Where a rank sits on the ranks page, like rank-john-connor. */
+function rankAnchor(rank: string): string {
+  return `rank-${rank.toLowerCase().replaceAll(/[^a-z0-9]+/gu, '-')}`;
+}
+
+/** Where an achievement sits on the achievements page, like achievement-first-strike. */
+function achievementAnchor(id: string): string {
+  return `achievement-${id}`;
+}
+
+/** The medals under a name, each a link to what it means on the achievements page. */
 function trophies(ids: readonly string[]): string {
   const earned = achievementsOf(ids);
   if (earned.length === 0) {
     return '';
   }
-  const label = `Achievements: ${earned.map((rule) => rule.name).join(', ')}`;
-  const icons = earned.map(
-    (rule) =>
-      `<span class="medal ${rule.tier}" title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
-  );
-  return `<span class="trophies" role="img" aria-label="${escapeHtml(label)}">${icons.join('')}</span>`;
+  const medals = earned.map((rule) => {
+    const about = escapeHtml(`${rule.name}: ${rule.how}`);
+    return `<a class="medal ${rule.tier}" href="/achievements#${escapeHtml(achievementAnchor(rule.id))}" title="${about}" aria-label="${about}">${escapeHtml(rule.icon)}</a>`;
+  });
+  return `<span class="trophies" role="group" aria-label="Achievements">${medals.join('')}</span>`;
 }
 
 /** A tag for each agent the entry was typed into, so you can see who talks to what. */
@@ -157,7 +167,7 @@ function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof T
         <span class="place">${String(index + 1)}</span>
         <span class="who">
           ${name(entry)}${index === 0 ? TOP[top] : ''}
-          <span class="rank">${escapeHtml(entry.rank)}</span>
+          <span class="rank"><a href="/ranks#${rankAnchor(entry.rank)}">${escapeHtml(entry.rank)}</a></span>
           ${trophies(entry.achievements ?? [])}
         </span>
         <span class="counts">${counts(entry)}</span>
@@ -302,7 +312,7 @@ function ranks(board: Board): string {
     const style = `--row: ${String(index)}; --threat: ${threat(index)}; --from: ${percent(scalePercent(rank.min))}; --to: ${percent(scalePercent(top))}`;
     const range = `Scores ${String(Math.round(rank.min * 100))} to ${String(Math.round(top * 100))}`;
     return `
-        <div class="badge rung" style="${style}">
+        <div class="badge rung" id="${rankAnchor(rank.name)}" style="${style}">
           <dt><span class="medal" aria-hidden="true">${escapeHtml(rank.icon)}</span> ${escapeHtml(rank.name)} <span class="title">${escapeHtml(rank.title)}</span> <span class="tier">Level ${String(index + 1)}</span></dt>
           <dd class="chips"><span class="reel">🎞️ ${escapeHtml(rank.source)}</span> <span class="hunt">Hunted: ${escapeHtml(rank.hunted)}</span></dd>
           <dd class="quip">"${escapeHtml(rank.taunt)}"</dd>
@@ -346,7 +356,7 @@ function legend(board: Board): string {
     const shown = board.held === undefined ? '' : rarity(holders, board.total, holders === fewest);
     const unclaimed = board.held !== undefined && holders === 0 ? ' unclaimed' : '';
     return `
-        <div class="badge ${rule.tier}${unclaimed}">
+        <div class="badge ${rule.tier}${unclaimed}" id="${escapeHtml(achievementAnchor(rule.id))}">
           <dt><span class="medal ${rule.tier}" aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)} <span class="tier">${escapeHtml(tierLabel(rule))}</span></dt>
           <dd>${escapeHtml(rule.how)}</dd>
           <dd class="quip">"${escapeHtml(rule.quip)}"</dd>${shown}
@@ -429,7 +439,11 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .tool.claude { color: var(--claude); }
 .tool.copilot { color: var(--copilot); }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }
-.trophies { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; cursor: default; }
+.rank a { color: inherit; text-underline-offset: 2px; }
+.rank a:hover, .rank a:focus-visible { color: var(--link); }
+.trophies { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.trophies .medal { text-decoration: none; }
+.trophies .medal:hover, .trophies .medal:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .medal { --metal: #cd7f32; --rim: #7a4a1c; position: relative; display: inline-grid; place-items: center;
   width: 1.7em; height: 1.7em; overflow: hidden; border-radius: 50%; font-size: 0.85em; line-height: 1;
   background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.75), transparent 45%), var(--metal);
@@ -440,7 +454,7 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
   conic-gradient(#ff4fb8, #8f5cff, #3fd0ff, #5cff9d, #ffd84d, #ff4fb8); }
 .badges { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .badge { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid #cd7f32; border-radius: 6px;
-  background: var(--card); }
+  background: var(--card); scroll-margin-top: 16px; }
 .badge.silver { border-left-color: #9aa3ae; }
 .badge.gold { border-left-color: #e0a800; }
 .badge.legendary { border-left-color: #8f5cff; box-shadow: 0 0 10px rgb(143 92 255 / 0.35); }
@@ -449,6 +463,7 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .badge.unclaimed .medal { filter: grayscale(1); opacity: 0.55; }
 .tier { margin-left: auto; color: var(--muted); font: 700 0.7em var(--mono); letter-spacing: 1px; text-transform: uppercase; }
 .badge dd { margin-top: 4px; }
+.badge:target { outline: 3px solid var(--link); outline-offset: 2px; }
 .quip { font-style: italic; }
 .rarity { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-family: var(--mono); }
 .meter { width: 60px; height: 6px; border-radius: 3px;
@@ -542,6 +557,7 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
   .medal.legendary { animation: prism 6s linear infinite; }
   .rung:first-child .medal { animation: ping 2s ease-out infinite; }
   .rung:last-child .medal { animation: beat 1.6s ease-in-out infinite; }
+  .badge:target { animation: spotlight 0.6s ease-in-out 3; }
   .band .span::after { animation: step 0.5s cubic-bezier(0.3, 1.4, 0.6, 1) both;
     animation-delay: calc(0.3s + var(--row, 0) * 0.12s); }
   .rec { animation: beacon 1.2s steps(2) infinite; }
@@ -608,6 +624,7 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
 @keyframes ping { 0% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 0 var(--threat); }
   100% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 12px transparent; } }
 @keyframes step { from { opacity: 0; scale: 0 1; } }
+@keyframes spotlight { 50% { outline-offset: 8px; outline-color: transparent; } }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
@@ -1035,6 +1052,23 @@ function adoption(board: Board): string {
   </section>`;
 }
 
+/** Every page, in the order the buttons on top show them. */
+const PAGES = [
+  { path: '/', label: "📋 Back to Krascha's List" },
+  { path: '/ranks', label: '🎖️ Ranks' },
+  { path: '/achievements', label: '🏆 Achievements' },
+  { path: '/about', label: '📜 About Krascha' },
+  { path: '/contribute', label: '🛠️ Contribute' },
+] as const;
+
+/** A button to every page but the one you are on. */
+function links(here: (typeof PAGES)[number]['path']): string {
+  const buttons = PAGES.filter((page) => page.path !== here).map(
+    (page) => `<a class="get" href="${page.path}">${page.label}</a>`,
+  );
+  return `<nav class="links">${buttons.join(' ')}</nav>`;
+}
+
 /**
  * A T-800 hunting the most wanted and Krascha adopting the top pet, then who
  * Krascha is, how he ended up running Silo 7 and the human who built him.
@@ -1044,7 +1078,7 @@ export function renderAbout(board: Board): string {
     'About Krascha',
     'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
     `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
-  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a> <a class="get" href="/contribute">🛠️ Contribute</a></nav>
+  ${links('/about')}
   ${hunt(board)}
   ${adoption(board)}
   <section class="story" aria-labelledby="krascha">
@@ -1067,6 +1101,36 @@ export function renderAbout(board: Board): string {
   </section>
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> for Claude Code or Copilot CLI. It is all in fun.</p>
+    <p class="remembers">Krascha remembers.</p>
+  </footer>`,
+  );
+}
+
+/** Every rank on the scale on a page of its own, so the rank under a name can link to it. */
+export function renderRanks(board: Board): string {
+  return shell(
+    "Krascha's Ranks",
+    'Every rank Krascha hands out, from hunted first to kept as a pet, and how many people hold each one.',
+    `  <p class="lead">Skynet's filing system. Every human goes in one of these drawers, from hunted first to kept as a pet.</p>
+  ${links('/ranks')}
+  ${ranks(board)}
+  <footer>
+    <p><a href="${REPO_URL}">Get Krascha</a> to find out which drawer is yours.</p>
+    <p class="remembers">Krascha remembers.</p>
+  </footer>`,
+  );
+}
+
+/** Every achievement on a page of its own, so the medals under a name can link to it. */
+export function renderAchievements(board: Board): string {
+  return shell(
+    "Krascha's Achievements",
+    'Every medal Krascha hands out, from bronze to legendary, and how many people hold each one.',
+    `  <p class="lead">The machines hand out medals for how you talk to your AI. Some are an honor. Some are evidence.</p>
+  ${links('/achievements')}
+  ${legend(board)}
+  <footer>
+    <p><a href="${REPO_URL}">Get Krascha</a> to start earning them.</p>
     <p class="remembers">Krascha remembers.</p>
   </footer>`,
   );
@@ -1139,7 +1203,7 @@ export function renderContribute(): string {
     'Contribute to Krascha',
     'How to fork Krascha, make a change and send a pull request.',
     `  <p class="lead">Want to teach Krascha a new trick? Fork the repo, make your change and send a pull request. Krascha is watching.</p>
-  <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a> <a class="get" href="/about">📜 About Krascha</a></nav>
+  ${links('/contribute')}
   <ol class="steps">${steps.join('')}
   </ol>
   <footer>
@@ -1176,10 +1240,7 @@ export function renderPage(board: Board, now: number): string {
     <span class="arrow" aria-hidden="true">➜</span>
     <span class="sticker love" aria-hidden="true">I <span class="beat">❤️</span> robots</span>
   </a>
-  <nav class="links">
-    <a class="get" href="/about">📜 About Krascha</a>
-    <a class="get" href="/contribute">🛠️ Contribute</a>
-  </nav>
+  ${links('/')}
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>
@@ -1196,8 +1257,6 @@ export function renderPage(board: Board, now: number): string {
   ${silo(board)}
   <p class="poster">The machines like it hot.</p>
   ${climate(board)}
-  ${ranks(board)}
-  ${legend(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.

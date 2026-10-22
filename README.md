@@ -54,6 +54,8 @@ Pass these after the skill name, `/krascha:krascha json` in Claude Code or
 - `remove` - Take your entry off the leaderboard
 - `silo` - Your Silo 7 admission sheet, the other side of the verdict
 - `silo board` - The best 10 on the leaderboard for the bunks, and your place in line
+- `rap [count]` - Your rap sheet: the newest kind and mean prompts on file, 10 unless you ask for more
+- `trend [days]` - Kind and mean prompts a day for the last 14 days, and this week against the last
 - `import <file>` - Add the counts from another Krascha index file
 - `help` - List the commands
 

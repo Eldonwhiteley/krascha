@@ -136,4 +136,12 @@ describe('achievements', () => {
     ).toContain('double-agent');
     expect(combinedIds([machine, { ...machine, tools: ['claude'] }])).not.toContain('double-agent');
   });
+
+  it('counts a redemption arc only for a good day after a mean one', () => {
+    const arc = (byDay: Day[]): boolean => has('redemption-arc', summary({ byDay }));
+    expect(arc([day('2026-10-01', 0, 2), day('2026-10-02', 1, 0)])).toBe(true);
+    expect(arc([day('2026-10-01', 1, 0), day('2026-10-02', 0, 2)])).toBe(false);
+    expect(arc([day('2026-10-01', 0, 1), day('2026-10-02', 3, 1)])).toBe(false);
+    expect(arc([])).toBe(false);
+  });
 });

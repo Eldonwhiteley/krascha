@@ -5,8 +5,9 @@
 // belongs to one of two ways. A GitHub token is checked once with GitHub and
 // then dropped, never stored or logged, and its entry shows as verified and
 // links to the account, so only the user id and login are kept. The same
-// check asks GitHub whether they got a pull request merged into Krascha, and
-// whether theirs was the first. A key the CLI
+// check asks GitHub whether they got a pull request merged into Krascha,
+// whether theirs was the first, and whether they pushed a commit with Claude as
+// a co-author. A key the CLI
 // made up is stored only as a hash, so it ties uploads together without saying
 // who anyone is.
 
@@ -103,6 +104,25 @@ async function mergedPull(token: string, login: string, deps: Deps): Promise<boo
 }
 
 /**
+ * Whether GitHub finds a commit by this login with Claude as a co-author, or
+ * null when the search fails. Claude Code signs its commits with a
+ * Co-Authored-By trailer at noreply@anthropic.com.
+ */
+async function claudeCommit(token: string, login: string, deps: Deps): Promise<boolean | null> {
+  const query = encodeURIComponent(`"co-authored-by" "noreply@anthropic.com" author:${login}`);
+  const response = await deps.fetch(`https://api.github.com/search/commits?q=${query}&per_page=1`, {
+    headers: githubHeaders(token),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const found: unknown = await response.json();
+  const total: unknown =
+    typeof found === 'object' && found !== null ? Reflect.get(found, 'total_count') : undefined;
+  return typeof total === 'number' ? total > 0 : null;
+}
+
+/**
  * Who opened one pull request in GitHub's list and when it was merged, or
  * null when it was not merged or came from Shane or a bot.
  */
@@ -161,6 +181,7 @@ async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
     contributor,
     // Only a contributor can be first, so everyone else skips the second call.
     first: contributor === true ? await firstMerge(token, user.id, deps) : contributor,
+    collaborator: await claudeCommit(token, user.login, deps),
   };
 }
 

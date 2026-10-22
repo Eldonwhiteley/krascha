@@ -8,6 +8,7 @@ import {
   CHAMPION,
   CROWD_FAVORITE,
   CROWN,
+  MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
 } from '../../src/shared/achievements.js';
@@ -688,6 +689,24 @@ describe('leaderboard worker', () => {
     const claim = { ...KIND, achievements: [MODEL_101] };
     expect((await w.upload('token-shane', claim)).entry.achievements).not.toContain(MODEL_101);
     expect((await w.board()).held).toMatchObject({ [MODEL_101]: 1 });
+  });
+
+  it('gives Machine collaborator to a GitHub account with a commit Claude co-authored', async () => {
+    const w = world();
+    const gus = await w.upload('token-gus', { ...KIND, name: 'Gus' });
+    expect(gus.entry.achievements).toContain(MACHINE_COLLABORATOR);
+    const ann = await w.upload('token-ann', { ...KIND, achievements: [MACHINE_COLLABORATOR] });
+    expect(ann.entry.achievements).not.toContain(MACHINE_COLLABORATOR);
+    // When the search fails, an entry keeps what it had.
+    const dan = await w.upload('token-dan', { ...KIND, name: 'Dan' });
+    expect(dan.entry.achievements).not.toContain(MACHINE_COLLABORATOR);
+    await w.sql(
+      `UPDATE scores SET achievements = '${MACHINE_COLLABORATOR}' WHERE owner = 'github:5'`,
+    );
+    expect((await w.upload('token-dan', { ...KIND, name: 'Dan' })).entry.achievements).toContain(
+      MACHINE_COLLABORATOR,
+    );
+    expect((await w.board()).held).toMatchObject({ [MACHINE_COLLABORATOR]: 2 });
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {

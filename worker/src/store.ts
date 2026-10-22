@@ -14,6 +14,7 @@ import {
   CROWN,
   knownIds,
   machineIds,
+  MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
 } from '../../src/shared/achievements.js';
@@ -57,6 +58,8 @@ export interface Owner {
   readonly contributor?: boolean | null;
   /** True when theirs is the first pull request merged into Krascha, and null when GitHub could not say. */
   readonly first?: boolean | null;
+  /** True when GitHub finds a commit of theirs with Claude as a co-author, and null when it could not say. */
+  readonly collaborator?: boolean | null;
 }
 
 const COLUMNS =
@@ -471,13 +474,18 @@ function had(found: Row | null, id: string): boolean {
 }
 
 /**
- * The achievements GitHub's pull requests earn the owner. When GitHub could
- * not say, the entry keeps what it had, since a merge does not come undone.
+ * The achievements GitHub's pull requests and commits earn the owner. When
+ * GitHub could not say, the entry keeps what it had, since a merge or a commit
+ * does not come undone.
  */
-function pullIds(owner: Owner, found: Row | null): string[] {
+function githubIds(owner: Owner, found: Row | null): string[] {
   const keep = (answer: boolean | null | undefined, id: string): string[] =>
     (answer === null ? had(found, id) : answer === true) ? [id] : [];
-  return [...keep(owner.contributor, MILES_DYSON), ...keep(owner.first, MODEL_101)];
+  return [
+    ...keep(owner.contributor, MILES_DYSON),
+    ...keep(owner.first, MODEL_101),
+    ...keep(owner.collaborator, MACHINE_COLLABORATOR),
+  ];
 }
 
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
@@ -531,7 +539,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
         ...combinedIds(machines),
         ...accountIds(githubIdOf(owner)),
         ...machineIds(machines),
-        ...pullIds(owner, found),
+        ...githubIds(owner, found),
       ]).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),

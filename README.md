@@ -80,7 +80,8 @@ token from `gh auth token` and the server checks it with GitHub, so your entry
 gets a check mark, your name links to your GitHub account and only you can
 change it. The server keeps your GitHub user id and login and drops the token.
 While it has the token, it also asks GitHub whether you got a pull request
-merged into Krascha, and whether yours was the first.
+merged into Krascha, whether yours was the first, and whether you pushed a
+commit with Claude as a co-author.
 To keep your name unlinked, upload with `--no-gh`, and run `remove` first if
 you are already on the board with GitHub.
 
@@ -90,6 +91,9 @@ them:
 - Leader of the human resistance goes only to Shane's GitHub account.
 - Miles Dyson goes to anyone with a pull request merged into Krascha, on their
   next upload with gh. Model 101 goes only to whoever got the first one merged.
+- Machine collaborator goes to anyone GitHub finds a commit for with Claude as
+  a co-author (the `Co-Authored-By` line Claude Code adds), on their next
+  upload with gh.
 - Good cop, bad cop goes to anyone with one machine that leans nice and one
   that leans mean.
 - Crowd favorite takes 10 likes.

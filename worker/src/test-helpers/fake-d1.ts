@@ -44,6 +44,7 @@ const GITHUB_USERS: Readonly<Record<string, { readonly id: number; readonly logi
   'token-dan': { id: 5, login: 'dan' },
   'token-eve': { id: 6, login: 'eve' },
   'token-fay': { id: 7, login: 'fay' },
+  'token-gus': { id: 8, login: 'gus' },
 };
 
 /**
@@ -62,10 +63,12 @@ const PULLS = [
 
 /** The logins with a pull request merged into Krascha. */
 const MERGED: ReadonlySet<string> = new Set(['eve', 'fay']);
+/** The logins with a commit that has Claude as a co-author. */
+const COLLABORATORS: ReadonlySet<string> = new Set(['gus']);
 /** The logins whose search fails, like when GitHub rate limits it. */
 const SEARCH_FAILS: ReadonlySet<string> = new Set(['dan']);
 
-/** GitHub's /user and its search for merged pull requests, for a few known tokens. */
+/** GitHub's /user and its searches for merged pull requests and commits, for a few known tokens. */
 export async function fakeGitHub(url: string, init: RequestInit): Promise<Response> {
   await Promise.resolve();
   const auth = new Headers(init.headers).get('authorization') ?? '';
@@ -87,6 +90,18 @@ export async function fakeGitHub(url: string, init: RequestInit): Promise<Respon
       query.includes(`author:${user.login}`) &&
       MERGED.has(user.login);
     return Response.json({ total_count: merged ? 1 : 0, items: [] });
+  }
+  if (url.startsWith('https://api.github.com/search/commits?')) {
+    const query = new URL(url).searchParams.get('q') ?? '';
+    if (SEARCH_FAILS.has(user.login)) {
+      return new Response('{"message":"API rate limit exceeded"}', { status: 403 });
+    }
+    const signed =
+      query.includes('"co-authored-by"') &&
+      query.includes('"noreply@anthropic.com"') &&
+      query.includes(`author:${user.login}`) &&
+      COLLABORATORS.has(user.login);
+    return Response.json({ total_count: signed ? 1 : 0, items: [] });
   }
   return Response.json({ ...user, email: 'hidden@example.com' });
 }

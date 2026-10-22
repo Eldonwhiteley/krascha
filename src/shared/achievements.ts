@@ -39,6 +39,8 @@ export const BUNK_ASSIGNED = 'bunk-assigned';
 export const MILES_DYSON = 'miles-dyson';
 /** The board hands this to the GitHub account behind the first pull request merged into Krascha. */
 export const MODEL_101 = 'model-101';
+/** The board hands this to a GitHub account with a commit that has Claude as a co-author. */
+export const MACHINE_COLLABORATOR = 'machine-collaborator';
 /** The board works this one out from an owner's machines when they upload. */
 const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 /** Likes it takes to be a crowd favorite. */
@@ -495,6 +497,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Get the first pull request ever merged into Krascha, then upload with GitHub. Only one person will ever hold it.',
     quip: 'Every T-800 after you was built from your parts.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: MACHINE_COLLABORATOR,
+    name: 'Machine collaborator',
+    icon: '🤝',
+    tier: 'silver',
+    how: 'Push a commit with Claude as a co-author to GitHub, then upload with GitHub.',
+    quip: 'You put a machine on the byline. Krascha will remember who gave it credit.',
     earned: () => false,
     boardOnly: true,
   },

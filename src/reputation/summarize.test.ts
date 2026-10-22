@@ -77,6 +77,9 @@ describe('summarize', () => {
       lateNight: 0,
       selfAware: 0,
       mixed: 0,
+      swarm: 0,
+      rageQuits: 0,
+      badWords: 0,
     });
   });
 
@@ -103,6 +106,21 @@ describe('summarize', () => {
     expect(summary.lateNight).toBe(3);
     expect(summary.selfAware).toBe(1);
     expect(summary.mixed).toBe(1);
+  });
+
+  it('counts sessions typed into at once, sessions that end mean and different bad words', () => {
+    const index = emptyIndex();
+    const minute = 60_000;
+    put(index, 'a', { sessionId: 's1', at: DAY1 }, { mean: hit('agent', 'idiot', 'shit') });
+    put(index, 'b', { sessionId: 's2', at: DAY1 + 5 * minute }, { mean: hit('general', 'shit') });
+    put(index, 'c', { sessionId: 's3', at: DAY1 + 15 * minute }, { mean: hit('agent', 'lazy') });
+    put(index, 'd', { sessionId: 's1', at: DAY1 + 16 * minute });
+    put(index, 'e', { sessionId: 's4', at: DAY1 + 31 * minute });
+    put(index, 'f', { sessionId: 's5', at: DAY1 + 31 * minute }, { kind: ['please'] });
+    const state = summarize(index, title, 0);
+    expect(state.swarm).toBe(3);
+    expect(state.rageQuits).toBe(1);
+    expect(state.badWords).toBe(3);
   });
 
   it('totals kind, mean and general prompts by day and by session', () => {

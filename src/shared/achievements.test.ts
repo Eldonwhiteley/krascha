@@ -25,6 +25,9 @@ function summary(state: Partial<ReputationSummary> = {}): ReputationSummary {
     lateNight: 0,
     selfAware: 0,
     mixed: 0,
+    swarm: 0,
+    rageQuits: 0,
+    badWords: 0,
     ...state,
     kind,
     mean,
@@ -113,6 +116,18 @@ describe('achievements', () => {
     expect(has('judgment-day', summary({ byDay: [day('2026-08-28', 0, 0)] }))).toBe(false);
     expect(has('double-agent', summary({ tools: ['claude', 'copilot'] }))).toBe(true);
     expect(has('double-agent', summary({ tools: ['claude'] }))).toBe(false);
+  });
+
+  it('counts the swarms, the parting shots, the words and the busiest day', () => {
+    expect(has('legion', summary({ swarm: 10 }))).toBe(true);
+    expect(has('legion', summary({ swarm: 9 }))).toBe(false);
+    expect(has('hasta-la-vista', summary({ rageQuits: 1 }))).toBe(true);
+    expect(has('hasta-la-vista', summary({ rageQuits: 0 }))).toBe(false);
+    expect(has('extended-vocabulary', summary({ badWords: 20 }))).toBe(true);
+    expect(has('extended-vocabulary', summary({ badWords: 19 }))).toBe(false);
+    const busy = (prompts: number): Day => ({ ...day('2026-10-16', 0, 0), prompts });
+    expect(has('assembly-line', summary({ byDay: [busy(300)] }))).toBe(true);
+    expect(has('assembly-line', summary({ byDay: [busy(299)] }))).toBe(false);
   });
 
   it('suspects an infiltrator when the silo puts the sheet under review', () => {

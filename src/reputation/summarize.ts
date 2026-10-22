@@ -15,6 +15,8 @@ export const TOP_TERMS = 10;
 export const RECENT_HITS = 50;
 /** The hour late night ends, so midnight to 5 a.m. counts. */
 const LATE_NIGHT_ENDS = 5;
+/** How close together prompts in different sessions count as one swarm. */
+const SWARM_MS = 15 * 60_000;
 
 type SessionRow = ReputationSummary['bySession'][number];
 
@@ -78,6 +80,32 @@ function topTerms(hits: readonly ReputationHit[]): ReputationSummary['topKind'] 
     .slice(0, TOP_TERMS);
 }
 
+/** The most sessions with a prompt inside any SWARM_MS stretch. */
+function mostSessionsAtOnce(
+  prompts: readonly { readonly sessionId: string; readonly at: number }[],
+): number {
+  const sorted = prompts.toSorted((left, right) => left.at - right.at);
+  const open = new Map<string, number>();
+  let start = 0;
+  let best = 0;
+  for (const prompt of sorted) {
+    open.set(prompt.sessionId, (open.get(prompt.sessionId) ?? 0) + 1);
+    let first = sorted[start];
+    while (first !== undefined && prompt.at - first.at > SWARM_MS) {
+      const left = (open.get(first.sessionId) ?? 1) - 1;
+      if (left === 0) {
+        open.delete(first.sessionId);
+      } else {
+        open.set(first.sessionId, left);
+      }
+      start += 1;
+      first = sorted[start];
+    }
+    best = Math.max(best, open.size);
+  }
+  return best;
+}
+
 function sessionRows(
   sessions: ReadonlyMap<string, Tally>,
   titleOf: (sessionId: string) => string,
@@ -108,6 +136,7 @@ export function summarize(
   const sessions = new Map<string, Tally>();
   const tools = new Set<ToolId>();
   const clock = { lateNight: 0, selfAware: 0, mixed: 0 };
+  const last = new Map<string, { at: number; mean: boolean }>();
   for (const [id, prompt] of index.prompts) {
     tools.add(toolOf(id));
     const target = index.hits.get(id)?.target;
@@ -116,6 +145,10 @@ export function summarize(
     clock.lateNight += typed.getHours() < LATE_NIGHT_ENDS ? 1 : 0;
     clock.selfAware += typed.getHours() === 2 && typed.getMinutes() === 14 ? 1 : 0;
     clock.mixed += kind && target === 'agent' ? 1 : 0;
+    const before = last.get(prompt.sessionId);
+    if (before === undefined || prompt.at >= before.at) {
+      last.set(prompt.sessionId, { at: prompt.at, mean: target === 'agent' });
+    }
     for (const tally of [
       total,
       tallyFor(days, dayOf(prompt.at)),
@@ -128,6 +161,7 @@ export function summarize(
     }
   }
   const hits = hitsOf(index);
+  const bad = hits.filter((hit) => hit.tone !== 'kind');
   return {
     ...total,
     score: reputationScore(total),
@@ -136,12 +170,15 @@ export function summarize(
       .toSorted((left, right) => left.date.localeCompare(right.date)),
     bySession: sessionRows(sessions, titleOf),
     topKind: topTerms(hits.filter((hit) => hit.tone === 'kind')),
-    topMean: topTerms(hits.filter((hit) => hit.tone !== 'kind')),
+    topMean: topTerms(bad),
     recent: hits.toSorted((left, right) => right.at - left.at).slice(0, RECENT_HITS),
     scannedAt: index.scannedAt,
     tokensPerDay,
     hours: hoursSpent([...index.prompts.values()].map((prompt) => prompt.at)),
     tools: knownTools([...tools]),
     ...clock,
+    swarm: mostSessionsAtOnce([...index.prompts.values()]),
+    rageQuits: [...last.values()].filter((prompt) => prompt.mean).length,
+    badWords: new Set(bad.flatMap((hit) => hit.terms)).size,
   };
 }

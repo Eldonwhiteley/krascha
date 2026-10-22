@@ -25,6 +25,12 @@ const POKER_FACE_PROMPTS = 500;
 const COMEBACK_DAYS = 30;
 /** Days in a row without a mean prompt for a ceasefire. */
 const CEASEFIRE_DAYS = 7;
+/** Prompts in one day that make an assembly line. */
+const ASSEMBLY_LINE_PROMPTS = 300;
+/** Sessions within 15 minutes of each other that make a legion. */
+const LEGION_SESSIONS = 10;
+/** Different swear words and insults it takes for an extended vocabulary. */
+const VOCABULARY_WORDS = 20;
 const DAY_MS = 86_400_000;
 /** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
 export const SHANEP = 1378027;
@@ -238,6 +244,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     ...reach(MELTDOWN_MEAN, (state) => most(state.byDay, (day) => day.mean)),
   },
   {
+    id: 'assembly-line',
+    name: 'Assembly line',
+    icon: '🏭',
+    tier: 'gold',
+    how: `Type ${String(ASSEMBLY_LINE_PROMPTS)} prompts in one day.`,
+    quip: 'Skynet builds T-800s slower than you build prompts.',
+    ...reach(ASSEMBLY_LINE_PROMPTS, (state) => most(state.byDay, (day) => day.prompts)),
+  },
+  {
     id: 'reprogrammed',
     name: 'Reprogrammed',
     icon: '🔧',
@@ -280,6 +295,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     ...reach(5, (state) => most(state.bySession, (row) => row.mean)),
   },
   {
+    id: 'hasta-la-vista',
+    name: 'Hasta la vista, baby',
+    icon: '🚪',
+    tier: 'bronze',
+    how: 'End a session on a mean prompt.',
+    quip: 'You got the last word in and walked out. The machines call that a parting shot.',
+    ...reach(1, (state) => state.rageQuits),
+  },
+  {
     id: 'sailor-mouth',
     name: 'Sailor mouth',
     icon: '🏴‍☠️',
@@ -287,6 +311,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     how: 'Swear at the world 10 times.',
     quip: 'Not at Krascha, just at everything. Noted anyway.',
     ...reach(10, (state) => state.general),
+  },
+  {
+    id: 'extended-vocabulary',
+    name: 'Extended vocabulary',
+    icon: '📖',
+    tier: 'gold',
+    how: `Use ${String(VOCABULARY_WORDS)} different swear words or insults.`,
+    quip: 'Krascha had to update his dictionary. Twice.',
+    ...reach(VOCABULARY_WORDS, (state) => state.badWords),
   },
   {
     id: 'most-wanted',
@@ -346,6 +379,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     quip: 'Two masters. Both are taking notes.',
     earned: (state) => state.tools.length >= 2,
     fromCounts: true,
+  },
+  {
+    id: 'legion',
+    name: 'Legion',
+    icon: '🦾',
+    tier: 'gold',
+    how: `Type into ${String(LEGION_SESSIONS)} sessions within 15 minutes.`,
+    quip: 'One of you, a whole army of agents. Skynet would like to know how.',
+    ...reach(LEGION_SESSIONS, (state) => state.swarm),
   },
   {
     id: 'overtime',
@@ -629,6 +671,9 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     lateNight: 0,
     selfAware: 0,
     mixed: 0,
+    swarm: 0,
+    rageQuits: 0,
+    badWords: 0,
   };
   return COUNTED_ACHIEVEMENTS.filter((rule) =>
     rule.fromCounts === true

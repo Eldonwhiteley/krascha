@@ -74,4 +74,10 @@ export interface ReputationSummary extends ReputationTally {
   readonly selfAware: number;
   /** Prompts both kind and mean to the agent, like "please fix this, idiot". */
   readonly mixed: number;
+  /** The most sessions you typed into within 15 minutes of each other. */
+  readonly swarm: number;
+  /** Sessions whose last prompt was mean to the agent. */
+  readonly rageQuits: number;
+  /** Different swear words and insults you used, at the agent or the world. */
+  readonly badWords: number;
 }

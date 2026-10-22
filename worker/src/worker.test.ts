@@ -583,8 +583,8 @@ describe('leaderboard worker', () => {
       );
       // The saved theme is applied in the head, before anything draws.
       expect(page.indexOf("localStorage.getItem('theme')")).toBeLessThan(page.indexOf('<body>'));
-      expect(page).toContain(':root[data-theme="dark"] { --bg: #070a08;');
-      expect(page).toContain(':root:not([data-theme="light"]) { --bg: #070a08;');
+      expect(page).toContain(':root[data-theme="dark"] { --bg: #020d05;');
+      expect(page).toContain(':root:not([data-theme="light"]) { --bg: #020d05;');
     }
   });
 
@@ -592,7 +592,7 @@ describe('leaderboard worker', () => {
     const w = world();
     for (const path of ['/', '/about']) {
       expect(await (await w.call('GET', path)).text()).toContain(
-        '<p class="feed"><span class="rec">● REC</span> Skynet public terminal 7',
+        '<p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7',
       );
     }
     const posters = new Set<string>();

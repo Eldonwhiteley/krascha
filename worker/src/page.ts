@@ -279,18 +279,22 @@ function legend(): string {
   </section>`;
 }
 
-/** The dark colors, a green phosphor terminal, used when the system asks for them or the toggle does. */
-const DARK = `--bg: #070a08; --fg: #cdeccf; --muted: #84a98a; --card: #0c120e; --line: #23402b;
-    --red: #ff6b61; --green: #4ee07f; --amber: #e8b54a; --link: #6fb8ff;
-    --claude: #f0a07a; --copilot: #b48cff;
-    --scan: rgb(0 0 0 / 0.16); --glow: 0 0 6px rgb(78 224 127 / 0.45);`;
+/** The dark colors, a wrist computer in a fallout shelter, used when the system asks for them or the toggle does. */
+const DARK = `--bg: #020d05; --fg: #6dff9b; --muted: #43c470; --card: #04170a; --line: #1f6b38;
+    --red: #ff7a59; --green: #b6ff5c; --amber: #ffd04d; --link: #c4ffd9;
+    --claude: #ffb38a; --copilot: #d0b0ff;
+    --bar: #0d3a1b; --bar-fg: #6dff9b; --poster: #6dff9b; --poster-fg: #020d05;
+    --scan: rgb(0 0 0 / 0.22); --glow: 0 0 5px rgb(109 255 155 / 0.55); --text-glow: 0 0 3px rgb(109 255 155 / 0.35);
+    --body: var(--mono); --vignette: rgb(0 0 0 / 0.6);`;
 
-// The light colors are a ration card: worn paper, black ink and propaganda red.
+// The light colors are a poster from the vault: cream paper, vault blue and yellow.
 const STYLE = `
-:root { --bg: #efeadf; --fg: #1c1a17; --muted: #5c564b; --card: #faf7ef; --line: #cfc6b3;
-  --red: #b0121b; --green: #1d6b37; --amber: #8a5800; --link: #0a52a8;
+:root { --bg: #f1e7c9; --fg: #14254a; --muted: #4b5677; --card: #fdf8e8; --line: #cbbd8f;
+  --red: #b3261e; --green: #1d6b37; --amber: #8a5800; --link: #1747a6;
   --claude: #a2471f; --copilot: #7340c8;
-  --scan: rgb(0 0 0 / 0.035); --glow: none; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --bar: #1f4fa0; --bar-fg: #ffd23f; --poster: #1f4fa0; --poster-fg: #ffd23f;
+  --scan: rgb(0 0 0 / 0.03); --glow: none; --text-glow: none; --vignette: rgb(60 40 0 / 0.12);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --body: system-ui, -apple-system, sans-serif;
   color-scheme: light dark; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { ${DARK} color-scheme: dark; }
@@ -299,16 +303,19 @@ const STYLE = `
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px 16px 48px; background: var(--bg); color: var(--fg);
-  font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  font: 15px/1.5 var(--body); text-shadow: var(--text-glow); }
+body::before { content: ""; position: fixed; inset: 0; z-index: 9; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, var(--vignette)); }
 body::after { content: ""; position: fixed; inset: 0; z-index: 10; pointer-events: none;
   background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px); }
 main { position: relative; max-width: 960px; margin: 0 auto; }
 .theme { position: absolute; top: 0; right: 0; padding: 4px 10px; border: 1px solid var(--line);
   border-radius: 2px; background: var(--card); font-size: 1.2em; cursor: pointer; }
 .theme:hover { border-color: var(--link); }
-.feed { margin: 0 0 12px; padding: 4px 56px 4px 0; border-bottom: 1px dashed var(--line); color: var(--muted);
+.feed { margin: 0 56px 12px 0; padding: 4px 8px; background: var(--bar); color: var(--bar-fg);
   font: 0.75em var(--mono); letter-spacing: 1px; text-transform: uppercase; }
-.rec { color: var(--red); font-weight: 700; }
+.rec { font-weight: 700; }
+.lead::after { content: "▮"; margin-left: 4px; color: var(--fg); }
 h1, h2, h3 { font-family: var(--mono); letter-spacing: 0.5px; text-shadow: var(--glow); }
 h1 { display: flex; gap: 12px; align-items: center; margin: 0 0 4px; padding-right: 56px;
   font-size: 1.8em; text-transform: uppercase; }
@@ -319,15 +326,17 @@ ${robotStyle('robot')}
 section { padding: 12px 16px; border: 1px solid var(--line); border-radius: 2px; background: var(--card); }
 section.wanted { border-top: 4px solid var(--red); }
 section.pets { border-top: 4px solid var(--green); }
-h2 { margin: 0 0 2px; font-size: 1.1em; text-transform: uppercase; }
+h2 { display: flex; gap: 10px; align-items: center; margin: 0 0 2px; font-size: 1.1em; text-transform: uppercase; }
+h2::after { content: ""; flex: 1; border-top: 2px solid var(--line); }
 .sub { margin: 0 0 8px; color: var(--muted); font-size: 0.9em; }
-.poster { margin: 16px 0; padding: 10px 16px; background: var(--red); color: var(--bg); text-align: center;
-  font: 700 1.05em/1.3 var(--mono); letter-spacing: 2px; text-transform: uppercase; }
-.poster::before, .poster::after { content: "▲"; margin: 0 12px; }
+.poster { margin: 16px 0; padding: 10px 16px; background: var(--poster); color: var(--poster-fg); text-align: center;
+  font: 700 1.05em/1.3 var(--mono); letter-spacing: 2px; text-transform: uppercase; text-shadow: none; }
+.poster::before, .poster::after { content: "\\2622\\FE0E"; margin: 0 12px; }
 ol { margin: 0; padding: 0; list-style: none; }
 li { display: grid; gap: 0 10px; grid-template-columns: 2em 1fr auto; align-items: baseline;
   padding: 6px 0; border-top: 1px solid var(--line); }
 li:first-child { border-top: 0; }
+section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .place { color: var(--muted); font: 700 0.9em var(--mono); text-align: right; }
 .who { min-width: 0; overflow-wrap: anywhere; }
 .verified { color: var(--green); font-weight: 700; }
@@ -383,11 +392,12 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
   font: 700 0.75em var(--mono); white-space: nowrap; rotate: -3deg; }
 .beat { display: inline-block; }
 .classified { position: absolute; top: 14px; right: 16px; padding: 2px 8px; border: 2px solid var(--red);
-  border-radius: 4px; color: var(--red); font: 700 0.8em ui-monospace, monospace; letter-spacing: 2px;
-  rotate: 8deg; opacity: 0.8; }
+  border-radius: 4px; background: var(--card); color: var(--red); font: 700 0.8em ui-monospace, monospace;
+  letter-spacing: 2px; rotate: 8deg; opacity: 0.8; }
 .remembers { font-family: var(--mono); }
 @media (prefers-reduced-motion: no-preference) {
   .rec { animation: beacon 1.2s steps(2) infinite; }
+  .lead::after { animation: blink 1s steps(1) infinite; }
   body::after { animation: flicker 6s steps(1) infinite; }
   section.wanted::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 40px;
     background: linear-gradient(transparent, color-mix(in srgb, var(--red) 25%, transparent), transparent);
@@ -411,6 +421,7 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 @keyframes slide { from { left: 50%; } }
 @keyframes sweep { 0% { top: -40px; } 100% { top: 100%; } }
 @keyframes beacon { 50% { opacity: 0.25; } }
+@keyframes blink { 50% { opacity: 0; } }
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
 @keyframes bounce { 40% { translate: 0 -6px; } }
@@ -424,8 +435,9 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 @keyframes cursor { 50% { border-color: transparent; } }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
-.get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 1px solid var(--line);
-  border-radius: 2px; background: var(--card); font-weight: 600; text-decoration: none; }
+.get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 2px solid var(--line);
+  border-radius: 2px; background: var(--card); font: 600 0.9em var(--mono); letter-spacing: 0.5px;
+  text-transform: uppercase; text-decoration: none; }
 .get:hover { border-color: var(--link); }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
@@ -475,7 +487,7 @@ function shell(title: string, description: string, body: string): string {
 <body>
 <main>
   <button class="theme" type="button" aria-label="Switch theme" hidden>🌙</button>
-  <p class="feed"><span class="rec">● REC</span> Skynet public terminal 7 · Surveillance active · This terminal is monitored for your safety</p>
+  <p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7 · Surveillance active · Monitored for your safety</p>
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>

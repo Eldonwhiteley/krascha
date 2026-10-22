@@ -318,7 +318,19 @@ async function like(request: Request, env: Env, deps: Deps): Promise<Response> {
     : new Response(null, { status: 303, headers: { location: '/' } });
 }
 
+/**
+ * Answers a request. URL filters and link checkers often send HEAD, so it gets
+ * the GET answer without the body.
+ */
 export async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
+  if (request.method !== 'HEAD') {
+    return answer(request, env, deps);
+  }
+  const response = await answer(new Request(request, { method: 'GET' }), env, deps);
+  return new Response(null, { status: response.status, headers: response.headers });
+}
+
+async function answer(request: Request, env: Env, deps: Deps): Promise<Response> {
   const url = new URL(request.url);
   const route = `${request.method} ${url.pathname}`;
   switch (route) {

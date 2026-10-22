@@ -1119,6 +1119,16 @@ describe('leaderboard worker', () => {
     }
   });
 
+  it('answers HEAD on every page like GET, without the body', async () => {
+    const w = world();
+    for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {
+      const response = await w.call('HEAD', path);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+      expect(await response.text()).toBe('');
+    }
+  });
+
   it('watches every page and hangs a new propaganda poster every hour', async () => {
     const w = world();
     for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {

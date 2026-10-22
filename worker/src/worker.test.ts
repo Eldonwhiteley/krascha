@@ -9,6 +9,7 @@ import {
   MAX_TOKENS_PER_DAY,
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
+import { RANKS } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
 import { CRITERIA, rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
 
@@ -478,6 +479,22 @@ describe('leaderboard worker', () => {
     for (const rule of ACHIEVEMENTS) {
       expect(page).toContain(`${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd>`);
     }
+  });
+
+  it('lists every rank on the scale in order, from hunted first to kept as a pet', async () => {
+    const w = world();
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<h2 id="ranks">🎖️ Ranks</h2>');
+    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('id="legend"'));
+    const spots = RANKS.map((rank) => {
+      expect(ladder).toContain(
+        `<dt>${escapeHtml(rank.name)}, ${escapeHtml(rank.title)}</dt><dd>${escapeHtml(rank.source)}. Hunted: ${escapeHtml(rank.hunted)}. Score ${String(Math.round(rank.min * 100))} and up.</dd>`,
+      );
+      return ladder.indexOf(`<dt>${escapeHtml(rank.name)},`);
+    });
+    expect(spots).toStrictEqual(spots.toSorted((a, b) => a - b));
+    expect(ladder).toContain('<dt>John Connor,');
+    expect(ladder).toContain('<dt>Theodore Twombly,');
   });
 
   it('ranks everyone on the board for Silo 7, like krascha silo board', async () => {

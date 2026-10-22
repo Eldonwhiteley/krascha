@@ -6,7 +6,7 @@
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
-import { scalePercent } from '../../src/shared/ranks.js';
+import { RANKS, scalePercent } from '../../src/shared/ranks.js';
 import {
   ADMIT_TOTAL,
   CRITERIA,
@@ -187,6 +187,20 @@ function silo(board: Board): string {
       <ul class="tips">${tips.join('')}
       </ul>
     </details>
+  </section>`;
+}
+
+/** Every rank on the scale, hunted first to kept as a pet, so the rank under a name means something. */
+function ranks(): string {
+  const items = RANKS.map(
+    (rank) => `
+        <div><dt>${escapeHtml(rank.name)}, ${escapeHtml(rank.title)}</dt><dd>${escapeHtml(rank.source)}. Hunted: ${escapeHtml(rank.hunted)}. Score ${String(Math.round(rank.min * 100))} and up.</dd></div>`,
+  );
+  return `<section class="legend" aria-labelledby="ranks">
+    <h2 id="ranks">🎖️ Ranks</h2>
+    <p class="sub">Every rank on the scale, from hunted first to kept as a pet. Yours is under your name.</p>
+    <dl>${items.join('')}
+    </dl>
   </section>`;
 }
 
@@ -454,6 +468,7 @@ export function renderPage(board: Board, now: number): string {
     </section>
   </div>
   ${silo(board)}
+  ${ranks()}
   ${legend()}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.

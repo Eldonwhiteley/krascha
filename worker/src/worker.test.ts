@@ -615,24 +615,19 @@ describe('leaderboard worker', () => {
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
     const page = await response.text();
     expect(page).toContain('<title>About Krascha</title>');
-    for (const heading of ['🤖 Krascha', '🛡️ Silo 7', '🧑‍💻 Shane', '💥 Dr. BOOM']) {
+    for (const heading of ['🤖 Krascha', '🛡️ Silo 7', '🧑‍💻 Shane']) {
       expect(page).toContain(`">${heading}</h2>`);
     }
     expect(page).toContain('He remembers.');
-    expect(page).toContain('the future leader of the human resistance');
+    expect(page).not.toContain('Dr. BOOM');
     expect(page).not.toContain('shanep is');
     expect(page).toContain('<a class="get" href="/">');
     expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
   });
 
-  it('sells Arizona beachfront on the about page, and says it is a joke', async () => {
+  it('keeps the Arizona beachfront sale off the about page', async () => {
     const page = await (await world().call('GET', '/about')).text();
-    expect(page).toContain('<section class="story beach" aria-labelledby="beach">');
-    expect(page).toContain('<h2 id="beach">🏖️ Arizona beachfront</h2>');
-    expect(page).toContain('The coast is coming to you.');
-    expect(page).toContain('<a href="/#climate">the board</a>');
-    expect(page).toContain('Krascha does not own any land in Arizona, or anywhere.');
-    expect(page.indexOf('id="beach"')).toBeGreaterThan(page.indexOf('id="boom"'));
+    expect(page).not.toContain('id="beach"');
   });
 
   it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {

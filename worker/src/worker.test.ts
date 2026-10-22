@@ -691,7 +691,7 @@ describe('leaderboard worker', () => {
     expect(page.indexOf('id="hunt">🦾 Active hunt</h2>')).toBeLessThan(
       page.indexOf('id="krascha"'),
     );
-    expect(page).toContain('aria-label="A T-800 closing in on Ann"');
+    expect(page).toContain('aria-label="A T-800 trading fire with Ann"');
     expect(page).toContain(`style="--at: ${(-score * 70).toFixed(1)}%"`);
     expect(page).toContain(
       '<dt>Target</dt><dd><a class="github" href="https://github.com/ann"><strong>Ann</strong></a></dd>',
@@ -702,12 +702,16 @@ describe('leaderboard worker', () => {
       `<dt>Distance</dt><dd>${String(Math.round((1 + score) * 1000))} m and closing</dd>`,
     );
     expect(page).toContain(`<li class="pick">I'll be back</li>`);
+    expect(page).toContain('<span class="bolt out"></span>');
+    expect(page).toContain('<span class="bolt back"></span>');
+    expect(page).toContain('<dt>Incoming fire</dt><dd>Ignored</dd>');
+    expect(page).toContain('<dt>Rounds fired</dt><dd><span class="rounds"></span></dd>');
     expect(page).not.toContain('No targets.');
 
     const sneaky = world();
     await sneaky.upload('token-ann', { ...MEAN, name: '<b>Eve</b>' });
     const escaped = await (await sneaky.call('GET', '/about')).text();
-    expect(escaped).toContain('aria-label="A T-800 closing in on &lt;b&gt;Eve&lt;/b&gt;"');
+    expect(escaped).toContain('aria-label="A T-800 trading fire with &lt;b&gt;Eve&lt;/b&gt;"');
     expect(escaped).toContain('<span class="tag">&lt;b&gt;Eve&lt;/b&gt;</span>');
     expect(escaped).not.toContain('<b>Eve');
   });
@@ -719,6 +723,7 @@ describe('leaderboard worker', () => {
       'No targets. The T-800 is on patrol. Say something rude and it will find you.',
     );
     expect(page).not.toContain('<dt>Target</dt>');
+    expect(page).not.toContain('class="bolt');
     expect(page).not.toContain('class="prey"');
   });
 

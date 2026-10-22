@@ -361,6 +361,7 @@ const DARK = `--bg: #020d05; --fg: #6dff9b; --muted: #43c470; --card: #04170a; -
 
 // The light colors are a poster from the vault: cream paper, vault blue and yellow.
 const STYLE = `
+@property --shots { syntax: '<integer>'; inherits: false; initial-value: 0; }
 :root { --bg: #f1e7c9; --fg: #14254a; --muted: #4b5677; --card: #fdf8e8; --line: #cbbd8f;
   --red: #b3261e; --green: #1d6b37; --amber: #8a5800; --link: #1747a6;
   --claude: #a2471f; --copilot: #7340c8;
@@ -552,6 +553,22 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
   .patrol .t800 { animation: patrol 9s ease-in-out infinite alternate, stomp 0.6s ease-in-out infinite; }
   .t800 .glow { animation: beacon 1.6s ease-in-out infinite; }
   .runner { animation: bounce 0.4s ease-in-out infinite; }
+  .ruins { animation: drift 30s linear infinite; }
+  .hk { animation: fly 11s linear infinite; }
+  .hk::after { animation: sweep-light 2.2s ease-in-out infinite alternate; }
+  /* The firefight starts once the T-800 has walked in: one shot each way every 0.8s. */
+  .scene .bolt { display: block; }
+  .bolt.out { animation: fire-out 0.8s linear 2.8s infinite both; }
+  .bolt.back { animation: fire-back 0.8s linear 3.2s infinite both; }
+  .scene:not(.patrol) .muzzle { animation: flash 0.8s steps(1) 2.8s infinite both; }
+  .gun { animation: kick 0.8s ease-out 3.2s infinite; }
+  .spark.on-t800 { animation: burst 0.8s ease-out 3.92s infinite both; }
+  .spark.miss { animation: burst 0.8s ease-out 3.52s infinite both; }
+  .scene:not(.patrol) .t800 { animation: stalk 2.4s ease-out both, stomp 0.6s ease-in-out infinite,
+    zapped 0.8s steps(1) 3.92s infinite; }
+  .t800 .coil { animation: beacon 0.4s steps(2) infinite; }
+  .rounds { animation: tally 800s linear 2.8s both; }
+  .readout .rounds::after { content: counter(rounds); }
   .reticle { animation: slam 0.4s cubic-bezier(0.3, 1.6, 0.6, 1) 2.4s both, lock 0.8s ease-out 2.4s both; }
   .aim { transform-origin: left; animation: draw 0.4s ease-out 2.2s both, beacon 0.8s steps(2) 2.6s infinite; }
   .readout div { animation: appear 0.3s ease-out both; animation-delay: calc(2.6s + var(--row, 0) * 0.25s); }
@@ -581,6 +598,18 @@ section.wanted, section.silo, section.climate, section.manhunt { position: relat
 @keyframes flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: 0.4; } 98% { opacity: 1; } 99% { opacity: 0.6; } }
 @keyframes cursor { 50% { border-color: transparent; } }
 @keyframes stalk { from { left: -112px; } }
+@keyframes drift { to { mask-position: -240px 100%; } }
+@keyframes fly { from { left: -60px; } to { left: calc(100% + 60px); } }
+@keyframes sweep-light { from { rotate: -18deg; } to { rotate: 18deg; } }
+@keyframes fire-out { 0% { left: calc(var(--x) + 128px); top: 96px; opacity: 1; scale: 2 1; }
+  10% { scale: 1; } 90% { left: calc(100% - 64px); top: 38px; opacity: 1; } 91%, 100% { opacity: 0; } }
+@keyframes fire-back { 0% { left: calc(100% - 140px); top: 74px; opacity: 1; scale: 2 1; }
+  10% { scale: 1; } 90% { left: calc(var(--x) + 56px); top: 70px; opacity: 1; } 91%, 100% { opacity: 0; } }
+@keyframes flash { 0% { opacity: 1; } 15%, 100% { opacity: 0; } }
+@keyframes kick { 0% { translate: 4px 0; rotate: 18deg; } 30%, 100% { translate: 0; rotate: 0deg; } }
+@keyframes burst { 0% { opacity: 1; scale: 0.4; } 35% { opacity: 0; scale: 1.8; } 100% { opacity: 0; } }
+@keyframes zapped { 0% { filter: brightness(2.2) drop-shadow(0 0 6px var(--amber)); } 12%, 100% { filter: none; } }
+@keyframes tally { to { --shots: 1000; } }
 @keyframes stomp { 0%, 50%, 100% { translate: 0 0; rotate: 0deg; } 25% { translate: 0 -5px; rotate: -4deg; }
   75% { translate: 0 -5px; rotate: 4deg; } }
 @keyframes patrol { from { left: 0; } to { left: calc(100% - 104px); } }
@@ -623,7 +652,27 @@ section.manhunt { border-top: 4px solid var(--red); }
   border: 2px solid var(--red); border-radius: 2px;
   background: repeating-linear-gradient(to bottom, transparent 0 3px, color-mix(in srgb, var(--red) 10%, transparent) 3px 4px),
     color-mix(in srgb, var(--red) 12%, var(--card)); }
-.t800 { position: absolute; top: 22px; left: var(--x); width: 104px; height: 104px; overflow: visible; }
+.t800 { position: absolute; z-index: 1; top: 22px; left: var(--x); width: 104px; height: 104px; overflow: visible; }
+.t800 .rifle { fill: var(--fg); }
+.t800 .coil { fill: var(--red); }
+.t800 .muzzle { fill: var(--amber); opacity: 0; }
+.ruins { position: absolute; inset: auto 0 0; height: 60px; background: color-mix(in srgb, var(--fg) 16%, transparent);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 60'%3E%3Cpath d='M0 60V38h14V26h8v14h12V18l6-6v18h12v14h12V30h8v-8h8v20h16v-8h8v14h16V28h8v-8h8v16h16v10h16V24l8 6v10h14v-8h10v12h16V30h10v10h14v20z'/%3E%3C/svg%3E")
+    repeat-x 0 100% / 240px 60px; }
+.hk { position: absolute; top: 4px; left: 62%; font-size: 20px; line-height: 1; text-shadow: none; }
+.hk::after { content: ""; position: absolute; top: 18px; left: 50%; width: 70px; height: 110px; translate: -50% 0;
+  transform-origin: 50% 0; clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--amber) 45%, transparent), transparent); }
+.bolt { display: none; position: absolute; z-index: 2; width: 22px; height: 3px; border-radius: 2px; }
+.bolt.out { background: var(--red); box-shadow: 0 0 6px 1px var(--red); }
+.bolt.back { background: var(--green); box-shadow: 0 0 6px 1px var(--green); }
+.spark { position: absolute; z-index: 2; width: 26px; height: 26px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, #fff 0 15%, var(--amber) 35%, transparent 70%); }
+.spark.on-t800 { top: 58px; left: calc(var(--x) + 42px); }
+.spark.miss { top: 26px; left: calc(100% - 72px); }
+.gun { position: absolute; top: 20px; left: -6px; font-size: 22px; line-height: 1; text-shadow: none; }
+.rounds { counter-reset: rounds var(--shots); }
+.rounds::after { content: "Plenty"; }
 .t800 .bone { fill: var(--card); stroke: var(--fg); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .t800 .seam { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-linecap: round; }
 .t800 .socket { fill: color-mix(in srgb, var(--fg) 35%, #000); }
@@ -713,7 +762,7 @@ ${body}
 }
 
 // A T-800 with the skin off: cranium, angular eye sockets, red eyes, a nose
-// cavity, two rows of teeth and the pistons that work the jaw.
+// cavity, two rows of teeth, the pistons that work the jaw and a plasma rifle.
 const T800 = `<svg class="t800" viewBox="0 0 64 64" aria-hidden="true">
 <defs><filter id="t800-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter></defs>
 <line class="bone" x1="9" y1="32" x2="12" y2="44"/>
@@ -737,7 +786,13 @@ const T800 = `<svg class="t800" viewBox="0 0 64 64" aria-hidden="true">
 <circle class="glow" cx="41" cy="30.5" r="3.6" filter="url(#t800-blur)"/>
 <circle class="eye" cx="23" cy="30.5" r="2.2"/>
 <circle class="eye" cx="41" cy="30.5" r="2.2"/>
+<g class="rifle"><rect x="38" y="44" width="34" height="5" rx="1"/><rect x="72" y="45.5" width="6" height="2"/><rect x="46" y="49" width="4" height="7" rx="1"/></g>
+<rect class="coil" x="56" y="45" width="10" height="3" rx="1"/>
+<circle class="muzzle" cx="80" cy="46.5" r="4"/>
 </svg>`;
+
+/** Ruins drifting by behind the hunt, and a Hunter-Killer sweeping its searchlight overhead. */
+const BACKDROP = '<span class="ruins"></span><span class="hk">🛸</span>';
 
 /** What the T-800 can say back, from its HUD in the first film. It picks the last one. */
 const RESPONSES = ['Yes/no', 'Or what?', 'Go away', 'Please come back later'] as const;
@@ -756,6 +811,7 @@ function hunt(board: Board): string {
   if (leader === undefined) {
     return `${head}
     <div class="scene patrol" role="img" aria-label="A T-800 on patrol with no target" style="--at: 40%">
+      ${BACKDROP}
       ${T800}
       <span class="vision">Scanning</span>
     </div>
@@ -768,6 +824,8 @@ function hunt(board: Board): string {
     ['Threat score', String(Math.round(leader.score * 100))],
     ['Mean prompts', count(leader.mean)],
     ['Distance', `${count(Math.round((1 + leader.score) * 1000))} m and closing`],
+    ['Incoming fire', 'Ignored'],
+    ['Rounds fired', '<span class="rounds"></span>'],
     ['Status', '<span class="kill">Terminate</span>'],
   ];
   const readout = lines.map(
@@ -779,11 +837,16 @@ function hunt(board: Board): string {
         <li>${escapeHtml(response)}</li>`,
   );
   return `${head}
-    <div class="scene" role="img" aria-label="${escapeHtml(`A T-800 closing in on ${leader.name}`)}" style="--at: ${percent(-leader.score * 70)}">
+    <div class="scene" role="img" aria-label="${escapeHtml(`A T-800 trading fire with ${leader.name}`)}" style="--at: ${percent(-leader.score * 70)}">
+      ${BACKDROP}
       ${T800}
       <span class="vision">Analysis: rude to Claude</span>
       <span class="aim"></span>
-      <span class="prey"><span class="tag">${escapeHtml(leader.name)}</span><span class="mark"><span class="runner">🏃</span><span class="reticle"></span></span></span>
+      <span class="bolt out"></span>
+      <span class="bolt back"></span>
+      <span class="spark on-t800"></span>
+      <span class="spark miss"></span>
+      <span class="prey"><span class="tag">${escapeHtml(leader.name)}</span><span class="mark"><span class="gun">🔫</span><span class="runner">🏃</span><span class="reticle"></span></span></span>
     </div>
     <div class="hud">
       <dl class="readout">${readout.join('')}

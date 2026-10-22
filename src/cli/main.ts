@@ -23,7 +23,7 @@ import type { ToolId } from '../shared/tools.js';
 import { TOOLS, toolNames } from '../shared/tools.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
-import { loadDailyUsage } from '../usage.js';
+import { loadUsage } from '../usage.js';
 
 import { MAX_TREND_DAYS, RAP_ENTRIES, TREND_DAYS, renderRapSheet, renderTrend } from './history.js';
 import type { Paint } from './render.js';
@@ -95,10 +95,11 @@ async function refresh(io: CliIo): Promise<Refreshed> {
   const sources = [claudeUserPrompts(claude), copilotUserPrompts(copilotDir(io.home, io.env))];
   const scan = await scanInto(index, { sources, now });
   await saveIndex(file, index);
-  const tokensPerDay = averageTokensPerDay(await loadDailyUsage(claude), now);
+  const usage = await loadUsage(claude);
+  const tokensPerDay = averageTokensPerDay(usage.days, now);
   const titleOf = (sessionId: string): string =>
     index.sessions.get(sessionId)?.title ?? `Session ${sessionId.slice(0, 8)}`;
-  return { summary: summarize(index, titleOf, tokensPerDay), scan };
+  return { summary: summarize(index, titleOf, tokensPerDay, usage.lifetimeTokens), scan };
 }
 
 /**

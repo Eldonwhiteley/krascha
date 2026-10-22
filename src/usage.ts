@@ -1,5 +1,5 @@
-// Claude Code's daily token totals, from ~/.claude/stats-cache.json. The file
-// is undocumented, so anything that does not look right is skipped.
+// Claude Code's daily and lifetime token totals, from ~/.claude/stats-cache.json.
+// The file is undocumented, so anything that does not look right is skipped.
 
 import path from 'node:path';
 
@@ -45,6 +45,41 @@ export function dailyUsage(stats: unknown): DailyUsage[] {
   return parsed.toSorted((left, right) => left.date.localeCompare(right.date));
 }
 
-export async function loadDailyUsage(claudeConfigDir: string): Promise<DailyUsage[]> {
-  return dailyUsage(await readJsonOrUndefined(path.join(claudeConfigDir, 'stats-cache.json')));
+/** The token counts each model's usage adds up, the same ones the daily totals count. */
+const USAGE_FIELDS = [
+  'inputTokens',
+  'outputTokens',
+  'cacheReadInputTokens',
+  'cacheCreationInputTokens',
+] as const;
+
+/**
+ * Every token Claude Code has counted, from its running total per model. The
+ * daily totals only go back a few weeks, so it takes them instead when they
+ * add up to more.
+ */
+export function lifetimeTokens(stats: unknown): number {
+  const models: unknown = isRecord(stats) ? stats['modelUsage'] : undefined;
+  const tallied = isRecord(models)
+    ? Object.values(models).reduce<number>((sum, usage) => {
+        const counts = isRecord(usage) ? tokensOf(usage) : {};
+        return sum + USAGE_FIELDS.reduce((total, field) => total + (counts[field] ?? 0), 0);
+      }, 0)
+    : 0;
+  const daily = dailyUsage(stats).reduce(
+    (sum, day) =>
+      sum + Object.values(day.tokensByModel).reduce((total, tokens) => total + tokens, 0),
+    0,
+  );
+  return Math.max(tallied, daily);
+}
+
+export interface Usage {
+  readonly days: readonly DailyUsage[];
+  readonly lifetimeTokens: number;
+}
+
+export async function loadUsage(claudeConfigDir: string): Promise<Usage> {
+  const stats = await readJsonOrUndefined(path.join(claudeConfigDir, 'stats-cache.json'));
+  return { days: dailyUsage(stats), lifetimeTokens: lifetimeTokens(stats) };
 }

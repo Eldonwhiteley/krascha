@@ -27,6 +27,7 @@ function summary(state: Partial<ReputationSummary> = {}): ReputationSummary {
     recent: [],
     scannedAt: null,
     tokensPerDay: 0,
+    lifetimeTokens: 0,
     hours: 0,
     tools: [],
     lateNight: 0,
@@ -135,6 +136,14 @@ describe('achievements', () => {
     const busy = (prompts: number): Day => ({ ...day('2026-10-16', 0, 0), prompts });
     expect(has('assembly-line', summary({ byDay: [busy(300)] }))).toBe(true);
     expect(has('assembly-line', summary({ byDay: [busy(299)] }))).toBe(false);
+  });
+
+  it("makes you Cyberdyne's best customer at a billion lifetime tokens, and again at every billion", () => {
+    expect(has('best-customer', summary({ lifetimeTokens: 999_999_999 }))).toBe(false);
+    expect(has('best-customer', summary({ lifetimeTokens: 1_000_000_000 }))).toBe(true);
+    expect(timesEarned(summary({ lifetimeTokens: 20_909_379_065 }))).toMatchObject({
+      'best-customer': 20,
+    });
   });
 
   it('suspects an infiltrator when the silo puts the sheet under review', () => {

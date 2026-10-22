@@ -17,6 +17,8 @@ import { knownTools } from './tools.js';
 
 /** The average a day it takes to be a token maxxer. */
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
+/** Lifetime tokens for Cyberdyne's best customer, earned again at every billion. */
+const BEST_CUSTOMER_TOKENS = 1_000_000_000;
 /** The hours with your AI it takes to work overtime. */
 const OVERTIME_HOURS = 500;
 /** Mean prompts in one day that make a meltdown. */
@@ -532,6 +534,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     fromCounts: true,
   },
   {
+    id: 'best-customer',
+    name: "Cyberdyne's best customer",
+    icon: '🏭',
+    tier: 'silver',
+    how: 'Burn through 1 billion tokens in Claude Code, all time. Every billion after counts again.',
+    quip: 'Cyberdyne sent you a fruit basket. It is ticking.',
+    ...every(BEST_CUSTOMER_TOKENS, (state) => state.lifetimeTokens),
+  },
+  {
     id: 'hunted-first',
     name: 'Hunted first',
     icon: '💀',
@@ -839,6 +850,8 @@ function totalsOf(machines: readonly MachineCounts[]): ReputationSummary {
     recent: [],
     scannedAt: null,
     tokensPerDay: sum((machine) => machine.tokensPerDay),
+    // Uploads do not carry it, so Cyberdyne's best customer counts when any machine earned it.
+    lifetimeTokens: 0,
     // Uploads do not carry it, so Overtime counts when any machine earned it.
     hours: 0,
     tools: knownTools(machines.flatMap((machine) => machine.tools ?? [])),

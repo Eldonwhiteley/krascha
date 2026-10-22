@@ -130,6 +130,7 @@ export function summarize(
   index: ReputationIndex,
   titleOf: (sessionId: string) => string,
   tokensPerDay: number,
+  lifetimeTokens: number,
 ): ReputationSummary {
   const total: Tally = { prompts: 0, kind: 0, mean: 0, general: 0 };
   const days = new Map<string, Tally>();
@@ -174,6 +175,7 @@ export function summarize(
     recent: hits.toSorted((left, right) => right.at - left.at).slice(0, RECENT_HITS),
     scannedAt: index.scannedAt,
     tokensPerDay,
+    lifetimeTokens,
     hours: hoursSpent([...index.prompts.values()].map((prompt) => prompt.at)),
     tools: knownTools([...tools]),
     ...clock,

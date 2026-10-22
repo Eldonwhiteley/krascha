@@ -64,6 +64,8 @@ export interface ReputationSummary extends ReputationTally {
   readonly scannedAt: number | null;
   /** Average tokens a day over the last TOKEN_WINDOW_DAYS days, from Claude Code's usage stats. */
   readonly tokensPerDay: number;
+  /** Every token Claude Code has counted, from its usage stats. */
+  readonly lifetimeTokens: number;
   /** Hours spent with your agents, worked out from when you typed each prompt. */
   readonly hours: number;
   /** The agents you typed any prompt into, in TOOLS order. */

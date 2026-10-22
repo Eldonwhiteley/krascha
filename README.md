@@ -132,6 +132,10 @@ outlive the transcripts Claude Code cleans up after 30 days. Prompt text is
 never stored, only a short excerpt around each kind or mean word. Nothing
 leaves your machine unless you run `board` or `upload`.
 
+When an update changes the words Krascha counts, he reads every transcript
+that is still there again, so your old prompts are judged by the new words.
+Prompts whose transcripts are gone keep the counts they had.
+
 ## The ranks
 
 From hunted first to kept as a pet:

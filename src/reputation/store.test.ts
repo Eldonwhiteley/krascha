@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 
+import { DETECTION_STAMP } from './detect.js';
 import type { Prompt } from './prompts.js';
 import type { ReputationIndex } from './store.js';
 import {
@@ -75,6 +76,25 @@ describe('index file', () => {
     expect(index.prompts).toStrictEqual(old.prompts);
     expect(index.hits).toStrictEqual(old.hits);
     expect(index.sessions).toStrictEqual(old.sessions);
+  });
+
+  it('reads every file again when the words have changed since the last save', async () => {
+    const file = await indexFile();
+    const old = filled();
+    await saveIndex(file, old);
+    const saved = z.record(z.string(), z.unknown()).parse(JSON.parse(await readFile(file, 'utf8')));
+    expect(saved['detection']).toBe(DETECTION_STAMP);
+    for (const detection of [{ detection: 'older words' }, {}]) {
+      const stale = Object.fromEntries(
+        Object.entries(saved).filter(([key]) => key !== 'detection'),
+      );
+      await writeFile(file, JSON.stringify({ ...stale, ...detection }));
+      const { index } = await loadIndex(file, 1);
+      expect(index.files.size).toBe(0);
+      expect(index.prompts).toStrictEqual(old.prompts);
+      expect(index.hits).toStrictEqual(old.hits);
+      expect(index.kind).toStrictEqual(old.kind);
+    }
   });
 
   it('reads a hit saved as aimed at claude as aimed at the agent', async () => {

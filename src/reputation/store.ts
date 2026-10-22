@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { readOptional, writeFileAtomic } from '../files.js';
 
 import type { FrustrationTarget } from './detect.js';
-import { detectFrustration } from './detect.js';
+import { DETECTION_STAMP, detectFrustration } from './detect.js';
 import type { Kindness } from './kind.js';
 import { detectKindness } from './kind.js';
 import type { Prompt } from './prompts.js';
@@ -64,6 +64,8 @@ const hitsSchema = z.record(
 // Version 1 came from the Frustration view and had no kind hits.
 const fileSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]),
+  // Which words counted the hits. Older indexes do not say.
+  detection: z.string().optional(),
   scannedAt: z.number().nullable(),
   files: z.record(z.string(), stampSchema),
   sessions: z.record(
@@ -101,8 +103,11 @@ function parseIndex(text: string): ReputationIndex | null {
   }
   const data = parsed.data;
   return {
-    // A version 1 index never looked for kind words, so every file is read again.
-    files: new Map(data.version === 1 ? [] : Object.entries(data.files)),
+    // A version 1 index never looked for kind words, and one counted with other
+    // words is out of date, so every file is read again.
+    files: new Map(
+      data.version === 1 || data.detection !== DETECTION_STAMP ? [] : Object.entries(data.files),
+    ),
     sessions: new Map(Object.entries(data.sessions)),
     prompts: new Map(Object.entries(data.prompts)),
     hits: new Map(Object.entries(data.hits)),
@@ -135,6 +140,7 @@ export async function loadIndex(file: string, now: number): Promise<LoadedIndex>
 export async function saveIndex(file: string, index: ReputationIndex): Promise<void> {
   const data: z.infer<typeof fileSchema> = {
     version: 2,
+    detection: DETECTION_STAMP,
     scannedAt: index.scannedAt,
     files: Object.fromEntries(index.files),
     sessions: Object.fromEntries(index.sessions),

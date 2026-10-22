@@ -184,7 +184,7 @@ describe('detectFrustration targets', () => {
 describe('detectFrustration terms', () => {
   it('knows every form and its kind', () => {
     expect(LEXICON).toHaveLength(57);
-    expect(ALL_FORMS).toHaveLength(286);
+    expect(ALL_FORMS).toHaveLength(304);
     for (const entry of LEXICON) {
       for (const form of entry.forms) {
         const found = detectFrustration(form);

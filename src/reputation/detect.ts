@@ -2,9 +2,11 @@
 // was aimed at the agent or was general swearing. The word matching here is
 // shared with the kindness detector.
 
+import { createHash } from 'node:crypto';
+
 import { stripIgnored } from './clean.js';
 import type { LexiconEntry } from './lexicon.js';
-import { DETERMINERS, LEXICON, NOT_TYPOS, SECOND_PERSON } from './lexicon.js';
+import { DETERMINERS, KIND_LEXICON, LEXICON, NOT_TYPOS, SECOND_PERSON } from './lexicon.js';
 
 /** Aimed at the agent the prompt was typed to, or swearing at the world. */
 export type FrustrationTarget = 'agent' | 'general';
@@ -168,6 +170,24 @@ export function unleet(word: string): string {
     ? word.replaceAll(LEET, (digit) => DIGIT_LETTERS[digit] ?? digit)
     : word;
 }
+
+/** Bump when the matching changes but the word lists do not, so every prompt is counted again. */
+const MATCH_RULES = 1;
+
+/** Changes whenever the words or the matching change. The index saves it to know when to count again. */
+export const DETECTION_STAMP = createHash('sha256')
+  .update(
+    JSON.stringify([
+      MATCH_RULES,
+      LEXICON,
+      KIND_LEXICON,
+      [...NOT_TYPOS],
+      [...DETERMINERS],
+      [...SECOND_PERSON],
+    ]),
+  )
+  .digest('hex')
+  .slice(0, 16);
 
 // Exact forms come first, so a typo never beats a real spelling.
 const FORMS = buildForms([...LEXICON, ...typoEntries(LEXICON)]);

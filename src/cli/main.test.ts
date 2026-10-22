@@ -212,7 +212,26 @@ describe('krascha', () => {
       name: 'Sarah Connor',
       auth: 'github',
       key: null,
+      uploadedPrompts: 3,
     });
+  });
+
+  it('reminds you to upload until the board has your latest prompts', async () => {
+    const home = await makeHome();
+    const never = "Tip: run upload to go on Krascha's List at krascha.com.";
+    expect((await home.run()).out).toContain(`Krascha remembers.\n\n${never}\n`);
+    expect((await home.run('silo')).out).toContain(never);
+    home.use({ fetch: fakeBoard([], false) });
+    await home.run('upload', 'Kyle');
+    expect((await home.run()).out).not.toContain('Tip:');
+    const project = path.join(home.root, '.claude', 'projects', '-work');
+    const lines = [prompt('u3', 'thank you'), prompt('u4', 'please and thanks')];
+    await writeFile(path.join(project, 's2.jsonl'), lines.map((line) => `${line}\n`).join(''));
+    const behind = "Tip: 2 prompts since your last upload. Run upload to update Krascha's List.";
+    expect((await home.run()).out).toContain(behind);
+    expect((await home.run('silo')).out).toContain(behind);
+    await home.run('remove');
+    expect((await home.run()).out).not.toContain('Tip:');
   });
 
   it('sends the same machine id every time and says when machines add up', async () => {

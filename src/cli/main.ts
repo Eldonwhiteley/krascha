@@ -25,7 +25,7 @@ import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadDailyUsage } from '../usage.js';
 
 import type { Paint } from './render.js';
-import { COLOR, PLAIN, renderReport } from './render.js';
+import { COLOR, PLAIN, plural, renderReport } from './render.js';
 import { renderSilo, renderSiloBoard } from './silo.js';
 
 export const INDEX_FILE = 'reputation.json';
@@ -95,10 +95,34 @@ async function refresh(io: CliIo): Promise<Refreshed> {
   return { summary: summarize(index, titleOf, tokensPerDay), scan };
 }
 
+/**
+ * A nudge to upload when you never have, or when you typed more prompts since
+ * your last upload. Empty once the board is current, and after a removal,
+ * since leaving the board was your call.
+ */
+export function uploadTip(saved: SavedEntry, prompts: number): string {
+  if (saved.name === null) {
+    return "Tip: run upload to go on Krascha's List at krascha.com.";
+  }
+  if (saved.entryId === null || saved.uploadedPrompts === null) {
+    return '';
+  }
+  const behind = prompts - saved.uploadedPrompts;
+  if (behind <= 0) {
+    return '';
+  }
+  return `Tip: ${plural(behind, 'prompt')} since your last upload. Run upload to update Krascha's List.`;
+}
+
+function withTip(text: string, tip: string, paint: Paint): string {
+  return tip === '' ? text : `${text}\n${paint.dim(tip)}\n`;
+}
+
 async function show(io: CliIo): Promise<number> {
+  const saved = await loadSaved(dataDir(io));
   const { summary } = await refresh(io);
   const paint: Paint = io.color ? COLOR : PLAIN;
-  io.out(renderReport(summary, paint));
+  io.out(withTip(renderReport(summary, paint), uploadTip(saved, summary.prompts), paint));
   return 0;
 }
 
@@ -202,7 +226,13 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     tools: summary.tools,
     machine,
   });
-  await saveSaved(dir, { entryId: standing.entry.id, name, auth: credential.kind, key });
+  await saveSaved(dir, {
+    entryId: standing.entry.id,
+    name,
+    auth: credential.kind,
+    key,
+    uploadedPrompts: summary.prompts,
+  });
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));
   return 0;
 }
@@ -220,7 +250,7 @@ async function remove(io: CliIo): Promise<number> {
     return 1;
   }
   await removeEntry(io.fetch, boardUrl(io), credential);
-  await saveSaved(dir, { ...saved, entryId: null, auth: null });
+  await saveSaved(dir, { ...saved, entryId: null, auth: null, uploadedPrompts: null });
   io.out('Krascha took you off the board. He still remembers.\n');
   return 0;
 }
@@ -279,7 +309,8 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const { summary } = await refresh(io);
   const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
   const rank = rankFor(summary.score).name;
-  io.out(renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint));
+  const sheet = renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint);
+  io.out(withTip(sheet, uploadTip(saved, summary.prompts), paint));
   return 0;
 }
 

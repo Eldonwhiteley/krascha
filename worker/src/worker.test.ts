@@ -735,6 +735,30 @@ describe('leaderboard worker', () => {
     expect((await w.board()).held).toMatchObject({ [OBSOLETE_MODEL]: 2 });
   });
 
+  it('gives Kyle Reese only to lhindman, checked with GitHub', async () => {
+    const w = world();
+    const claim = { ...KIND, achievements: ['kyle-reese'] };
+    expect((await w.upload('token-luke', KIND)).entry.achievements).toContain('kyle-reese');
+    expect((await w.upload('token-not-luke', claim)).entry.achievements).not.toContain(
+      'kyle-reese',
+    );
+    expect((await w.upload('token-shane', claim)).entry.achievements).not.toContain('kyle-reese');
+    expect((await w.board()).held).toMatchObject({ 'kyle-reese': 1 });
+  });
+
+  it('hands Kyle Reese to the lhindman entry already on the board', async () => {
+    const w = world();
+    const luke = await w.upload('token-luke', KIND);
+    await w.upload('token-bob', KIND);
+    await w.sql("UPDATE scores SET achievements = ''");
+    const migration = new URL('../migrations/0012_kyle_reese.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    const board = await w.board(luke.entry.id);
+    expect(earned(board.me?.entry.achievements)).toStrictEqual(['kyle-reese']);
+    expect(board.held).toMatchObject({ 'kyle-reese': 1 });
+  });
+
   it('makes anyone with 10 likes a crowd favorite', async () => {
     const w = world();
     const ann = await w.upload('token-ann', MEAN);

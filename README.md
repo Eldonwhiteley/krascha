@@ -89,6 +89,7 @@ Some achievements come from the board itself, so the report does not list
 them:
 
 - Leader of the human resistance goes only to Shane's GitHub account.
+- Kyle Reese goes only to lhindman's GitHub account.
 - Miles Dyson goes to anyone with a pull request merged into Krascha, on their
   next upload with gh. Model 101 goes only to whoever got the first one merged.
 - Machine collaborator goes to anyone GitHub finds a commit for with Claude as

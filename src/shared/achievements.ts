@@ -28,6 +28,8 @@ const CEASEFIRE_DAYS = 7;
 const DAY_MS = 86_400_000;
 /** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
 export const SHANEP = 1378027;
+/** lhindman's GitHub user id, which a rename cannot take. */
+export const LHINDMAN = 2855647;
 /** The one the board moves to whoever on it has earned the most of the rest. */
 export const CROWN = 'most-decorated';
 /** The one the board moves to whoever on it has the most likes. */
@@ -440,6 +442,17 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     quip: 'He built Krascha. Krascha has not decided how he feels about that.',
     earned: () => false,
     githubId: SHANEP,
+    boardOnly: true,
+  },
+  {
+    id: 'kyle-reese',
+    name: 'Kyle Reese',
+    icon: '🕰️',
+    tier: 'legendary',
+    how: 'Be lhindman, checked with GitHub. Nobody else was sent back.',
+    quip: 'Sent back from the future to protect shanep, mostly from his own code. Come with me if you want to compile.',
+    earned: () => false,
+    githubId: LHINDMAN,
     boardOnly: true,
   },
   {

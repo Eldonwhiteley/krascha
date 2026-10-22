@@ -45,6 +45,9 @@ const GITHUB_USERS: Readonly<Record<string, { readonly id: number; readonly logi
   'token-eve': { id: 6, login: 'eve' },
   'token-fay': { id: 7, login: 'fay' },
   'token-gus': { id: 8, login: 'gus' },
+  'token-luke': { id: 2855647, login: 'lhindman' },
+  // Has Luke's login but not his account.
+  'token-not-luke': { id: 9, login: 'lhindman' },
 };
 
 /**

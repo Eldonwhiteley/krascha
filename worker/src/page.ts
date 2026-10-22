@@ -134,6 +134,8 @@ function warmthScale(kg: number): string {
 const TOP = {
   wanted: ' <span class="target">TARGET ACQUIRED</span>',
   pets: ' <span class="hearts" aria-hidden="true"><span>💕</span><span>💖</span><span>💕</span></span>',
+  climate:
+    ' <span class="sticker" role="img" aria-label="I love datacenters">I <span class="beat">❤️</span> datacenters</span>',
 } as const;
 
 function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof TOP): string {
@@ -214,7 +216,7 @@ function climate(board: Board): string {
       <li>
         <span class="place">${String(index + 1)}</span>
         <span class="who">
-          ${name(entry)}
+          ${name(entry)}${index === 0 ? TOP.climate : ''}
           <span class="rank">${escapeHtml(rank.name)}, ${escapeHtml(rank.verdict)}</span>
         </span>
         <span class="counts">${COMPACT.format(entry.tokensPerDay ?? 0)} tokens a day, ${escapeHtml(co2Text(kg))} of CO2 in 60 days</span>
@@ -376,6 +378,10 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 .hearts { position: relative; display: inline-block; width: 1em; }
 .hearts span { position: absolute; left: 0; bottom: 0; opacity: 0; font-size: 0.8em; }
 .stamp { display: inline-block; }
+.sticker { display: inline-block; padding: 0 6px; border: 2px solid var(--fg); border-radius: 3px;
+  background: var(--card); box-shadow: 2px 2px 0 var(--red); color: var(--fg);
+  font: 700 0.75em var(--mono); white-space: nowrap; rotate: -3deg; }
+.beat { display: inline-block; }
 .classified { position: absolute; top: 14px; right: 16px; padding: 2px 8px; border: 2px solid var(--red);
   border-radius: 4px; color: var(--red); font: 700 0.8em ui-monospace, monospace; letter-spacing: 2px;
   rotate: 8deg; opacity: 0.8; }
@@ -390,6 +396,7 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
   .hearts span { animation: float 3s ease-out infinite; }
   .hearts span:nth-child(2) { left: 0.4em; animation-delay: 1s; }
   .hearts span:nth-child(3) { left: -0.3em; animation-delay: 2s; }
+  .beat { animation: beat 1.2s ease-in-out infinite; }
   .wanted li:hover { animation: shake 0.25s linear 2; }
   .pets li:hover .who strong { display: inline-block; animation: bounce 0.5s ease; }
   .knob { animation: slide 0.8s cubic-bezier(0.3, 1.4, 0.6, 1) 0.3s both; }
@@ -407,6 +414,7 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
 @keyframes bounce { 40% { translate: 0 -6px; } }
+@keyframes beat { 0%, 40%, 100% { scale: 1; } 15% { scale: 1.3; } 25% { scale: 1.1; } }
 @keyframes slam { 0% { opacity: 0; scale: 3; } 100% { opacity: 1; scale: 1; } }
 @keyframes glitch { 0%, 88%, 100% { text-shadow: none; translate: 0; }
   90% { text-shadow: 2px 0 var(--link), -2px 0 var(--green); translate: 1px 0; }

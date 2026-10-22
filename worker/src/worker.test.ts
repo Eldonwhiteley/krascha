@@ -504,6 +504,19 @@ describe('leaderboard worker', () => {
     expect(page.indexOf('id="climate"')).toBeGreaterThan(page.indexOf('id="silo"'));
   });
 
+  it('sticks I ❤️ datacenters on the warmest climate changer and nobody else', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, tokensPerDay: 100_000_000 });
+    await w.upload('token-bob', { ...KIND, tokensPerDay: 200_000_000 });
+    const page = await (await w.call('GET', '/')).text();
+    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('id="ranks"'));
+    const check = '<span class="verified" title="Checked with GitHub">✓</span>';
+    expect(section).toContain(
+      `<strong>Bob</strong></a> ${check} <span class="sticker" role="img" aria-label="I love datacenters">I <span class="beat">❤️</span> datacenters</span>`,
+    );
+    expect(page.split('class="sticker"')).toHaveLength(2);
+  });
+
   it('says the climate changers list is empty until someone sends tokens', async () => {
     const page = await (await world().call('GET', '/')).text();
     expect(page).toContain('Nobody yet. The planet is holding steady');

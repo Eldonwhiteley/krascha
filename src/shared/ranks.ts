@@ -158,7 +158,7 @@ export function promotion(tally: Tally): RankChange | null {
   return change(tally, (more) => ({ kind: tally.kind + more, mean: tally.mean }));
 }
 
-/** How many more prompts mean to Claude move you down a rank, or null at the bottom. */
+/** How many more prompts mean to your AI move you down a rank, or null at the bottom. */
 export function demotion(tally: Tally): RankChange | null {
   if (rankFor(reputationScore(tally)) === JOHN_CONNOR) {
     return null;

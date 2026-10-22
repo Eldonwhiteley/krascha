@@ -207,7 +207,7 @@ describe('leaderboard worker', () => {
     const html = await page.text();
     expect(html).toContain('aria-label="Achievements: First strike, Meltdown"');
     expect(html).toContain(
-      '<span title="Meltdown: Be mean to Claude 5 times in one day.">🌋</span>',
+      '<span title="Meltdown: Be mean to your AI 5 times in one day.">🌋</span>',
     );
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.achievements).toStrictEqual([]);

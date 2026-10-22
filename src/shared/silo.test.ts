@@ -124,7 +124,9 @@ describe('tipsFor', () => {
   it('names only the tells that cost Human points', () => {
     const theodore = scoreApplicant('Theodore', { prompts: 1000, kind: 1000, mean: 0 });
     expect(theodore.tells).toStrictEqual(['polite']);
-    expect(tipsFor(theodore)[0]).toMatch(/^Swear at your computer once in a while\. Saying please/u);
+    expect(tipsFor(theodore)[0]).toMatch(
+      /^Swear at your computer once in a while\. Saying please/u,
+    );
     const both = scoreApplicant('T-1000', {
       prompts: 1000,
       kind: 1000,

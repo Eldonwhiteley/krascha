@@ -7,6 +7,7 @@
 import type { AchievementRule } from '../../src/shared/achievements.js';
 import {
   ACHIEVEMENTS,
+  CHAMPION,
   COUNTED_ACHIEVEMENTS,
   CROWN,
   TIERS,
@@ -348,15 +349,31 @@ function rarity(holders: number, total: number, rarest: boolean): string {
   return `<dd class="rarity">${meter(holders, total, 'hold it')}${flag}</dd>`;
 }
 
-/** Who holds the crown, in place of a meter, since only one can. */
-function holderLine(holder: BoardEntry | null): string {
+/** "1 like", "3 likes". */
+function plural(amount: number, one: string): string {
+  return amount === 1 ? `1 ${one}` : `${count(amount)} ${one}s`;
+}
+
+/** Who holds a crown and with how many of what, in place of a meter, since only one can. */
+function holderLine(holder: BoardEntry | null, what: (holder: BoardEntry) => string): string {
   if (holder === null) {
     return '<dd class="rarity">Nobody has this one yet. Be the first.</dd>';
   }
-  const earned = (holder.achievements ?? []).filter((id) => id !== CROWN).length;
-  const medals = earned === 1 ? '1 achievement' : `${count(earned)} achievements`;
   // One span, since the row is a flex box and would split the sentence at the link.
-  return `<dd class="rarity"><span>Held by ${shownName(holder)}${holder.verified ? CHECK : ''}, with ${medals}.</span></dd>`;
+  return `<dd class="rarity"><span>Held by ${shownName(holder)}${holder.verified ? CHECK : ''}, with ${what(holder)}.</span></dd>`;
+}
+
+/** Each crown and what it is held with, so the page names the holder. */
+function crownLine(rule: AchievementRule, board: Board): string | null {
+  if (rule.id === CROWN && board.crown !== undefined) {
+    return holderLine(board.crown, (holder) =>
+      plural((holder.achievements ?? []).filter((id) => id !== CROWN).length, 'achievement'),
+    );
+  }
+  if (rule.id === CHAMPION && board.champion !== undefined) {
+    return holderLine(board.champion, (holder) => plural(holder.likes ?? 0, 'like'));
+  }
+  return null;
 }
 
 /**
@@ -377,9 +394,7 @@ function legend(board: Board): string {
     const shown =
       board.held === undefined
         ? ''
-        : rule.id === CROWN && board.crown !== undefined
-          ? holderLine(board.crown)
-          : rarity(holders, board.total, rarest);
+        : (crownLine(rule, board) ?? rarity(holders, board.total, rarest));
     const unclaimed = board.held !== undefined && holders === 0 ? ' unclaimed' : '';
     return `
         <div class="badge ${rule.tier}${unclaimed}" id="${escapeHtml(achievementAnchor(rule.id))}">
@@ -929,8 +944,12 @@ function shell(title: string, description: string, body: string, script = ''): s
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
-<script>${THEME_TOGGLE}</script>${script === '' ? '' : `
-<script>${script}</script>`}
+<script>${THEME_TOGGLE}</script>${
+    script === ''
+      ? ''
+      : `
+<script>${script}</script>`
+  }
 </body>
 </html>
 `;

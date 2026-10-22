@@ -41,13 +41,34 @@ const GITHUB_USERS: Readonly<Record<string, { readonly id: number; readonly logi
   'token-shane': { id: 1378027, login: 'shanep' },
   // Has Shane's login but not his account, like someone who took it after a rename.
   'token-not-shane': { id: 4, login: 'shanep' },
+  'token-dan': { id: 5, login: 'dan' },
+  'token-eve': { id: 6, login: 'eve' },
 };
 
-export async function fakeGitHub(init: RequestInit): Promise<Response> {
+/** The logins with a pull request merged into Krascha. */
+const MERGED: ReadonlySet<string> = new Set(['eve']);
+/** The logins whose search fails, like when GitHub rate limits it. */
+const SEARCH_FAILS: ReadonlySet<string> = new Set(['dan']);
+
+/** GitHub's /user and its search for merged pull requests, for a few known tokens. */
+export async function fakeGitHub(url: string, init: RequestInit): Promise<Response> {
   await Promise.resolve();
   const auth = new Headers(init.headers).get('authorization') ?? '';
   const user = GITHUB_USERS[auth.replace('Bearer ', '')];
-  return user === undefined
-    ? new Response('{"message":"Bad credentials"}', { status: 401 })
-    : Response.json({ ...user, email: 'hidden@example.com' });
+  if (user === undefined) {
+    return new Response('{"message":"Bad credentials"}', { status: 401 });
+  }
+  if (url.startsWith('https://api.github.com/search/issues?')) {
+    const query = new URL(url).searchParams.get('q') ?? '';
+    if (SEARCH_FAILS.has(user.login)) {
+      return new Response('{"message":"API rate limit exceeded"}', { status: 403 });
+    }
+    const merged =
+      query.includes('repo:shanep/krascha') &&
+      query.includes('is:merged') &&
+      query.includes(`author:${user.login}`) &&
+      MERGED.has(user.login);
+    return Response.json({ total_count: merged ? 1 : 0, items: [] });
+  }
+  return Response.json({ ...user, email: 'hidden@example.com' });
 }

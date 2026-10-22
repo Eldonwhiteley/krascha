@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { ACHIEVEMENTS, CROWN } from '../../src/shared/achievements.js';
+import {
+  ACHIEVEMENTS,
+  BUNK_ASSIGNED,
+  CHAMPION,
+  CROWD_FAVORITE,
+  CROWN,
+  MILES_DYSON,
+} from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
   isBoard,
@@ -59,9 +66,9 @@ function world(): World {
   let ids = 0;
   let githubCalls = 0;
   const deps: Deps = {
-    fetch: async (_url, init) => {
+    fetch: async (url, init) => {
       githubCalls += 1;
-      return fakeGitHub(init);
+      return fakeGitHub(url, init);
     },
     now: () => now,
     newId: () => {
@@ -126,6 +133,12 @@ const MEAN = { name: 'Ann', kind: 2, mean: 30, prompts: 400 };
 const KIND = { name: 'Bob', kind: 80, mean: 1, prompts: 300 };
 const MIDDLE = { name: '', kind: 5, mean: 3, prompts: 200 };
 
+/** What an entry holds without the ones the board works out when it is read. */
+function earned(achievements: readonly string[] | undefined): string[] {
+  const onRead = new Set([CROWN, CHAMPION, BUNK_ASSIGNED, CROWD_FAVORITE]);
+  return (achievements ?? []).filter((id) => !onRead.has(id));
+}
+
 describe('leaderboard worker', () => {
   it('starts with an empty board', async () => {
     const w = world();
@@ -138,6 +151,7 @@ describe('leaderboard worker', () => {
       held: {},
       ranks: {},
       crown: null,
+      champion: null,
       me: null,
     });
   });
@@ -189,7 +203,8 @@ describe('leaderboard worker', () => {
         mean: 30,
         prompts: 400,
         uploadedAt: START,
-        achievements: [],
+        // Ann is admitted to the silo alone, and the bunk alone is enough for the crown.
+        achievements: [CROWN, BUNK_ASSIGNED],
         tokensPerDay: 0,
         tools: [],
         likes: 0,
@@ -206,19 +221,20 @@ describe('leaderboard worker', () => {
       ...MEAN,
       achievements: ['meltdown', 'made-up', 'first-strike', 'meltdown'],
     });
-    // Alone on the board, Ann has the most, so the board adds the crown.
-    expect(standing.entry.achievements).toStrictEqual(['first-strike', 'meltdown', CROWN]);
+    // Alone on the board, Ann has the most and a bunk, so the board adds both.
+    const shown = ['first-strike', 'meltdown', CROWN, BUNK_ASSIGNED];
+    expect(standing.entry.achievements).toStrictEqual(shown);
     const board = await w.board();
-    expect(board.mostWanted[0]?.achievements).toStrictEqual(['first-strike', 'meltdown', CROWN]);
+    expect(board.mostWanted[0]?.achievements).toStrictEqual(shown);
     const page = await w.call('GET', '/');
     const html = await page.text();
     expect(html).toContain('<span class="trophies" role="group" aria-label="Achievements">');
     expect(html).toContain(
       '<a class="medal silver" href="/achievements#achievement-meltdown" title="Meltdown: Be mean to your AI 5 times in one day." aria-label="Meltdown: Be mean to your AI 5 times in one day.">🌋</a>',
     );
-    // With none, nobody has the most.
+    // With none earned, the bunk is still one more than nobody.
     const again = await w.upload('token-ann', MEAN);
-    expect(again.entry.achievements).toStrictEqual([]);
+    expect(again.entry.achievements).toStrictEqual([CROWN, BUNK_ASSIGNED]);
   });
 
   it('keeps the token average, shows it on the page and resets it when an upload leaves it out', async () => {
@@ -318,9 +334,12 @@ describe('leaderboard worker', () => {
       'diplomat',
       'first-strike',
       'meltdown',
+      'double-agent',
       'climate-changer',
       'token-maxxer',
       CROWN,
+      // The Copilot laptop leans mean and the Claude desktop leans nice.
+      'good-cop-bad-cop',
     ]);
     const again = await w.upload('token-ann', { ...MEAN, prompts: 500, machine: laptop });
     expect(again).toMatchObject({ machines: 2, entry: { prompts: 800, tools: ['claude'] } });
@@ -545,13 +564,15 @@ describe('leaderboard worker', () => {
     const shane = await w.upload('token-shane', MEAN);
     expect(shane.entry.achievements).toContain('resistance-leader');
     // The login is not enough, and nobody can send it in an upload.
-    expect((await w.upload('token-not-shane', claim)).entry.achievements).toStrictEqual([
+    expect(earned((await w.upload('token-not-shane', claim)).entry.achievements)).toStrictEqual([
       'first-strike',
     ]);
-    expect((await w.upload('token-ann', claim)).entry.achievements).toStrictEqual(['first-strike']);
+    expect(earned((await w.upload('token-ann', claim)).entry.achievements)).toStrictEqual([
+      'first-strike',
+    ]);
     const key = { authorization: `Key ${'k'.repeat(40)}`, 'cf-connecting-ip': '10.0.0.1' };
-    const keyed: unknown = await (await w.raw('POST', '/api/scores', key, claim)).json();
-    expect(keyed).toMatchObject({ entry: { achievements: ['first-strike'] } });
+    const keyed = (await (await w.raw('POST', '/api/scores', key, claim)).json()) as Standing;
+    expect(earned(keyed.entry.achievements)).toStrictEqual(['first-strike']);
     for (const machine of ['m', 'n']) {
       await w.upload('token-bob', { ...claim, machine: machine.repeat(43) });
     }
@@ -569,7 +590,7 @@ describe('leaderboard worker', () => {
     const migration = new URL('../migrations/0008_resistance_leader.sql', import.meta.url);
     await w.sql(readFileSync(migration, 'utf8'));
     await w.sql(readFileSync(migration, 'utf8'));
-    expect((await w.board(shane.entry.id)).me?.entry.achievements).toStrictEqual([
+    expect(earned((await w.board(shane.entry.id)).me?.entry.achievements)).toStrictEqual([
       'first-strike',
       'resistance-leader',
     ]);
@@ -583,7 +604,10 @@ describe('leaderboard worker', () => {
         .filter((entry) => (entry.achievements ?? []).includes(CROWN))
         .map((entry) => entry.name);
     };
-    const ann = await w.upload('token-ann', { ...MEAN, achievements: ['first-strike', 'meltdown'] });
+    const ann = await w.upload('token-ann', {
+      ...MEAN,
+      achievements: ['first-strike', 'meltdown'],
+    });
     expect(ann.entry.achievements).toContain(CROWN);
     // A tie leaves it where it is.
     const tie = await w.upload('token-bob', { ...KIND, achievements: ['manners', 'charm'] });
@@ -592,9 +616,10 @@ describe('leaderboard worker', () => {
     // Nobody can send it in an upload.
     const claim = { ...KIND, name: 'Cat', achievements: [CROWN, 'manners'] };
     expect((await w.upload('token-cat', claim)).entry.achievements).toStrictEqual(['manners']);
+    // Ann's bunk counts, so Bob needs 4 to pass her 3.
     const passed = await w.upload('token-bob', {
       ...KIND,
-      achievements: ['manners', 'charm', 'saint'],
+      achievements: ['manners', 'charm', 'saint', 'diplomat'],
     });
     expect(passed.entry.achievements).toContain(CROWN);
     expect(await holders()).toStrictEqual(['Bob']);
@@ -613,15 +638,127 @@ describe('leaderboard worker', () => {
     const page = await (await w.call('GET', '/achievements')).text();
     const crown = page.slice(page.indexOf(`id="achievement-${CROWN}"`));
     expect(crown.slice(0, crown.indexOf('</div>'))).toContain(
-      '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 3 achievements.</span></dd>',
+      '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 4 achievements.</span></dd>',
     );
   });
 
   it('counts Leader of the human resistance toward Most decorated', async () => {
     const w = world();
     await w.upload('token-ann', { ...MEAN, achievements: ['first-strike'] });
-    const shane = await w.upload('token-shane', { ...KIND, achievements: ['manners'] });
-    expect(shane.entry.achievements).toStrictEqual(['manners', 'resistance-leader', CROWN]);
+    // Ann has first strike and a bunk, so shanep needs 3 to pass her.
+    const shane = await w.upload('token-shane', { ...KIND, achievements: ['manners', 'charm'] });
+    expect(shane.entry.achievements).toStrictEqual([
+      'manners',
+      'charm',
+      'resistance-leader',
+      CROWN,
+    ]);
+  });
+
+  it('gives Miles Dyson to a GitHub account with a pull request merged into Krascha', async () => {
+    const w = world();
+    const eve = await w.upload('token-eve', { ...KIND, name: 'Eve' });
+    expect(eve.entry.achievements).toContain(MILES_DYSON);
+    // Nobody can send it, and a key has no GitHub account to look up.
+    const claim = { ...KIND, achievements: [MILES_DYSON, 'manners'] };
+    expect(earned((await w.upload('token-ann', claim)).entry.achievements)).toStrictEqual([
+      'manners',
+    ]);
+    const key = { authorization: `Key ${'k'.repeat(40)}`, 'cf-connecting-ip': '10.0.0.1' };
+    const keyed = (await (await w.raw('POST', '/api/scores', key, claim)).json()) as Standing;
+    expect(earned(keyed.entry.achievements)).toStrictEqual(['manners']);
+    // When the search fails, an entry keeps what it had, since a merge does not come undone.
+    const dan = await w.upload('token-dan', { ...KIND, name: 'Dan' });
+    expect(dan.entry.achievements).not.toContain(MILES_DYSON);
+    await w.sql(`UPDATE scores SET achievements = '${MILES_DYSON}' WHERE owner = 'github:5'`);
+    expect((await w.upload('token-dan', { ...KIND, name: 'Dan' })).entry.achievements).toContain(
+      MILES_DYSON,
+    );
+    expect((await w.board()).held).toMatchObject({ [MILES_DYSON]: 2 });
+  });
+
+  it('makes anyone with 10 likes a crowd favorite', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', MEAN);
+    const bob = await w.upload('token-bob', KIND);
+    await w.sql(`UPDATE scores SET likes = 10 WHERE entry_id = '${ann.entry.id}'`);
+    await w.sql(`UPDATE scores SET likes = 9 WHERE entry_id = '${bob.entry.id}'`);
+    const board = await w.board(bob.entry.id);
+    expect(board.mostWanted[0]?.achievements).toContain(CROWD_FAVORITE);
+    expect(board.pets[0]?.achievements).not.toContain(CROWD_FAVORITE);
+    expect(board.me?.entry.achievements).not.toContain(CROWD_FAVORITE);
+    expect(board.held).toMatchObject({ [CROWD_FAVORITE]: 1 });
+  });
+
+  it("gives People's champion to the most liked, and moves it only when someone passes", async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', MEAN);
+    const bob = await w.upload('token-bob', KIND);
+    const likes = async (entry: string, count: number): Promise<void> => {
+      await w.sql(`UPDATE scores SET likes = ${String(count)} WHERE entry_id = '${entry}'`);
+    };
+    // Nobody has any likes yet.
+    expect((await w.board()).champion).toBeNull();
+    await likes(ann.entry.id, 2);
+    await likes(bob.entry.id, 2);
+    // A tie on the first read goes to the earliest upload, and later ties leave it there.
+    expect((await w.board()).champion?.name).toBe('Ann');
+    await likes(bob.entry.id, 3);
+    expect((await w.board()).champion?.name).toBe('Bob');
+    await likes(ann.entry.id, 3);
+    const board = await w.board();
+    expect(board.champion?.name).toBe('Bob');
+    expect(board.pets[0]?.achievements).toContain(CHAMPION);
+    expect(board.mostWanted[0]?.achievements).not.toContain(CHAMPION);
+    expect(board.held).toMatchObject({ [CHAMPION]: 1 });
+    // Nobody can send it in an upload.
+    const claim = { ...MEAN, achievements: [CHAMPION] };
+    expect((await w.upload('token-ann', claim)).entry.achievements).not.toContain(CHAMPION);
+    const page = await (await w.call('GET', '/achievements')).text();
+    const champion = page.slice(page.indexOf(`id="achievement-${CHAMPION}"`));
+    expect(champion.slice(0, champion.indexOf('</div>'))).toContain(
+      '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 3 likes.</span></dd>',
+    );
+  });
+
+  it('gives Bunk assigned to the admitted among the best 10 for the bunks', async () => {
+    const w = world();
+    // Bob says please too often, so the silo puts him under review instead.
+    const bob = await w.upload('token-bob', KIND);
+    expect(bob.entry.achievements).not.toContain(BUNK_ASSIGNED);
+    const keyed: Standing[] = [];
+    for (const [index, letter] of [...'abcdefghijk'].entries()) {
+      w.setNow(START + index);
+      const key = {
+        authorization: `Key ${letter.repeat(40)}`,
+        'cf-connecting-ip': `10.0.0.${String(index)}`,
+      };
+      keyed.push((await (await w.raw('POST', '/api/scores', key, MEAN)).json()) as Standing);
+    }
+    // Eleven tie, so the 10 who uploaded first get the bunks.
+    const board = await w.board();
+    expect(board.held).toMatchObject({ [BUNK_ASSIGNED]: 10 });
+    expect((await w.board(keyed[0]?.entry.id ?? '')).me?.entry.achievements).toContain(
+      BUNK_ASSIGNED,
+    );
+    expect((await w.board(keyed[10]?.entry.id ?? '')).me?.entry.achievements).not.toContain(
+      BUNK_ASSIGNED,
+    );
+  });
+
+  it('hands Good cop, bad cop to entries already on the board', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, machine: 'l'.repeat(43) });
+    const both = await w.upload('token-ann', { ...KIND, name: 'Ann', machine: 'd'.repeat(43) });
+    expect(both.entry.achievements).toContain('good-cop-bad-cop');
+    await w.upload('token-bob', { ...KIND, machine: 'b'.repeat(43) });
+    await w.sql("UPDATE scores SET achievements = ''");
+    const migration = new URL('../migrations/0010_good_cop_bad_cop.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    const board = await w.board(both.entry.id);
+    expect(earned(board.me?.entry.achievements)).toStrictEqual(['good-cop-bad-cop']);
+    expect(board.held).toMatchObject({ 'good-cop-bad-cop': 1 });
   });
 
   it('moves Most decorated to whoever has the most when the holder leaves the board', async () => {
@@ -674,6 +811,7 @@ describe('leaderboard worker', () => {
       meltdown: 1,
       manners: 1,
       [CROWN]: 1,
+      [BUNK_ASSIGNED]: 1,
     });
     const page = await (await w.call('GET', '/achievements')).text();
     expect(page).toContain('2 of 2 hold it (100%)');
@@ -752,8 +890,8 @@ describe('leaderboard worker', () => {
       expect(lists).toContain(`href="/achievements#achievement-${id}"`);
       expect(achievements).toContain(`id="achievement-${id}"`);
     }
-    // Three earned and Ann's crown.
-    expect(lists.split('<a class="medal ')).toHaveLength(5);
+    // Three earned, and Ann's crown and bunk.
+    expect(lists.split('<a class="medal ')).toHaveLength(6);
     // Each medal is its own link, so none hide inside one big image for screen readers.
     expect(lists).not.toContain('class="trophies" role="img"');
     expect(page).toContain('.badge:target {');

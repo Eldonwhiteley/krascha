@@ -4,7 +4,18 @@
 // Cloudflare type package.
 
 import type { MachineCounts } from '../../src/shared/achievements.js';
-import { accountIds, combinedIds, CROWN, knownIds } from '../../src/shared/achievements.js';
+import {
+  accountIds,
+  BUNK_ASSIGNED,
+  CHAMPION,
+  combinedIds,
+  CROWD_FAVORITE,
+  CROWD_FAVORITE_LIKES,
+  CROWN,
+  knownIds,
+  machineIds,
+  MILES_DYSON,
+} from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
   ANONYMOUS,
@@ -38,6 +49,11 @@ export interface Owner {
   readonly verified: boolean;
   /** The GitHub login when GitHub vouched for it, kept for a link to the account. */
   readonly github: string | null;
+  /**
+   * True when GitHub lists a pull request of theirs merged into Krascha, and
+   * null when GitHub could not say. Missing for a key.
+   */
+  readonly contributor?: boolean | null;
 }
 
 const COLUMNS =
@@ -180,7 +196,7 @@ async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   return { entry, place, siloPlace };
 }
 
-/** Everyone on the board, for the crown and the holder counts. */
+/** Everyone on the board, for the awards and the holder counts. */
 async function listed(database: D1Database): Promise<BoardEntry[]> {
   const { results } = await database.prepare(`SELECT ${COLUMNS} FROM scores WHERE ${LISTED}`).all();
   return results.map((row) => entryOf(row));
@@ -192,48 +208,106 @@ function decorations(entry: BoardEntry): number {
 }
 
 /**
- * The listed entry with the most achievements, who holds the crown, or null
- * when nobody has any. A tie leaves it with the holder, so it moves only to
- * someone with more. When the holder has left the board it goes to whoever
+ * The listed entry with the most of `measure`, who holds the crown `id`, or
+ * null when nobody has any. A tie leaves it with the holder, so it moves only
+ * to someone with more. When the holder has left the board it goes to whoever
  * has the most, the earliest upload first.
  */
 async function crownHolder(
   database: D1Database,
+  id: string,
   everyone: readonly BoardEntry[],
+  measure: (entry: BoardEntry) => number,
 ): Promise<BoardEntry | null> {
-  const top = everyone.reduce((best, entry) => Math.max(best, decorations(entry)), 0);
-  const stored = await database.prepare('SELECT entry FROM crown WHERE id = ?').bind(CROWN).first();
+  const top = everyone.reduce((best, entry) => Math.max(best, measure(entry)), 0);
+  const stored = await database.prepare('SELECT entry FROM crown WHERE id = ?').bind(id).first();
   const was = stored === null ? null : text(stored, 'entry');
-  const leaders = everyone.filter((entry) => top > 0 && decorations(entry) === top);
+  const leaders = everyone.filter((entry) => top > 0 && measure(entry) === top);
   const holder =
     leaders.find((entry) => entry.id === was) ??
     leaders.toSorted((a, b) => a.uploadedAt - b.uploadedAt)[0] ??
     null;
   if (holder === null && was !== null) {
-    await database.prepare('DELETE FROM crown WHERE id = ?').bind(CROWN).run();
+    await database.prepare('DELETE FROM crown WHERE id = ?').bind(id).run();
   } else if (holder !== null && holder.id !== was) {
     await database
       .prepare(
         'INSERT INTO crown (id, entry) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET entry = excluded.entry',
       )
-      .bind(CROWN, holder.id)
+      .bind(id, holder.id)
       .run();
   }
-  return holder === null ? null : crowned(holder, holder.id);
+  return holder;
 }
 
-/** The entry with the crown added when it is the holder's. */
-function crowned(entry: BoardEntry, holder: string | undefined): BoardEntry {
-  return entry.id === holder
-    ? { ...entry, achievements: knownIds([...(entry.achievements ?? []), CROWN]) }
-    : entry;
+/** What the board hands out when it is read, since likes and places move without an upload. */
+interface Awards {
+  /** The entries with a bunk. */
+  readonly bunks: ReadonlySet<string>;
+  readonly champion: string | undefined;
+  readonly decorated: string | undefined;
+}
+
+/** The entry with what the board hands out on read added. */
+function awarded(entry: BoardEntry, awards: Awards): BoardEntry {
+  const extra = [
+    ...((entry.likes ?? 0) >= CROWD_FAVORITE_LIKES ? [CROWD_FAVORITE] : []),
+    ...(awards.bunks.has(entry.id) ? [BUNK_ASSIGNED] : []),
+    ...(entry.id === awards.champion ? [CHAMPION] : []),
+    ...(entry.id === awards.decorated ? [CROWN] : []),
+  ];
+  return extra.length === 0
+    ? entry
+    : { ...entry, achievements: knownIds([...(entry.achievements ?? []), ...extra]) };
+}
+
+/**
+ * The admitted among the best BOARD_SIZE for the bunks, in the same order as
+ * the bunks list. Probation and review do not get a bunk.
+ */
+function bunked(everyone: readonly BoardEntry[]): Set<string> {
+  const best = everyone
+    .map((entry) => ({ entry, silo: scoreApplicant('', entry) }))
+    .toSorted((a, b) => b.silo.total - a.silo.total || a.entry.uploadedAt - b.entry.uploadedAt)
+    .slice(0, BOARD_SIZE);
+  return new Set(
+    best.filter(({ silo }) => silo.status === 'admitted').map(({ entry }) => entry.id),
+  );
+}
+
+interface Awarded {
+  readonly awards: Awards;
+  readonly champion: BoardEntry | null;
+  readonly crown: BoardEntry | null;
+}
+
+/**
+ * Works out who gets what on read. The likes crown goes first, so it counts
+ * toward Most decorated along with the rest.
+ */
+async function awardsFor(database: D1Database, everyone: readonly BoardEntry[]): Promise<Awarded> {
+  const bunks = bunked(everyone);
+  const champion = await crownHolder(database, CHAMPION, everyone, (entry) => entry.likes ?? 0);
+  const before: Awards = { bunks, champion: champion?.id, decorated: undefined };
+  const crown = await crownHolder(
+    database,
+    CROWN,
+    everyone.map((entry) => awarded(entry, before)),
+    decorations,
+  );
+  const awards: Awards = { ...before, decorated: crown?.id };
+  return {
+    awards,
+    champion: champion === null ? null : awarded(champion, awards),
+    crown: crown === null ? null : awarded(crown, awards),
+  };
 }
 
 /** How many listed entries hold each achievement, by id. */
-function held(everyone: readonly BoardEntry[], holder: BoardEntry | null): Record<string, number> {
+function held(everyone: readonly BoardEntry[], awards: Awards): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const entry of everyone) {
-    for (const id of crowned(entry, holder?.id).achievements ?? []) {
+    for (const id of awarded(entry, awards).achievements ?? []) {
       counts[id] = (counts[id] ?? 0) + 1;
     }
   }
@@ -262,24 +336,25 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     listed(database),
     ranked(database),
   ]);
-  const holder = await crownHolder(database, everyone);
-  const crown = (entries: readonly BoardEntry[]): BoardEntry[] =>
-    entries.map((entry) => crowned(entry, holder?.id));
+  const { awards, champion, crown } = await awardsFor(database, everyone);
+  const award = (entries: readonly BoardEntry[]): BoardEntry[] =>
+    entries.map((entry) => awarded(entry, awards));
   const mine =
     me === null
       ? null
       : await database.prepare(`SELECT ${COLUMNS} FROM scores WHERE entry_id = ?`).bind(me).first();
   const standing = mine === null ? null : await standingOf(database, mine);
   return {
-    mostWanted: crown(mostWanted),
-    pets: crown(pets),
-    bunks: crown(bunks),
-    warmers: crown(warmers),
+    mostWanted: award(mostWanted),
+    pets: award(pets),
+    bunks: award(bunks),
+    warmers: award(warmers),
     total: count,
-    held: held(everyone, holder),
+    held: held(everyone, awards),
     ranks,
-    crown: holder,
-    me: standing === null ? null : { ...standing, entry: crowned(standing.entry, holder?.id) },
+    crown,
+    champion,
+    me: standing === null ? null : { ...standing, entry: awarded(standing.entry, awards) },
   };
 }
 
@@ -387,11 +462,21 @@ async function saveMachine(
   return results.map((row) => machineOf(row));
 }
 
+/**
+ * Whether the owner has a pull request merged into Krascha. When GitHub could
+ * not say, the entry keeps what it had, since a merge does not come undone.
+ */
+function contributed(owner: Owner, found: Row | null): boolean {
+  return owner.contributor === null
+    ? found !== null && text(found, 'achievements').split(',').includes(MILES_DYSON)
+    : owner.contributor === true;
+}
+
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
   const { owner, upload, now, newId } = save;
   const day = utcDay(now);
   const found = await database
-    .prepare('SELECT entry_id, upload_day, uploads_today FROM scores WHERE owner = ?')
+    .prepare('SELECT entry_id, upload_day, uploads_today, achievements FROM scores WHERE owner = ?')
     .bind(owner.id)
     .first();
   const sameDay = found !== null && text(found, 'upload_day') === day;
@@ -434,7 +519,12 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       now,
       day,
       uploadsToday + 1,
-      knownIds([...combinedIds(machines), ...accountIds(githubIdOf(owner))]).join(','),
+      knownIds([
+        ...combinedIds(machines),
+        ...accountIds(githubIdOf(owner)),
+        ...machineIds(machines),
+        ...(contributed(owner, found) ? [MILES_DYSON] : []),
+      ]).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),
       tools.join(','),
@@ -449,12 +539,12 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     throw new Error('the saved score could not be read back');
   }
   const standing = await standingOf(database, row);
-  const holder = await crownHolder(database, await listed(database));
+  const { awards } = await awardsFor(database, await listed(database));
   return {
     ok: true,
     standing: {
       ...standing,
-      entry: crowned(standing.entry, holder?.id),
+      entry: awarded(standing.entry, awards),
       machines: machines.length,
     },
   };
@@ -483,7 +573,10 @@ export async function likeEntry(database: D1Database, like: Like): Promise<numbe
   }
   const likes = number_(found, 'likes');
   await database.prepare('DELETE FROM likes WHERE day <> ?').bind(like.day).run();
-  const seen = await database.prepare('SELECT day FROM likes WHERE liker = ?').bind(like.liker).first();
+  const seen = await database
+    .prepare('SELECT day FROM likes WHERE liker = ?')
+    .bind(like.liker)
+    .first();
   if (seen !== null) {
     return likes;
   }

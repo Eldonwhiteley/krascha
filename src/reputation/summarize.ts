@@ -13,6 +13,8 @@ import type { ReputationIndex } from './store.js';
 
 export const TOP_TERMS = 10;
 export const RECENT_HITS = 50;
+/** The hour late night ends, so midnight to 5 a.m. counts. */
+const LATE_NIGHT_ENDS = 5;
 
 type SessionRow = ReputationSummary['bySession'][number];
 
@@ -105,10 +107,15 @@ export function summarize(
   const days = new Map<string, Tally>();
   const sessions = new Map<string, Tally>();
   const tools = new Set<ToolId>();
+  const clock = { lateNight: 0, selfAware: 0, mixed: 0 };
   for (const [id, prompt] of index.prompts) {
     tools.add(toolOf(id));
     const target = index.hits.get(id)?.target;
     const kind = index.kind.has(id);
+    const typed = new Date(prompt.at);
+    clock.lateNight += typed.getHours() < LATE_NIGHT_ENDS ? 1 : 0;
+    clock.selfAware += typed.getHours() === 2 && typed.getMinutes() === 14 ? 1 : 0;
+    clock.mixed += kind && target === 'agent' ? 1 : 0;
     for (const tally of [
       total,
       tallyFor(days, dayOf(prompt.at)),
@@ -135,5 +142,6 @@ export function summarize(
     tokensPerDay,
     hours: hoursSpent([...index.prompts.values()].map((prompt) => prompt.at)),
     tools: knownTools([...tools]),
+    ...clock,
   };
 }

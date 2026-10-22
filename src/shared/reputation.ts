@@ -68,4 +68,10 @@ export interface ReputationSummary extends ReputationTally {
   readonly hours: number;
   /** The agents you typed any prompt into, in TOOLS order. */
   readonly tools: readonly ToolId[];
+  /** Prompts typed between midnight and 5 a.m., your time. */
+  readonly lateNight: number;
+  /** Prompts typed at 2:14 a.m., your time, the minute Skynet became self-aware. */
+  readonly selfAware: number;
+  /** Prompts both kind and mean to the agent, like "please fix this, idiot". */
+  readonly mixed: number;
 }

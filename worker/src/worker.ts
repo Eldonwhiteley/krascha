@@ -4,7 +4,8 @@
 // and removals at /api/scores and likes at /api/likes. An upload proves who it
 // belongs to one of two ways. A GitHub token is checked once with GitHub and
 // then dropped, never stored or logged, and its entry shows as verified and
-// links to the account, so only the user id and login are kept. A key the CLI
+// links to the account, so only the user id and login are kept. The same
+// check asks GitHub whether they got a pull request merged into Krascha. A key the CLI
 // made up is stored only as a hash, so it ties uploads together without saying
 // who anyone is.
 
@@ -30,6 +31,9 @@ import { likeEntry, readBoard, removeScore, saveScore, utcDay } from './store.js
 export interface Env {
   readonly DB: D1Database;
 }
+
+/** Where a merged pull request earns Miles Dyson. */
+const REPO = 'shanep/krascha';
 
 /** What the handler needs from the outside, so tests can stand in for GitHub and the clock. */
 export interface Deps {
@@ -69,18 +73,46 @@ function githubUserOf(user: unknown): { readonly id: number; readonly login: str
     : null;
 }
 
+function githubHeaders(token: string): Record<string, string> {
+  return {
+    authorization: `Bearer ${token}`,
+    accept: 'application/vnd.github+json',
+    'user-agent': 'krascha',
+  };
+}
+
+/**
+ * Whether GitHub lists a pull request by this login merged into Krascha, or
+ * null when the search fails. The login comes from the same token, so it is
+ * the account's own.
+ */
+async function mergedPull(token: string, login: string, deps: Deps): Promise<boolean | null> {
+  const query = encodeURIComponent(`repo:${REPO} is:pr is:merged author:${login}`);
+  const response = await deps.fetch(`https://api.github.com/search/issues?q=${query}&per_page=1`, {
+    headers: githubHeaders(token),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const found: unknown = await response.json();
+  const total: unknown =
+    typeof found === 'object' && found !== null ? Reflect.get(found, 'total_count') : undefined;
+  return typeof total === 'number' ? total > 0 : null;
+}
+
 async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
   const response = await deps.fetch('https://api.github.com/user', {
-    headers: {
-      authorization: `Bearer ${token}`,
-      accept: 'application/vnd.github+json',
-      'user-agent': 'krascha',
-    },
+    headers: githubHeaders(token),
   });
   const user = response.ok ? githubUserOf(await response.json()) : null;
   return user === null
     ? null
-    : { id: `github:${String(user.id)}`, verified: true, github: user.login };
+    : {
+        id: `github:${String(user.id)}`,
+        verified: true,
+        github: user.login,
+        contributor: await mergedPull(token, user.login, deps),
+      };
 }
 
 /**

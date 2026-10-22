@@ -76,12 +76,24 @@ If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
 gets a check mark, your name links to your GitHub account and only you can
 change it. The server keeps your GitHub user id and login and drops the token.
-Two achievements come from the board itself, so the report does not list
-them. Leader of the human resistance goes only to Shane's GitHub account, and
-Most decorated goes to whoever on the board has the most achievements. It
-moves when someone passes them, and a tie leaves it where it is.
+While it has the token, it also asks GitHub whether you got a pull request
+merged into Krascha.
 To keep your name unlinked, upload with `--no-gh`, and run `remove` first if
 you are already on the board with GitHub.
+
+Some achievements come from the board itself, so the report does not list
+them:
+
+- Leader of the human resistance goes only to Shane's GitHub account.
+- Miles Dyson goes to anyone with a pull request merged into Krascha, on their
+  next upload with gh.
+- Good cop, bad cop goes to anyone with one machine that leans nice and one
+  that leans mean.
+- Crowd favorite takes 10 likes.
+- Bunk assigned goes to the admitted among the best 10 for the Silo 7 bunks.
+- Most decorated goes to whoever has the most achievements, and People's
+  champion to whoever has the most likes. Each moves when someone passes the
+  holder, and a tie leaves it where it is.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you
@@ -91,9 +103,10 @@ nobody floods the board.
 ### More than one machine
 
 Run `upload` on each machine and the board adds them up into one entry. The
-counts and the tokens a day are summed and the achievements are worked out
-from the totals, except the ones about a single day or session, which count if
-either machine earned them. Each upload replaces only that machine's last one.
+counts and the tokens a day are summed, the tools are combined, and the
+achievements are worked out from the totals, except the ones about a single
+day, session or prompt, which count if either machine earned them. Each
+upload replaces only that machine's last one.
 With gh, sign in to the same GitHub account on both. Without gh, copy
 `~/.krascha/leaderboard.json` to the second machine so they share the key. Do
 not also `import` one machine's counts into the other, or the board counts

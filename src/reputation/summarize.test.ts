@@ -74,7 +74,35 @@ describe('summarize', () => {
       tokensPerDay: 0,
       hours: 0,
       tools: [],
+      lateNight: 0,
+      selfAware: 0,
+      mixed: 0,
     });
+  });
+
+  it('counts prompts typed late at night, at 2:14 a.m. and both kind and mean', () => {
+    const index = emptyIndex();
+    const at = (hours: number, minutes: number): number =>
+      new Date(2026, 7, 29, hours, minutes).getTime();
+    put(index, 'claude:a', { sessionId: 's1', at: at(0, 0) });
+    put(index, 'claude:b', { sessionId: 's1', at: at(2, 14) }, { kind: ['please'] });
+    put(
+      index,
+      'claude:c',
+      { sessionId: 's1', at: at(4, 59) },
+      { kind: ['please'], mean: hit('agent', 'idiot') },
+    );
+    put(
+      index,
+      'claude:d',
+      { sessionId: 's1', at: at(5, 0) },
+      { kind: ['thanks'], mean: hit('general', 'damn') },
+    );
+    put(index, 'claude:e', { sessionId: 's1', at: at(14, 14) }, { mean: hit('agent', 'idiot') });
+    const summary = summarize(index, title, 0);
+    expect(summary.lateNight).toBe(3);
+    expect(summary.selfAware).toBe(1);
+    expect(summary.mixed).toBe(1);
   });
 
   it('totals kind, mean and general prompts by day and by session', () => {

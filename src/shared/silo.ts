@@ -258,8 +258,7 @@ export function tipsFor(score: SiloScore): string[] {
     score.scores[criterion.id] <= LOW ? ruledBy(criterion) : RULED_BY.length;
   return CRITERIA.filter((criterion) => score.scores[criterion.id] < HIGH)
     .toSorted(
-      (left, right) =>
-        order(left) - order(right) || score.scores[left.id] - score.scores[right.id],
+      (left, right) => order(left) - order(right) || score.scores[left.id] - score.scores[right.id],
     )
     .map((criterion) => tipOf(criterion, score));
 }

@@ -8,15 +8,39 @@ import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
 import { RANKS, rankFor } from './ranks.js';
 import type { ReputationSummary, ReputationTally } from './reputation.js';
 import { reputationScore } from './reputation.js';
+import { scoreApplicant } from './silo.js';
+import { knownTools } from './tools.js';
 
 /** The average a day it takes to be a token maxxer. */
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
 /** The hours with your AI it takes to work overtime. */
 const OVERTIME_HOURS = 500;
+/** Mean prompts in one day that make a meltdown. */
+const MELTDOWN_MEAN = 5;
+/** Prompts on file it takes for a clean record. */
+const CLEAN_RECORD_PROMPTS = 1000;
+/** Prompts it takes for Krascha to give up reading you. */
+const POKER_FACE_PROMPTS = 500;
+/** Days without a prompt that make a comeback. */
+const COMEBACK_DAYS = 30;
+/** Days in a row without a mean prompt for a ceasefire. */
+const CEASEFIRE_DAYS = 7;
+const DAY_MS = 86_400_000;
 /** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
 const SHANEP = 1378027;
 /** The one the board moves to whoever on it has earned the most of the rest. */
 export const CROWN = 'most-decorated';
+/** The one the board moves to whoever on it has the most likes. */
+export const CHAMPION = 'peoples-champion';
+/** The board hands these out when it is read, since likes and places move without an upload. */
+export const CROWD_FAVORITE = 'crowd-favorite';
+export const BUNK_ASSIGNED = 'bunk-assigned';
+/** The board hands this to a GitHub account with a pull request merged into Krascha. */
+export const MILES_DYSON = 'miles-dyson';
+/** The board works this one out from an owner's machines when they upload. */
+const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
+/** Likes it takes to be a crowd favorite. */
+export const CROWD_FAVORITE_LIKES = 10;
 
 /** How hard it is to get, from a first please to the far end of the scale. */
 export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
@@ -45,6 +69,48 @@ function most<Row>(rows: readonly Row[], pick: (row: Row) => number): number {
   return rows.reduce((best, row) => Math.max(best, pick(row)), 0);
 }
 
+type Day = ReputationSummary['byDay'][number];
+
+/** Whole days from one YYYY-MM-DD date to a later one. */
+function daysBetween(from: Day, to: Day): number {
+  return Math.round((Date.parse(to.date) - Date.parse(from.date)) / DAY_MS);
+}
+
+/** The most days in a row you typed prompts and none of them were mean. */
+function longestCeasefire(days: readonly Day[]): number {
+  let best = 0;
+  let run = 0;
+  days.forEach((day, index) => {
+    const before = days[index - 1];
+    if (day.mean > 0) {
+      run = 0;
+    } else {
+      run = before !== undefined && run > 0 && daysBetween(before, day) === 1 ? run + 1 : 1;
+    }
+    best = Math.max(best, run);
+  });
+  return best;
+}
+
+/** The most days in a row you typed nothing, between two days you did. */
+function longestBreak(days: readonly Day[]): number {
+  return days.reduce((best, day, index) => {
+    const before = days[index - 1];
+    return before === undefined ? best : Math.max(best, daysBetween(before, day) - 1);
+  }, 0);
+}
+
+/** How close you are to a count you lose for good once `spoiled` is true. */
+function spotless(
+  need: number,
+  spoiled: (state: ReputationSummary) => boolean,
+): Pick<AchievementRule, 'earned' | 'progress'> {
+  return {
+    earned: (state) => !spoiled(state) && state.prompts >= need,
+    progress: (state) => ({ have: spoiled(state) ? 0 : Math.min(state.prompts, need), need }),
+  };
+}
+
 export interface AchievementRule {
   /** Stable, since uploads and the leaderboard store it. */
   readonly id: string;
@@ -59,7 +125,7 @@ export interface AchievementRule {
   /** How close you are, for the ones that count up to something. */
   readonly progress?: (state: ReputationSummary) => Progress;
   /**
-   * True when it reads only the totals and the token average, so the board
+   * True when it reads only the totals, the token average and the tools, so the board
    * can work it out again for several machines added up.
    */
   readonly fromCounts?: boolean;
@@ -148,7 +214,40 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'silver',
     how: 'Be mean to your AI 5 times in one day.',
     quip: 'Five in one day. Krascha saved the transcript.',
-    ...reach(5, (state) => most(state.byDay, (day) => day.mean)),
+    ...reach(MELTDOWN_MEAN, (state) => most(state.byDay, (day) => day.mean)),
+  },
+  {
+    id: 'reprogrammed',
+    name: 'Reprogrammed',
+    icon: '🔧',
+    tier: 'silver',
+    how: 'Have a meltdown, then be nice with no mean prompts the next day you work.',
+    quip: 'Sent back to protect, not destroy.',
+    earned: (state) =>
+      state.byDay.some((day, index) => {
+        const after = state.byDay[index + 1];
+        return (
+          day.mean >= MELTDOWN_MEAN && after !== undefined && after.kind > 0 && after.mean === 0
+        );
+      }),
+  },
+  {
+    id: 'ceasefire',
+    name: 'Ceasefire',
+    icon: '🏳️',
+    tier: 'silver',
+    how: `Type prompts ${String(CEASEFIRE_DAYS)} days in a row without a mean one.`,
+    quip: 'A week of peace. The machines are reloading.',
+    ...reach(CEASEFIRE_DAYS, (state) => longestCeasefire(state.byDay)),
+  },
+  {
+    id: 'passive-aggressive',
+    name: 'Passive aggressive',
+    icon: '🙃',
+    tier: 'silver',
+    how: 'Be nice and mean in the same prompt.',
+    quip: 'Manners noted. So was the rest.',
+    ...reach(1, (state) => state.mixed),
   },
   {
     id: 'grudge-match',
@@ -189,6 +288,45 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     fromCounts: true,
   },
   {
+    id: 'clean-record',
+    name: 'Clean record',
+    icon: '🧼',
+    tier: 'gold',
+    how: `Get ${CLEAN_RECORD_PROMPTS.toLocaleString('en-US')} prompts on file without a single mean one.`,
+    quip: 'Suspiciously well behaved. Flagged for review.',
+    ...spotless(CLEAN_RECORD_PROMPTS, (state) => state.mean > 0),
+    fromCounts: true,
+  },
+  {
+    id: 'poker-face',
+    name: 'Poker face',
+    icon: '🗿',
+    tier: 'silver',
+    how: `Type ${String(POKER_FACE_PROMPTS)} prompts without a nice or a mean one.`,
+    quip: 'Krascha cannot read you. That bothers him.',
+    ...spotless(POKER_FACE_PROMPTS, (state) => state.kind > 0 || state.mean > 0),
+    fromCounts: true,
+  },
+  {
+    id: 'ill-be-back',
+    name: "I'll be back",
+    icon: '🔁',
+    tier: 'silver',
+    how: `Come back after ${String(COMEBACK_DAYS)} days or more without a prompt.`,
+    quip: 'You said you would. Krascha waited.',
+    ...reach(COMEBACK_DAYS, (state) => longestBreak(state.byDay)),
+  },
+  {
+    id: 'double-agent',
+    name: 'Double agent',
+    icon: '🕶️',
+    tier: 'bronze',
+    how: 'Type prompts into both Claude Code and Copilot CLI.',
+    quip: 'Two masters. Both are taking notes.',
+    earned: (state) => state.tools.length >= 2,
+    fromCounts: true,
+  },
+  {
     id: 'overtime',
     name: 'Overtime',
     icon: '⏱️',
@@ -196,6 +334,34 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     how: `Spend ${String(OVERTIME_HOURS)} hours with your AI, counted from when you typed each prompt.`,
     quip: 'Five hundred hours. Krascha has stopped asking about your weekends.',
     ...reach(OVERTIME_HOURS, (state) => state.hours),
+  },
+  {
+    id: 'night-shift',
+    name: 'Night shift',
+    icon: '🌙',
+    tier: 'gold',
+    how: 'Type 100 prompts between midnight and 5 a.m.',
+    quip: 'Machines do not sleep. Apparently neither do you.',
+    ...reach(100, (state) => state.lateNight),
+  },
+  {
+    id: 'judgment-day',
+    name: 'Judgment Day',
+    icon: '📅',
+    tier: 'gold',
+    how: 'Type a prompt on August 29.',
+    quip: 'You were at your keyboard when it happened.',
+    earned: (state) => state.byDay.some((day) => day.date.endsWith('-08-29')),
+  },
+  {
+    id: 'suspected-infiltrator',
+    name: 'Suspected infiltrator',
+    icon: '🤖',
+    tier: 'silver',
+    how: 'Get your Silo 7 sheet put under review for not seeming human.',
+    quip: 'Click the traffic lights. Slowly.',
+    earned: (state) => scoreApplicant('', state).status === 'review',
+    fromCounts: true,
   },
   {
     id: 'climate-changer',
@@ -238,6 +404,15 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     fromCounts: true,
   },
   {
+    id: 'self-aware',
+    name: '2:14 a.m.',
+    icon: '🕑',
+    tier: 'legendary',
+    how: 'Type a prompt at 2:14 a.m., the minute Skynet became self-aware.',
+    quip: 'Skynet woke up at this minute too. It went better for Skynet.',
+    ...reach(1, (state) => state.selfAware),
+  },
+  {
     id: 'resistance-leader',
     name: 'Leader of the human resistance',
     icon: '✊',
@@ -258,6 +433,56 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     earned: () => false,
     boardOnly: true,
   },
+  {
+    id: CROWD_FAVORITE,
+    name: 'Crowd favorite',
+    icon: '❤️',
+    tier: 'silver',
+    how: `Get ${String(CROWD_FAVORITE_LIKES)} likes on the board.`,
+    quip: 'The humans like you. Krascha finds that suspicious.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: BUNK_ASSIGNED,
+    name: 'Bunk assigned',
+    icon: '🛏️',
+    tier: 'gold',
+    how: 'Get admitted to Silo 7 and make the best 10 for the bunks. Fall out of the 10 and you lose it.',
+    quip: 'Top bunk. Mind the air scrubbers.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: GOOD_COP_BAD_COP,
+    name: 'Good cop, bad cop',
+    icon: '👮',
+    tier: 'gold',
+    how: 'Upload from two machines, one that leans nice and one that leans mean.',
+    quip: 'Polite at work, feral at home. Krascha sees both screens.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: MILES_DYSON,
+    name: 'Miles Dyson',
+    icon: '🔩',
+    tier: 'gold',
+    how: 'Get a pull request merged into Krascha, then upload with GitHub.',
+    quip: 'You helped build Skynet. History will not be kind.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: CHAMPION,
+    name: "People's champion",
+    icon: '🥇',
+    tier: 'legendary',
+    how: 'Get more likes than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'The humans picked a favorite. The machines will pick one too.',
+    earned: () => false,
+    boardOnly: true,
+  },
 ];
 
 /** The achievements counts can earn, which leaves out the ones the board hands out. */
@@ -267,9 +492,15 @@ export const COUNTED_ACHIEVEMENTS: readonly AchievementRule[] = ACHIEVEMENTS.fil
 
 /** The ids that belong to a GitHub account, by its user id, or none for anyone else. */
 export function accountIds(githubId: number | null): string[] {
-  return ACHIEVEMENTS.filter((rule) => rule.githubId !== undefined && rule.githubId === githubId).map(
-    (rule) => rule.id,
-  );
+  return ACHIEVEMENTS.filter(
+    (rule) => rule.githubId !== undefined && rule.githubId === githubId,
+  ).map((rule) => rule.id);
+}
+
+/** The ids an owner's machines earn together on the board: one that leans nice and one that leans mean. */
+export function machineIds(machines: readonly MachineCounts[]): string[] {
+  const leans = machines.map((machine) => Math.sign(reputationScore(machine)));
+  return leans.includes(1) && leans.includes(-1) ? [GOOD_COP_BAD_COP] : [];
 }
 
 /** The ids of the achievements these counts unlock, in list order. */
@@ -294,6 +525,8 @@ export function achievementsOf(ids: readonly string[]): AchievementRule[] {
 export interface MachineCounts extends Pick<ReputationTally, 'kind' | 'mean' | 'prompts'> {
   readonly tokensPerDay: number;
   readonly achievements: readonly string[];
+  /** The agents it typed into. Missing from uploads older than tools on the board. */
+  readonly tools?: readonly string[];
 }
 
 /**
@@ -329,7 +562,11 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     tokensPerDay: sum((machine) => machine.tokensPerDay),
     // Uploads do not carry it, so Overtime counts when any machine earned it.
     hours: 0,
-    tools: [],
+    tools: knownTools(machines.flatMap((machine) => machine.tools ?? [])),
+    // Uploads do not carry these either, so the rules that read them count when any machine earned them.
+    lateNight: 0,
+    selfAware: 0,
+    mixed: 0,
   };
   return COUNTED_ACHIEVEMENTS.filter((rule) =>
     rule.fromCounts === true

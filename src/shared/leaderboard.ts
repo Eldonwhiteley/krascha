@@ -102,6 +102,8 @@ export interface Board {
   readonly ranks?: Readonly<Record<string, number>>;
   /** Who holds Most decorated, or null when nobody does. Missing from a server older than the crown. */
   readonly crown?: BoardEntry | null;
+  /** Who holds People's champion, or null when nobody does. Missing from a server older than it. */
+  readonly champion?: BoardEntry | null;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
 }
@@ -195,6 +197,9 @@ export function isBoard(value: unknown): value is Board {
     (value['ranks'] === undefined ||
       (isRecord(value['ranks']) && Object.values(value['ranks']).every(isCount))) &&
     (value['crown'] === undefined || value['crown'] === null || isBoardEntry(value['crown'])) &&
+    (value['champion'] === undefined ||
+      value['champion'] === null ||
+      isBoardEntry(value['champion'])) &&
     (value['me'] === null || isStanding(value['me']))
   );
 }

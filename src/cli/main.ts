@@ -165,7 +165,12 @@ function uploaded(standing: Standing, verified: boolean, prompts: number): strin
       : `You are number ${String(standing.place)} on Krascha's List, counting from the most wanted.`;
   const machines = standing.machines ?? 1;
   const added = machines > 1 ? ` That adds up your ${String(machines)} machines.` : '';
-  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}\n`;
+  // A server older than the silo on the board sends no silo place.
+  const silo =
+    standing.siloPlace === undefined || standing.siloPlace === null
+      ? ''
+      : ` You are number ${String(standing.siloPlace)} in line for a Silo 7 bunk.`;
+  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}${silo}\n`;
 }
 
 async function upload(io: CliIo, args: readonly string[]): Promise<number> {

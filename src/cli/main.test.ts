@@ -40,7 +40,12 @@ interface Sent {
 }
 
 /** A board server that takes any upload and puts it in first place. */
-function fakeBoard(sent: Sent[], verified: boolean, machines?: number): FetchFunction {
+function fakeBoard(
+  sent: Sent[],
+  verified: boolean,
+  machines?: number,
+  siloPlace?: number,
+): FetchFunction {
   return async (_url, init) => {
     const headers = new Headers(init.headers);
     const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
@@ -61,9 +66,12 @@ function fakeBoard(sent: Sent[], verified: boolean, machines?: number): FetchFun
       prompts: 3,
       uploadedAt: 1,
     };
-    return Response.json(
-      machines === undefined ? { entry, place: null } : { entry, place: null, machines },
-    );
+    return Response.json({
+      entry,
+      place: siloPlace === undefined ? null : 7,
+      ...(machines === undefined ? {} : { machines }),
+      ...(siloPlace === undefined ? {} : { siloPlace }),
+    });
   };
 }
 
@@ -221,6 +229,21 @@ describe('krascha', () => {
       machine,
       machine,
     ]);
+  });
+
+  it('says where you are in line for Silo 7', async () => {
+    const home = await makeHome();
+    home.use({ fetch: fakeBoard([], true, undefined, 4) });
+    const { out } = await home.run('upload', 'Kyle');
+    expect(out).toContain("You are number 7 on Krascha's List");
+    expect(out).toContain('You are number 4 in line for a Silo 7 bunk.');
+  });
+
+  it('says nothing about Silo 7 until you are in line', async () => {
+    const home = await makeHome();
+    home.use({ fetch: fakeBoard([], true) });
+    const { out } = await home.run('upload', 'Kyle');
+    expect(out).not.toContain('Silo 7');
   });
 
   it('uploads with a key when gh is signed out, and keeps using it', async () => {

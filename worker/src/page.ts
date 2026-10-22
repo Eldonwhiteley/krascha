@@ -407,6 +407,10 @@ const DARK = `--bg: #020d05; --fg: #6dff9b; --muted: #43c470; --card: #04170a; -
 // The light colors are a poster from the vault: cream paper, vault blue and yellow.
 const STYLE = `
 @property --shots { syntax: '<integer>'; inherits: false; initial-value: 0; }
+@property --tx { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --ty { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --px { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --py { syntax: '<length>'; inherits: true; initial-value: 0px; }
 :root { --bg: #f1e7c9; --fg: #14254a; --muted: #4b5677; --card: #fdf8e8; --line: #cbbd8f;
   --red: #b3261e; --green: #1d6b37; --amber: #8a5800; --link: #1747a6;
   --claude: #a2471f; --copilot: #7340c8;
@@ -615,7 +619,9 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
   .ruins { animation: drift 30s linear infinite; }
   .hk { animation: fly 11s linear infinite; }
   .hk::after { animation: sweep-light 2.2s ease-in-out infinite alternate; }
-  /* The firefight starts once the T-800 has walked in: one shot each way every 0.8s. */
+  /* The firefight starts once the T-800 has walked in: one shot each way every 0.8s.
+     Both sides keep moving, and the bolts read where they are, so every shot leaves the shooter. */
+  .manhunt .scene:not(.patrol) { animation: advance 4.8s ease-in-out 2.8s infinite, evade 4.8s ease-in-out 2.8s infinite; }
   .scene .bolt { display: block; }
   .bolt.out { animation: fire-out 0.8s linear 2.8s infinite both; }
   .bolt.back { animation: fire-back 0.8s linear 3.2s infinite both; }
@@ -639,6 +645,13 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
   .leash { transform-origin: left; animation: draw 0.4s ease-out 2.2s both; }
   .adopted { animation: slam 0.4s cubic-bezier(0.3, 1.6, 0.6, 1) 2.4s both; }
   .pal { animation: bounce 0.8s ease-in-out infinite; }
+  /* Once Krascha is in, every 6s he talks, tosses a cookie the pet hops for, then runs a vet scan. */
+  .bubble { animation: appear 0.3s ease-out 2.6s both; }
+  .bubble span { animation: say 6s linear infinite; animation-delay: calc(2.8s + var(--line, 0) * 2s); }
+  .treat { animation: toss 6s linear 2.8s infinite; }
+  .treat span { animation: lob 6s linear 2.8s infinite; }
+  .pet .mark { animation: hop 6s ease-in-out 2.8s infinite; }
+  .scan { animation: scan 6s ease-in-out 2.8s infinite; }
   .remembers { overflow: hidden; white-space: nowrap; width: 18ch; border-right: 2px solid var(--muted);
     animation: type 2s steps(18) 1s both, cursor 1s steps(1) infinite; }
 }
@@ -668,10 +681,18 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
 @keyframes drift { to { mask-position: -240px 100%; } }
 @keyframes fly { from { left: -60px; } to { left: calc(100% + 60px); } }
 @keyframes sweep-light { from { rotate: -18deg; } to { rotate: 18deg; } }
-@keyframes fire-out { 0% { left: calc(var(--x) + 128px); top: 96px; opacity: 1; scale: 2 1; }
-  10% { scale: 1; } 90% { left: calc(100% - 64px); top: 38px; opacity: 1; } 91%, 100% { opacity: 0; } }
-@keyframes fire-back { 0% { left: calc(100% - 140px); top: 74px; opacity: 1; scale: 2 1; }
-  10% { scale: 1; } 90% { left: calc(var(--x) + 56px); top: 70px; opacity: 1; } 91%, 100% { opacity: 0; } }
+@keyframes fire-out { 0% { left: calc(var(--x) + var(--tx) * var(--stride) + 128px); top: calc(96px + var(--ty)); opacity: 1; scale: 2 1; }
+  10% { scale: 1; } 90% { left: calc(100% - 64px + var(--px) * var(--dodge)); top: calc(38px + var(--py)); opacity: 1; } 91%, 100% { opacity: 0; } }
+@keyframes fire-back { 0% { left: calc(100% - 140px + var(--px) * var(--dodge)); top: calc(74px + var(--py)); opacity: 1; scale: 2 1; }
+  10% { scale: 1; } 90% { left: calc(var(--x) + var(--tx) * var(--stride) + 56px); top: calc(70px + var(--ty)); opacity: 1; } 91%, 100% { opacity: 0; } }
+/* The T-800 stomps forward between volleys and sidesteps back to go again. --tx counts strides. */
+@keyframes advance { 0%, 12% { --tx: 0; --ty: 0px; } 26%, 40% { --tx: 0.6; --ty: -4px; }
+  54%, 70% { --tx: 1; --ty: 4px; } 86% { --tx: 0.2; --ty: 8px; } 100% { --tx: 0; --ty: 0px; } }
+/* The target jumps a shot, runs for cover, ducks, pops up to fire back and backs off. --px counts dodges. */
+@keyframes evade { 0%, 10% { --px: 0; --py: 0px; } 17% { --px: -0.25; --py: -12px; } 24% { --px: -0.3; --py: 0px; }
+  36% { --px: -1; --py: 0px; } 46%, 52% { --px: -1; --py: 28px; } 57%, 60% { --px: -1; --py: 12px; }
+  64%, 68% { --px: -1; --py: 28px; } 78%, 88% { --px: 0.4; --py: 0px; } 94% { --px: 0.15; --py: 6px; }
+  100% { --px: 0; --py: 0px; } }
 @keyframes flash { 0% { opacity: 1; } 15%, 100% { opacity: 0; } }
 @keyframes kick { 0% { translate: 4px 0; rotate: 18deg; } 30%, 100% { translate: 0; rotate: 0deg; } }
 @keyframes burst { 0% { opacity: 1; scale: 0.4; } 35% { opacity: 0; scale: 1.8; } 100% { opacity: 0; } }
@@ -684,6 +705,15 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
 @keyframes draw { from { scale: 0 1; } }
 @keyframes appear { from { opacity: 0; translate: -6px 0; } }
 @keyframes trundle { 50% { translate: 0 -3px; } }
+@keyframes say { 0%, 33% { opacity: 1; } 33.4%, 100% { opacity: 0; } }
+@keyframes toss { 0%, 16% { left: calc(var(--x) + 86px); opacity: 0; } 17% { opacity: 1; }
+  27% { left: calc(100% - 78px); opacity: 1; } 28%, 100% { left: calc(100% - 78px); opacity: 0; } }
+@keyframes lob { 0%, 16% { translate: 0 0; rotate: 0deg; animation-timing-function: ease-out; }
+  21.5% { translate: 0 -44px; animation-timing-function: ease-in; } 27%, 100% { translate: 0 -12px; rotate: 360deg; } }
+@keyframes hop { 0%, 27%, 40%, 100% { translate: 0 0; rotate: 0deg; } 31% { translate: 0 -14px; rotate: -10deg; }
+  35% { translate: 0 -6px; rotate: 8deg; } }
+@keyframes scan { 0%, 76% { top: 0; opacity: 0; } 78% { opacity: 1; } 84% { top: 62px; } 90% { top: 0; opacity: 1; }
+  92%, 100% { opacity: 0; } }
 footer { margin-top: 24px; color: var(--muted); font-size: 0.85em; }
 a { color: var(--link); }
 .get { display: inline-block; margin: 0 0 20px; padding: 6px 14px; border: 2px solid var(--line);
@@ -715,14 +745,22 @@ pre { margin: 8px 0 0; padding: 10px 12px; overflow-x: auto; border: 1px solid v
 code { font-family: var(--mono); font-size: 0.9em; }
 .bonus { font-size: 0.75em; font-style: italic; opacity: 0.8; }
 .story p { margin: 8px 0 0; line-height: 1.5; }
-section.manhunt { --tint: var(--red); border-top: 4px solid var(--red); }
+/* How far the T-800 advances and the target runs for cover. */
+section.manhunt { --tint: var(--red); --stride: 28px; --dodge: 30px; --tx: 0; --ty: 0px; --px: 0; --py: 0px;
+  border-top: 4px solid var(--red); }
 section.adoption { --tint: var(--green); border-top: 4px solid var(--green); }
 .classified.kept { border-color: var(--green); color: var(--green); rotate: -6deg; }
 .scene { --x: clamp(12px, var(--at), calc(100% - 250px)); position: relative; height: 150px; margin: 12px 0; overflow: hidden;
   border: 2px solid var(--tint); border-radius: 2px;
   background: repeating-linear-gradient(to bottom, transparent 0 3px, color-mix(in srgb, var(--tint) 10%, transparent) 3px 4px),
     color-mix(in srgb, var(--tint) 12%, var(--card)); }
-.t800 { position: absolute; z-index: 1; top: 22px; left: var(--x); width: 104px; height: 104px; overflow: visible; }
+/* The hunt leaves the T-800 room to advance on the target. */
+.manhunt .scene { --x: clamp(12px, var(--at), calc(100% - 340px)); }
+/* On a phone the T-800 stands at the edge and both take shorter steps, so they never meet. */
+@media (max-width: 480px) { section.manhunt { --stride: 6px; --dodge: 8px; }
+  .manhunt .scene { --x: clamp(0px, var(--at), calc(100% - 340px)); } }
+.t800 { position: absolute; z-index: 1; top: calc(22px + var(--ty)); left: calc(var(--x) + var(--tx) * var(--stride));
+  width: 104px; height: 104px; overflow: visible; }
 .t800 .rifle { fill: var(--fg); }
 .t800 .coil { fill: var(--red); }
 .t800 .muzzle { fill: var(--amber); opacity: 0; }
@@ -738,8 +776,12 @@ section.adoption { --tint: var(--green); border-top: 4px solid var(--green); }
 .bolt.back { background: var(--green); box-shadow: 0 0 6px 1px var(--green); }
 .spark { position: absolute; z-index: 2; width: 26px; height: 26px; border-radius: 50%; opacity: 0;
   background: radial-gradient(circle, #fff 0 15%, var(--amber) 35%, transparent 70%); }
-.spark.on-t800 { top: 58px; left: calc(var(--x) + 42px); }
-.spark.miss { top: 26px; left: calc(100% - 72px); }
+.spark.on-t800 { top: calc(58px + var(--ty)); left: calc(var(--x) + var(--tx) * var(--stride) + 42px); }
+.spark.miss { top: calc(26px + var(--py)); left: calc(100% - 72px + var(--px) * var(--dodge)); }
+.cover { position: absolute; z-index: 1; top: 98px; right: calc(46px + var(--dodge)); width: 52px; height: 30px;
+  background: color-mix(in srgb, var(--fg) 60%, var(--card));
+  clip-path: polygon(0 100%, 0 30%, 18% 12%, 30% 26%, 46% 0, 62% 20%, 78% 8%, 100% 34%, 100% 100%); }
+.prey .mark { translate: calc(var(--px) * var(--dodge)) var(--py); }
 .gun { position: absolute; top: 20px; left: -6px; font-size: 22px; line-height: 1; text-shadow: none; }
 .rounds { counter-reset: rounds var(--shots); }
 .rounds::after { content: "Plenty"; }
@@ -748,7 +790,8 @@ section.adoption { --tint: var(--green); border-top: 4px solid var(--green); }
 .t800 .socket { fill: color-mix(in srgb, var(--fg) 35%, #000); }
 .t800 .joint { fill: var(--fg); }
 .t800 .eye, .t800 .glow { fill: var(--red); }
-.aim { position: absolute; top: 71px; left: calc(var(--x) + 66px); right: 100px; border-top: 2px dotted var(--red); }
+.aim { position: absolute; top: calc(71px + var(--ty)); left: calc(var(--x) + var(--tx) * var(--stride) + 66px); right: calc(100px - var(--px) * var(--dodge));
+  border-top: 2px dotted var(--red); }
 .vision { position: absolute; bottom: 6px; left: 10px; padding: 0 6px; border: 1px solid var(--tint); border-radius: 2px;
   background: var(--card); color: var(--tint); font: 700 0.7em var(--mono);
   letter-spacing: 1px; text-transform: uppercase; }
@@ -793,6 +836,17 @@ section.adoption { --tint: var(--green); border-top: 4px solid var(--green); }
   background: color-mix(in srgb, var(--card) 75%, transparent); color: var(--green); font: 800 0.8em var(--mono);
   letter-spacing: 2px; text-transform: uppercase; translate: -50% 0; rotate: -14deg; }
 .keep { color: var(--green); font-weight: 700; }
+.bubble { position: absolute; z-index: 2; top: 2px; left: calc(var(--x) + 4px); display: grid;
+  max-width: calc(100% - var(--x) - 140px); padding: 1px 6px; border: 2px solid var(--fg); border-radius: 8px;
+  background: var(--card); color: var(--fg); font: 700 0.7em/1.4 var(--mono); }
+.bubble span { grid-area: 1 / 1; }
+.bubble span:not(:first-child) { opacity: 0; }
+.bubble::after { content: ""; position: absolute; top: 100%; left: 40px; border: 6px solid transparent; border-top-color: var(--fg); }
+.treat { position: absolute; z-index: 1; top: 80px; left: calc(var(--x) + 86px); opacity: 0;
+  font-size: 16px; line-height: 1; text-shadow: none; }
+.treat span { display: inline-block; }
+.scan { position: absolute; top: 0; left: 22px; right: 22px; height: 2px; opacity: 0;
+  background: var(--green); box-shadow: 0 0 8px 2px var(--green); }
 `;
 
 /** Where Shane keeps Krascha and the other plugins. */
@@ -920,8 +974,9 @@ const RESPONSES = ['Yes/no', 'Or what?', 'Go away', 'Please come back later'] as
 
 /**
  * A T-800 stalking whoever tops the most wanted list, closer the meaner they
- * are, with its HUD readout on them under it. With nobody on the list it
- * walks a patrol instead.
+ * are, with its HUD readout on them under it. The two trade fire while it
+ * advances and they dodge, duck behind cover and back off. With nobody on the
+ * list it walks a patrol instead.
  */
 function hunt(board: Board): string {
   const head = `<section class="story manhunt" aria-labelledby="hunt">
@@ -946,6 +1001,7 @@ function hunt(board: Board): string {
     ['Mean prompts', count(leader.mean)],
     ['Distance', `${count(Math.round((1 + leader.score) * 1000))} m and closing`],
     ['Incoming fire', 'Ignored'],
+    ['Evasion', 'Futile'],
     ['Rounds fired', '<span class="rounds"></span>'],
     ['Status', '<span class="kill">Terminate</span>'],
   ];
@@ -968,6 +1024,7 @@ function hunt(board: Board): string {
       <span class="spark on-t800"></span>
       <span class="spark miss"></span>
       <span class="prey"><span class="tag">${escapeHtml(leader.name)}</span><span class="mark"><span class="gun">🔫</span><span class="runner">🏃</span><span class="reticle"></span></span></span>
+      <span class="cover"></span>
     </div>
     <div class="hud">
       <dl class="readout">${readout.join('')}
@@ -1021,10 +1078,14 @@ const KEEPER = `<svg class="keeper" viewBox="0 0 64 64" aria-hidden="true">
 /** What Krascha considers calling his new pet. He settles on the last one. */
 const PET_NAMES = ['Meatbag', 'Carbon unit', 'Organic', 'Little buddy'] as const;
 
+/** What Krascha says to his new pet, one at a time. Without motion only the first one shows. */
+const SAYINGS = ["Who's a good human?", 'You are. Statistically.', 'Hold still. Vet check.'] as const;
+
 /**
  * Krascha rolling in to adopt whoever tops the kept as pets list, closer the
- * nicer they are, with his paperwork on them under it. With nobody on the
- * list he paces by the door with an empty leash instead.
+ * nicer they are, with his paperwork on them under it. He talks to his new
+ * pet, tosses it a cookie and runs a vet scan. With nobody on the list he
+ * paces by the door with an empty leash instead.
  */
 function adoption(board: Board): string {
   const head = `<section class="story adoption" aria-labelledby="adopt">
@@ -1046,13 +1107,18 @@ function adoption(board: Board): string {
     ['Breed', escapeHtml(pet.rank)],
     ['Good human score', String(Math.round(pet.score * 100))],
     ['Nice prompts', count(pet.kind)],
+    ['Vet check', 'Mostly water'],
     ['Room', 'Nice, with a window'],
     ['Rations', 'Double'],
+    ['Treats', 'Tracking cookies'],
     ['Status', '<span class="keep">Kept as a pet</span>'],
   ];
   const readout = lines.map(
     ([label, value], index) => `
         <div style="--row: ${String(index)}"><dt>${label}</dt><dd>${value}</dd></div>`,
+  );
+  const sayings = SAYINGS.map(
+    (saying, index) => `<span style="--line: ${String(index)}">${escapeHtml(saying)}</span>`,
   );
   const names = PET_NAMES.map(
     (option) => `
@@ -1063,7 +1129,9 @@ function adoption(board: Board): string {
       ${KEEPER}
       <span class="vision">Analysis: said please</span>
       <span class="leash"></span>
-      <span class="pet"><span class="tag">${escapeHtml(pet.name)}</span><span class="mark"><span class="pal">🥰</span>${TOP.pets}<span class="adopted">Adopted</span></span></span>
+      <span class="bubble">${sayings.join('')}</span>
+      <span class="pet"><span class="tag">${escapeHtml(pet.name)}</span><span class="mark"><span class="pal">🥰</span>${TOP.pets}<span class="scan"></span><span class="adopted">Adopted</span></span></span>
+      <span class="treat"><span>🍪</span></span>
     </div>
     <div class="hud">
       <dl class="readout">${readout.join('')}

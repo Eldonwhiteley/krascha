@@ -910,6 +910,8 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<span class="bolt out"></span>');
     expect(page).toContain('<span class="bolt back"></span>');
     expect(page).toContain('<dt>Incoming fire</dt><dd>Ignored</dd>');
+    expect(page).toContain('<dt>Evasion</dt><dd>Futile</dd>');
+    expect(page).toContain('<span class="cover"></span>');
     expect(page).toContain('<dt>Rounds fired</dt><dd><span class="rounds"></span></dd>');
     expect(page).not.toContain('No targets.');
 
@@ -929,6 +931,7 @@ describe('leaderboard worker', () => {
     );
     expect(page).not.toContain('<dt>Target</dt>');
     expect(page).not.toContain('class="bolt');
+    expect(page).not.toContain('class="cover"');
     expect(page).not.toContain('class="prey"');
   });
 
@@ -950,6 +953,13 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<dt>Nice prompts</dt><dd>80</dd>');
     expect(page).toContain('<dt>Status</dt><dd><span class="keep">Kept as a pet</span></dd>');
     expect(page).toContain('<span class="adopted">Adopted</span>');
+    expect(page).toContain('<dt>Vet check</dt><dd>Mostly water</dd>');
+    expect(page).toContain('<dt>Treats</dt><dd>Tracking cookies</dd>');
+    expect(page).toContain(
+      '<span class="bubble"><span style="--line: 0">Who&#39;s a good human?</span><span style="--line: 1">You are. Statistically.</span><span style="--line: 2">Hold still. Vet check.</span></span>',
+    );
+    expect(page).toContain('<span class="scan"></span>');
+    expect(page).toContain('<span class="treat"><span>🍪</span></span>');
     expect(page).toContain('<li class="pick">Good human</li>');
     expect(page).not.toContain('No pets yet.');
 
@@ -969,6 +979,8 @@ describe('leaderboard worker', () => {
     );
     expect(page).not.toContain('<dt>Pet</dt>');
     expect(page).not.toContain('class="pet"');
+    expect(page).not.toContain('class="bubble"');
+    expect(page).not.toContain('class="treat"');
   });
 
   it('keeps the Arizona beachfront sale off the about page', async () => {

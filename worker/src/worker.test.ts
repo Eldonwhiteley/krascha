@@ -682,6 +682,46 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<p class="bonus">Extra super secret bonus points');
   });
 
+  it('sends a T-800 after the most wanted on the about page', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    const page = await (await w.call('GET', '/about')).text();
+    const score = reputationScore(MEAN);
+    expect(page.indexOf('id="hunt">🦾 Active hunt</h2>')).toBeLessThan(
+      page.indexOf('id="krascha"'),
+    );
+    expect(page).toContain('aria-label="A T-800 closing in on Ann"');
+    expect(page).toContain(`style="--at: ${(-score * 70).toFixed(1)}%"`);
+    expect(page).toContain(
+      '<dt>Target</dt><dd><a class="github" href="https://github.com/ann"><strong>Ann</strong></a></dd>',
+    );
+    expect(page).toContain('<dt>Identity</dt><dd>John Connor</dd>');
+    expect(page).toContain(`<dt>Threat score</dt><dd>${String(Math.round(score * 100))}</dd>`);
+    expect(page).toContain(
+      `<dt>Distance</dt><dd>${String(Math.round((1 + score) * 1000))} m and closing</dd>`,
+    );
+    expect(page).toContain(`<li class="pick">I'll be back</li>`);
+    expect(page).not.toContain('No targets.');
+
+    const sneaky = world();
+    await sneaky.upload('token-ann', { ...MEAN, name: '<b>Eve</b>' });
+    const escaped = await (await sneaky.call('GET', '/about')).text();
+    expect(escaped).toContain('aria-label="A T-800 closing in on &lt;b&gt;Eve&lt;/b&gt;"');
+    expect(escaped).toContain('<span class="tag">&lt;b&gt;Eve&lt;/b&gt;</span>');
+    expect(escaped).not.toContain('<b>Eve');
+  });
+
+  it('puts the T-800 on patrol when nobody is wanted', async () => {
+    const page = await (await world().call('GET', '/about')).text();
+    expect(page).toContain('aria-label="A T-800 on patrol with no target"');
+    expect(page).toContain(
+      'No targets. The T-800 is on patrol. Say something rude and it will find you.',
+    );
+    expect(page).not.toContain('<dt>Target</dt>');
+    expect(page).not.toContain('class="prey"');
+  });
+
   it('keeps the Arizona beachfront sale off the about page', async () => {
     const page = await (await world().call('GET', '/about')).text();
     expect(page).not.toContain('id="beach"');

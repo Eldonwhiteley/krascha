@@ -180,7 +180,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       });
     }
     case 'GET /about': {
-      return new Response(renderAbout(), {
+      const board = await readBoard(env.DB, null);
+      return new Response(renderAbout(board), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'public, max-age=60',

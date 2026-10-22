@@ -4,7 +4,7 @@
 // Cloudflare type package.
 
 import type { MachineCounts } from '../../src/shared/achievements.js';
-import { combinedIds, knownIds } from '../../src/shared/achievements.js';
+import { accountIds, combinedIds, knownIds } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
   ANONYMOUS,
@@ -81,6 +81,11 @@ function entryOf(row: Row): BoardEntry {
     tools: knownTools(text(row, 'tools').split(',')),
     likes: number_(row, 'likes'),
   };
+}
+
+/** The GitHub user id of a checked owner, or null for a key. */
+function githubIdOf(owner: Owner): number | null {
+  return owner.verified ? Number(owner.id.slice('github:'.length)) : null;
 }
 
 /** UTC calendar date, YYYY-MM-DD, which is when the upload cap resets. */
@@ -378,7 +383,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       now,
       day,
       uploadsToday + 1,
-      combinedIds(machines).join(','),
+      knownIds([...combinedIds(machines), ...accountIds(githubIdOf(owner))]).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),
       tools.join(','),

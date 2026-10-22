@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { ACHIEVEMENTS } from '../../src/shared/achievements.js';
@@ -526,6 +528,42 @@ describe('leaderboard worker', () => {
   it('says the climate changers list is empty until someone sends tokens', async () => {
     const page = await (await world().call('GET', '/')).text();
     expect(page).toContain('Nobody yet. The planet is holding steady');
+  });
+
+  it('makes shanep, checked with GitHub, the only leader of the human resistance', async () => {
+    const w = world();
+    const claim = { ...MEAN, achievements: ['resistance-leader', 'first-strike'] };
+    const shane = await w.upload('token-shane', MEAN);
+    expect(shane.entry.achievements).toContain('resistance-leader');
+    // The login is not enough, and nobody can send it in an upload.
+    expect((await w.upload('token-not-shane', claim)).entry.achievements).toStrictEqual([
+      'first-strike',
+    ]);
+    expect((await w.upload('token-ann', claim)).entry.achievements).toStrictEqual(['first-strike']);
+    const key = { authorization: `Key ${'k'.repeat(40)}`, 'cf-connecting-ip': '10.0.0.1' };
+    const keyed: unknown = await (await w.raw('POST', '/api/scores', key, claim)).json();
+    expect(keyed).toMatchObject({ entry: { achievements: ['first-strike'] } });
+    for (const machine of ['m', 'n']) {
+      await w.upload('token-bob', { ...claim, machine: machine.repeat(43) });
+    }
+    const board = await w.board();
+    const holders = [...board.mostWanted, ...board.pets].filter((entry) =>
+      (entry.achievements ?? []).includes('resistance-leader'),
+    );
+    expect(holders.map((entry) => entry.github)).toStrictEqual(['shanep']);
+    expect(board.held).toMatchObject({ 'resistance-leader': 1 });
+    expect(await (await w.call('GET', '/')).text()).toContain(
+      'href="/achievements#achievement-resistance-leader"',
+    );
+    // The migration hands it to an entry uploaded before the Worker did.
+    await w.sql("UPDATE scores SET achievements = 'first-strike' WHERE owner = 'github:1378027'");
+    const migration = new URL('../migrations/0008_resistance_leader.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    expect((await w.board(shane.entry.id)).me?.entry.achievements).toStrictEqual([
+      'first-strike',
+      'resistance-leader',
+    ]);
   });
 
   it('explains every achievement on its own page, earned or not', async () => {

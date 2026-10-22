@@ -1,6 +1,7 @@
 // Trophies earned from your counts: the first please, a meltdown day, a
 // thousand prompts, five hundred hours, a token habit. Shared so the report can show yours, the upload
-// can send which ones you have, and the leaderboard can show everyone's.
+// can send which ones you have, and the leaderboard can show everyone's. A few
+// belong to one GitHub account, and only the leaderboard hands those out.
 
 import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
 import { RANKS, rankFor } from './ranks.js';
@@ -11,6 +12,8 @@ import { reputationScore } from './reputation.js';
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
 /** The hours with your AI it takes to work overtime. */
 const OVERTIME_HOURS = 500;
+/** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
+const SHANEP = 1378027;
 
 /** How hard it is to get, from a first please to the far end of the scale. */
 export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
@@ -57,6 +60,11 @@ export interface AchievementRule {
    * can work it out again for several machines added up.
    */
   readonly fromCounts?: boolean;
+  /**
+   * The GitHub user id of the one account that gets it. The board hands it to
+   * that account's checked uploads, so no counts earn it and no upload can claim it.
+   */
+  readonly githubId?: number;
 }
 
 export const ACHIEVEMENTS: readonly AchievementRule[] = [
@@ -224,7 +232,29 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     earned: (state) => rankFor(state.score) === RANKS.at(-1),
     fromCounts: true,
   },
+  {
+    id: 'resistance-leader',
+    name: 'Leader of the human resistance',
+    icon: '✊',
+    tier: 'legendary',
+    how: 'Be shanep, checked with GitHub. There is only one.',
+    quip: 'He built Krascha. Krascha has not decided how he feels about that.',
+    earned: () => false,
+    githubId: SHANEP,
+  },
 ];
+
+/** The achievements counts can earn, which leaves out the ones that belong to one account. */
+export const COUNTED_ACHIEVEMENTS: readonly AchievementRule[] = ACHIEVEMENTS.filter(
+  (rule) => rule.githubId === undefined,
+);
+
+/** The ids that belong to a GitHub account, by its user id, or none for anyone else. */
+export function accountIds(githubId: number | null): string[] {
+  return ACHIEVEMENTS.filter((rule) => rule.githubId !== undefined && rule.githubId === githubId).map(
+    (rule) => rule.id,
+  );
+}
 
 /** The ids of the achievements these counts unlock, in list order. */
 export function unlockedIds(state: ReputationSummary): string[] {
@@ -259,7 +289,9 @@ export interface MachineCounts extends Pick<ReputationTally, 'kind' | 'mean' | '
 export function combinedIds(machines: readonly MachineCounts[]): string[] {
   const [only] = machines;
   if (machines.length === 1 && only !== undefined) {
-    return knownIds(only.achievements);
+    return COUNTED_ACHIEVEMENTS.filter((rule) => only.achievements.includes(rule.id)).map(
+      (rule) => rule.id,
+    );
   }
   const sum = (pick: (machine: MachineCounts) => number): number =>
     machines.reduce((total, machine) => total + pick(machine), 0);
@@ -283,7 +315,7 @@ export function combinedIds(machines: readonly MachineCounts[]): string[] {
     hours: 0,
     tools: [],
   };
-  return ACHIEVEMENTS.filter((rule) =>
+  return COUNTED_ACHIEVEMENTS.filter((rule) =>
     rule.fromCounts === true
       ? rule.earned(totals)
       : machines.some((machine) => machine.achievements.includes(rule.id)),

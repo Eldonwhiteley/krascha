@@ -38,6 +38,9 @@ const GITHUB_USERS: Readonly<Record<string, { readonly id: number; readonly logi
   'token-ann': { id: 1, login: 'ann' },
   'token-bob': { id: 2, login: 'bob' },
   'token-cat': { id: 3, login: 'cat' },
+  'token-shane': { id: 1378027, login: 'shanep' },
+  // Has Shane's login but not his account, like someone who took it after a rename.
+  'token-not-shane': { id: 4, login: 'shanep' },
 };
 
 export async function fakeGitHub(init: RequestInit): Promise<Response> {

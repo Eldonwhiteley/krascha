@@ -2,7 +2,7 @@
 // where you sit on the scale, what it takes to move, and your trophies.
 
 import type { AchievementRule, Progress, Tier } from '../shared/achievements.js';
-import { ACHIEVEMENTS, TIERS, unlockedIds } from '../shared/achievements.js';
+import { COUNTED_ACHIEVEMENTS, TIERS, unlockedIds } from '../shared/achievements.js';
 import type { Rank, RankChange } from '../shared/ranks.js';
 import { RANKS, demotion, levelOf, promotion, rankFor, scalePercent } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
@@ -172,13 +172,14 @@ function closeness(rule: AchievementRule, summary: ReputationSummary): number {
 
 function trophies(summary: ReputationSummary, paint: Paint): string[] {
   const unlocked = new Set(unlockedIds(summary));
-  const earned = ACHIEVEMENTS.filter((rule) => unlocked.has(rule.id));
-  const locked = ACHIEVEMENTS.filter((rule) => !unlocked.has(rule.id)).toSorted(
+  // The report only shows what counts can earn. The board hands out the rest.
+  const earned = COUNTED_ACHIEVEMENTS.filter((rule) => unlocked.has(rule.id));
+  const locked = COUNTED_ACHIEVEMENTS.filter((rule) => !unlocked.has(rule.id)).toSorted(
     (a, b) => closeness(b, summary) - closeness(a, summary),
   );
-  const shelf = ACHIEVEMENTS.map((rule) => (unlocked.has(rule.id) ? '■' : '□')).join('');
+  const shelf = COUNTED_ACHIEVEMENTS.map((rule) => (unlocked.has(rule.id) ? '■' : '□')).join('');
   const lines = [
-    `${paint.bold(`🏆 Achievements: ${String(earned.length)} of ${String(ACHIEVEMENTS.length)}`)}  ${paint.yellow(shelf)}`,
+    `${paint.bold(`🏆 Achievements: ${String(earned.length)} of ${String(COUNTED_ACHIEVEMENTS.length)}`)}  ${paint.yellow(shelf)}`,
   ];
   if (earned.length > 0) {
     lines.push('', paint.bold('Trophy case'));

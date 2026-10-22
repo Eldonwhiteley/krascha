@@ -484,6 +484,9 @@ describe('leaderboard worker', () => {
     expect(board.warmers?.map((entry) => entry.name)).toStrictEqual(['Bob', 'Ann']);
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<h2 id="climate">🔥 Climate changers</h2>');
+    expect(page).toContain(
+      '<p class="poster">The machines like it hot.</p>\n  <section class="climate"',
+    );
     const section = page.slice(page.indexOf('id="climate"'), page.indexOf('id="ranks"'));
     expect(section).toContain(
       '<span class="rank">Arizona beachfront, The coast is on its way to you.</span>',

@@ -583,6 +583,7 @@ export function renderPage(board: Board, now: number): string {
   </div>
   <p class="poster">${escapeHtml(slogan)}</p>
   ${silo(board)}
+  <p class="poster">The machines like it hot.</p>
   ${climate(board)}
   ${ranks()}
   ${legend()}

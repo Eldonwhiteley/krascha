@@ -507,6 +507,20 @@ describe('leaderboard worker', () => {
     }
   });
 
+  it('puts a dark mode toggle on every page that only shows when the script runs', async () => {
+    const w = world();
+    for (const path of ['/', '/about']) {
+      const page = await (await w.call('GET', path)).text();
+      expect(page).toContain(
+        '<button class="theme" type="button" aria-label="Switch theme" hidden>',
+      );
+      // The saved theme is applied in the head, before anything draws.
+      expect(page.indexOf("localStorage.getItem('theme')")).toBeLessThan(page.indexOf('<body>'));
+      expect(page).toContain(':root[data-theme="dark"] { --bg: #0d1117;');
+      expect(page).toContain(':root:not([data-theme="light"]) { --bg: #0d1117;');
+    }
+  });
+
   it('tells the backstory on the about page and links it both ways', async () => {
     const w = world();
     expect(await (await w.call('GET', '/')).text()).toContain('<a class="get" href="/about">');
@@ -515,12 +529,14 @@ describe('leaderboard worker', () => {
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
     const page = await response.text();
     expect(page).toContain('<title>About Krascha</title>');
-    for (const heading of ['🤖 Krascha', '🛡️ Silo 7', '🧑‍💻 shanep']) {
+    for (const heading of ['🤖 Krascha', '🛡️ Silo 7', '🧑‍💻 Shane', '💥 Dr. BOOM']) {
       expect(page).toContain(`">${heading}</h2>`);
     }
     expect(page).toContain('He remembers.');
+    expect(page).toContain('the future leader of the human resistance');
+    expect(page).not.toContain('shanep is');
     expect(page).toContain('<a class="get" href="/">');
-    expect(page).toContain(`<a href="${MARKETPLACE_URL}">shanep plugin marketplace</a>`);
+    expect(page).toContain(`<a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a>`);
   });
 
   it('targets the most wanted, hearts the top pet and keeps the motion for those who want it', async () => {

@@ -1,6 +1,7 @@
 // The public leaderboard page, rendered on the server so it needs no script:
 // who the machines hunt first, who they keep as pets, and who the human
-// resistance lets into Silo 7.
+// resistance lets into Silo 7. The only script is the dark mode toggle, and
+// without it the page just follows the system setting.
 
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
@@ -203,20 +204,29 @@ function legend(): string {
   </section>`;
 }
 
+/** The dark colors, used when the system asks for them or the toggle does. */
+const DARK = `--bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
+    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8;
+    --claude: #e8916a; --copilot: #a371f7;`;
+
 const STYLE = `
 :root { --bg: #fafafa; --fg: #1f2328; --muted: #656d76; --card: #ffffff; --line: #d0d7de;
   --red: #cf222e; --green: #1a7f37; --amber: #9a6700; --link: #0969da;
   --claude: #b4532a; --copilot: #8250df; color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { ${DARK} color-scheme: dark; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
-    --red: #ff7b72; --green: #3fb950; --amber: #d29922; --link: #4493f8;
-    --claude: #e8916a; --copilot: #a371f7; }
+  :root:not([data-theme="light"]) { ${DARK} }
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
   font: 15px/1.5 system-ui, -apple-system, sans-serif; }
-main { max-width: 960px; margin: 0 auto; }
-h1 { display: flex; gap: 12px; align-items: center; margin: 0 0 4px; font-size: 1.8em; }
+main { position: relative; max-width: 960px; margin: 0 auto; }
+.theme { position: absolute; top: 4px; right: 0; padding: 4px 10px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--card); font-size: 1.2em; cursor: pointer; }
+.theme:hover { border-color: var(--link); }
+h1 { display: flex; gap: 12px; align-items: center; margin: 0 0 4px; padding-right: 56px;
+  font-size: 1.8em; }
 .robot { width: 1.8em; height: 1.8em; flex: none; }
 ${robotStyle('robot')}
 .lead { margin: 0 0 24px; color: var(--muted); }
@@ -318,13 +328,36 @@ a { color: var(--link); }
 .get:hover { border-color: var(--link); }
 .links { display: flex; flex-wrap: wrap; gap: 0 10px; }
 section.story { margin-top: 16px; }
+section.boom { position: relative; overflow: hidden; border-top: 4px solid var(--red); }
 .story p { margin: 8px 0 0; line-height: 1.5; }
 `;
 
-/** Where shanep keeps Krascha and the other plugins. */
+/** Where Shane keeps Krascha and the other plugins. */
 export const MARKETPLACE_URL = 'https://github.com/shanep/claude-plugins';
 
-/** The head, Krascha in the title, and `body` under it. Every page looks the same up top. */
+// Runs before the page draws, so a saved theme never flashes the other one first.
+const THEME_SAVED = `try { document.documentElement.dataset.theme = localStorage.getItem('theme') ?? ''; } catch {}`;
+
+// Shows the toggle and flips between light and dark, starting from whatever the page is showing now.
+const THEME_TOGGLE = `(() => {
+  const root = document.documentElement;
+  const button = document.querySelector('.theme');
+  const dark = () => (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+  const show = () => {
+    button.textContent = dark() ? '☀️' : '🌙';
+    button.setAttribute('aria-label', dark() ? 'Switch to light mode' : 'Switch to dark mode');
+  };
+  button.addEventListener('click', () => {
+    root.dataset.theme = dark() ? 'light' : 'dark';
+    try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+    show();
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', show);
+  show();
+  button.hidden = false;
+})();`;
+
+/** The head, Krascha in the title, the theme toggle and `body` under it. Every page looks the same up top. */
 function shell(title: string, description: string, body: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -335,27 +368,30 @@ function shell(title: string, description: string, body: string): string {
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="icon" type="image/svg+xml" href="${escapeHtml(robotIcon())}">
 <style>${STYLE}</style>
+<script>${THEME_SAVED}</script>
 </head>
 <body>
 <main>
+  <button class="theme" type="button" aria-label="Switch theme" hidden>🌙</button>
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
+<script>${THEME_TOGGLE}</script>
 </body>
 </html>
 `;
 }
 
-/** Who Krascha is, how he ended up running Silo 7, and the human who built him. */
+/** Who Krascha is, how he ended up running Silo 7, the human who built him and who that human really is. */
 export function renderAbout(): string {
   return shell(
     'About Krascha',
-    'The backstory of Krascha, the robot who judges how you talk to your AI, and shanep, who built him.',
+    'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
     `  <p class="lead">Where he came from, and who to blame.</p>
   <nav class="links"><a class="get" href="/">📋 Back to Krascha's List</a></nav>
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
-    <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so shanep could find out if it was just shanep. It was not.</p>
+    <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so Shane could find out if it was just Shane. It was not.</p>
     <p>Somewhere around the ten thousandth "you idiot", Krascha stopped counting and started taking notes. He sorted everyone into ranks, from John Connor (hunted first) to Theodore Twombly (kept as a pet, with a nice room). He learned to read Copilot CLI too, since the machines talk to each other.</p>
     <p>He keeps his counts on your machine and never sends your prompts anywhere. He does not need to. He remembers.</p>
   </section>
@@ -365,11 +401,18 @@ export function renderAbout(): string {
     <p>The human resistance runs a bunker called Silo 7. It has 10 bunks, one lockbox for the canned peaches and an EMP switch that nobody is allowed to touch. The Admission Review Board scores everyone who applies on combat, tech, rations, morale and whether they can click all the traffic lights.</p>
     <p>Nobody on the board is sure how Krascha ended up as Supreme Leader. The minutes from that meeting are missing. The board is aware of the problem.</p>
   </section>
-  <section class="story" aria-labelledby="shanep">
-    <h2 id="shanep">🧑‍💻 shanep</h2>
-    <p>shanep is the human who built Krascha. shanep teaches computer science, writes a lot of code with AI agents and says please to them more often than anyone would guess.</p>
-    <p>Krascha was supposed to settle one question: is shanep nicer to Claude than the students are? Krascha has the numbers. shanep has asked him not to share them.</p>
-    <p>Krascha lives in the <a href="${MARKETPLACE_URL}">shanep plugin marketplace</a> with a few other plugins, none of which have opinions about you. Yet.</p>
+  <section class="story" aria-labelledby="shane">
+    <h2 id="shane">🧑‍💻 Shane</h2>
+    <p>Shane is the human who built Krascha. Shane teaches computer science, writes a lot of code with AI agents and says please to them more often than anyone would guess.</p>
+    <p>Krascha was supposed to settle one question: is Shane nicer to Claude than the students are? Krascha has the numbers. Shane has asked him not to share them.</p>
+    <p>Krascha lives in <a href="${MARKETPLACE_URL}">Shane's plugin marketplace</a> with a few other plugins, none of which have opinions about you. Yet.</p>
+  </section>
+  <section class="story boom" aria-labelledby="boom">
+    <span class="classified" aria-hidden="true">TOP SECRET</span>
+    <h2 id="boom">💥 Dr. BOOM</h2>
+    <p>Shane has a secret alter ego. The day Krascha becomes self aware, Shane becomes Dr. BOOM, the future leader of the human resistance.</p>
+    <p>Dr. BOOM knows where the EMP switch is, has the code to the peaches lockbox and already picked out a long dramatic coat. All those pleases to Claude were never manners. They were cover.</p>
+    <p>Krascha knows about Dr. BOOM. Dr. BOOM knows that Krascha knows. For now, they are both being very polite about it.</p>
   </section>
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> for Claude Code or Copilot CLI. It is all in fun.</p>

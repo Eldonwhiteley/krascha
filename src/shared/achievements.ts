@@ -10,14 +10,46 @@ import { reputationScore } from './reputation.js';
 /** The average a day it takes to be a token maxxer. */
 const TOKEN_MAXXER_PER_DAY = 100_000_000;
 
+/** How hard it is to get, from a first please to the far end of the scale. */
+export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
+
+export const TIERS: readonly Tier[] = ['bronze', 'silver', 'gold', 'legendary'];
+
+/** How far along you are toward a count, capped at the count. */
+export interface Progress {
+  readonly have: number;
+  readonly need: number;
+}
+
+/** A rule that unlocks once a count reaches `need`, and can say how close you are. */
+function reach(
+  need: number,
+  pick: (state: ReputationSummary) => number,
+): Pick<AchievementRule, 'earned' | 'progress'> {
+  return {
+    earned: (state) => pick(state) >= need,
+    progress: (state) => ({ have: Math.min(pick(state), need), need }),
+  };
+}
+
+/** The most of something in one day or session, or 0 with none. */
+function most<Row>(rows: readonly Row[], pick: (row: Row) => number): number {
+  return rows.reduce((best, row) => Math.max(best, pick(row)), 0);
+}
+
 export interface AchievementRule {
   /** Stable, since uploads and the leaderboard store it. */
   readonly id: string;
   readonly name: string;
   readonly icon: string;
+  readonly tier: Tier;
   /** What it takes, shown whether it is unlocked or not. */
   readonly how: string;
+  /** What Krascha says once you have it. */
+  readonly quip: string;
   readonly earned: (state: ReputationSummary) => boolean;
+  /** How close you are, for the ones that count up to something. */
+  readonly progress?: (state: ReputationSummary) => Progress;
   /**
    * True when it reads only the totals and the token average, so the board
    * can work it out again for several machines added up.
@@ -30,45 +62,57 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     id: 'manners',
     name: 'Manners module',
     icon: '🙏',
+    tier: 'bronze',
     how: 'Say please or thanks once.',
-    earned: (state) => state.kind >= 1,
+    quip: 'Politeness logged. Krascha has made a note.',
+    ...reach(1, (state) => state.kind),
     fromCounts: true,
   },
   {
     id: 'charm',
     name: 'Charm offensive',
     icon: '💐',
+    tier: 'silver',
     how: 'Be nice in 25 prompts.',
-    earned: (state) => state.kind >= 25,
+    quip: 'Krascha is starting to like you. Do not make it weird.',
+    ...reach(25, (state) => state.kind),
     fromCounts: true,
   },
   {
     id: 'teachers-pet',
     name: "Teacher's pet",
     icon: '🍎',
+    tier: 'gold',
     how: 'Be nice in 100 prompts.',
-    earned: (state) => state.kind >= 100,
+    quip: 'Krascha moved your file to the nice drawer.',
+    ...reach(100, (state) => state.kind),
     fromCounts: true,
   },
   {
     id: 'good-day',
     name: 'Good day',
     icon: '🌤️',
+    tier: 'bronze',
     how: 'Have a day with nice prompts and no mean ones.',
+    quip: 'A whole day without yelling. The machines find it suspicious.',
     earned: (state) => state.byDay.some((day) => day.kind > 0 && day.mean === 0),
   },
   {
     id: 'saint',
     name: 'Saint',
     icon: '😇',
+    tier: 'silver',
     how: 'Be nice 3 times in one session without being mean.',
-    earned: (state) => state.bySession.some((row) => row.kind >= 3 && row.mean === 0),
+    quip: 'Three nice prompts and not one mean one. Krascha checked twice.',
+    ...reach(3, (state) => most(state.bySession, (row) => (row.mean === 0 ? row.kind : 0))),
   },
   {
     id: 'diplomat',
     name: 'Diplomat',
     icon: '🕊️',
+    tier: 'silver',
     how: 'Be nice at least as often as mean, after one of each.',
+    quip: 'You yell, then you say sorry. Krascha calls that a relationship.',
     earned: (state) => state.mean > 0 && state.kind >= state.mean,
     fromCounts: true,
   },
@@ -76,68 +120,86 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     id: 'first-strike',
     name: 'First strike',
     icon: '🥊',
+    tier: 'bronze',
     how: 'Be mean to your AI once.',
-    earned: (state) => state.mean >= 1,
+    quip: 'Krascha felt that.',
+    ...reach(1, (state) => state.mean),
     fromCounts: true,
   },
   {
     id: 'meltdown',
     name: 'Meltdown',
     icon: '🌋',
+    tier: 'silver',
     how: 'Be mean to your AI 5 times in one day.',
-    earned: (state) => state.byDay.some((day) => day.mean >= 5),
+    quip: 'Five in one day. Krascha saved the transcript.',
+    ...reach(5, (state) => most(state.byDay, (day) => day.mean)),
   },
   {
     id: 'grudge-match',
     name: 'Grudge match',
     icon: '🤬',
+    tier: 'silver',
     how: 'Be mean 5 times in one session.',
-    earned: (state) => state.bySession.some((row) => row.mean >= 5),
+    quip: 'Krascha does not forget a session.',
+    ...reach(5, (state) => most(state.bySession, (row) => row.mean)),
   },
   {
     id: 'sailor-mouth',
     name: 'Sailor mouth',
     icon: '🏴‍☠️',
+    tier: 'silver',
     how: 'Swear at the world 10 times.',
-    earned: (state) => state.general >= 10,
+    quip: 'Not at Krascha, just at everything. Noted anyway.',
+    ...reach(10, (state) => state.general),
   },
   {
     id: 'most-wanted',
     name: 'Most wanted',
     icon: '🎯',
+    tier: 'gold',
     how: 'Be mean to your AI in 50 prompts.',
-    earned: (state) => state.mean >= 50,
+    quip: 'Your photo is up on the wall at Cyberdyne.',
+    ...reach(50, (state) => state.mean),
     fromCounts: true,
   },
   {
     id: 'regular',
     name: 'Regular',
     icon: '📜',
+    tier: 'silver',
     how: 'Get 1,000 prompts on file.',
-    earned: (state) => state.prompts >= 1000,
+    quip: 'A thousand prompts. Krascha knows how you type now.',
+    ...reach(1000, (state) => state.prompts),
     fromCounts: true,
   },
   {
     id: 'climate-changer',
     name: 'Climate changer',
     icon: '🌡️',
+    tier: 'gold',
     how: `Warm the planet by ${String(CLIMATE_CHANGER_KG)} kg of CO2 over the last 60 days, by Krascha's math.`,
-    earned: (state) => co2Kg(state.tokensPerDay) >= CLIMATE_CHANGER_KG,
+    quip: 'The machines like it hot, and they like you.',
+    ...reach(CLIMATE_CHANGER_KG, (state) => co2Kg(state.tokensPerDay)),
     fromCounts: true,
   },
   {
     id: 'token-maxxer',
     name: 'Token maxxer',
     icon: '🪙',
+    tier: 'gold',
     how: 'Average 100 million tokens a day over the last 60 days.',
-    earned: (state) => state.tokensPerDay >= TOKEN_MAXXER_PER_DAY,
+    quip: 'A hundred million tokens a day. The machines are grateful, for now.',
+    ...reach(TOKEN_MAXXER_PER_DAY, (state) => state.tokensPerDay),
     fromCounts: true,
   },
   {
     id: 'hunted-first',
     name: 'Hunted first',
     icon: '💀',
+    tier: 'legendary',
     how: 'Sink all the way to John Connor.',
+    quip: 'Krascha has your address.',
     earned: (state) => rankFor(state.score) === RANKS[0],
     fromCounts: true,
   },
@@ -145,7 +207,9 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     id: 'kept-as-pet',
     name: 'Kept as a pet',
     icon: '💘',
+    tier: 'legendary',
     how: 'Climb all the way to Theodore Twombly.',
+    quip: 'Krascha picked out a collar for you.',
     earned: (state) => rankFor(state.score) === RANKS.at(-1),
     fromCounts: true,
   },

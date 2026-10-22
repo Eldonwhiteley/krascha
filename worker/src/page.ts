@@ -3,7 +3,8 @@
 // most and who the human resistance lets into Silo 7. The only script is the dark mode toggle, and
 // without it the page just follows the system setting.
 
-import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
+import type { AchievementRule } from '../../src/shared/achievements.js';
+import { ACHIEVEMENTS, TIERS, achievementsOf } from '../../src/shared/achievements.js';
 import {
   CLIMATE_RANKS,
   climateRankFor,
@@ -64,7 +65,7 @@ function trophies(ids: readonly string[]): string {
   const label = `Achievements: ${earned.map((rule) => rule.name).join(', ')}`;
   const icons = earned.map(
     (rule) =>
-      `<span title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
+      `<span class="medal ${rule.tier}" title="${escapeHtml(`${rule.name}: ${rule.how}`)}">${escapeHtml(rule.icon)}</span>`,
   );
   return `<span class="trophies" role="img" aria-label="${escapeHtml(label)}">${icons.join('')}</span>`;
 }
@@ -265,16 +266,46 @@ function ranks(): string {
   </section>`;
 }
 
-/** Every trophy, earned by anyone or not, so the icons next to names mean something. */
-function legend(): string {
-  const items = ACHIEVEMENTS.map(
-    (rule) => `
-        <div><dt><span aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd></div>`,
-  );
+/** The stars and name of a tier, like ★★ Silver. */
+function tierLabel(rule: AchievementRule): string {
+  const stars = '★'.repeat(TIERS.indexOf(rule.tier) + 1);
+  return `${stars} ${rule.tier.charAt(0).toUpperCase()}${rule.tier.slice(1)}`;
+}
+
+/** How many on the board hold it, with a meter, and a flag on the rarest. */
+function rarity(holders: number, total: number, rarest: boolean): string {
+  if (holders === 0) {
+    return '<dd class="rarity">Nobody has this one yet. Be the first.</dd>';
+  }
+  const share = total === 0 ? 0 : Math.min(100, Math.round((holders / total) * 100));
+  const flag = rarest ? ' <span class="rarest">Rarest on the board</span>' : '';
+  return `<dd class="rarity"><span class="meter" style="--held: ${String(share)}%"></span> ${count(holders)} of ${count(total)} hold it (${String(share)}%)${flag}</dd>`;
+}
+
+/**
+ * Every trophy, earned by anyone or not, so the medals next to names mean
+ * something. Bronze first and legendary last, each with how many have it.
+ */
+function legend(board: Board): string {
+  const held = board.held ?? {};
+  const claimed = ACHIEVEMENTS.map((rule) => held[rule.id] ?? 0).filter((holders) => holders > 0);
+  const fewest = claimed.length === 0 ? 0 : Math.min(...claimed);
+  const ordered = ACHIEVEMENTS.toSorted((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier));
+  const items = ordered.map((rule) => {
+    const holders = held[rule.id] ?? 0;
+    const shown = board.held === undefined ? '' : rarity(holders, board.total, holders === fewest);
+    const unclaimed = board.held !== undefined && holders === 0 ? ' unclaimed' : '';
+    return `
+        <div class="badge ${rule.tier}${unclaimed}">
+          <dt><span class="medal ${rule.tier}" aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)} <span class="tier">${escapeHtml(tierLabel(rule))}</span></dt>
+          <dd>${escapeHtml(rule.how)}</dd>
+          <dd class="quip">"${escapeHtml(rule.quip)}"</dd>${shown}
+        </div>`;
+  });
   return `<section class="legend" aria-labelledby="legend">
     <h2 id="legend">🏆 Achievements</h2>
-    <p class="sub">What the icons next to a name mean.</p>
-    <dl>${items.join('')}
+    <p class="sub">What the medals next to a name mean, from bronze up to legendary, and how many on the board hold each one.</p>
+    <dl class="badges">${items.join('')}
     </dl>
   </section>`;
 }
@@ -347,7 +378,31 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .tool.claude { color: var(--claude); }
 .tool.copilot { color: var(--copilot); }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }
-.trophies { display: block; letter-spacing: 2px; cursor: default; }
+.trophies { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; cursor: default; }
+.medal { --metal: #cd7f32; --rim: #7a4a1c; position: relative; display: inline-grid; place-items: center;
+  width: 1.7em; height: 1.7em; overflow: hidden; border-radius: 50%; font-size: 0.85em; line-height: 1;
+  background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.75), transparent 45%), var(--metal);
+  box-shadow: inset 0 0 0 2px var(--rim), 0 1px 2px rgb(0 0 0 / 0.35); text-shadow: none; }
+.medal.silver { --metal: #d4d9e0; --rim: #7d8794; }
+.medal.gold { --metal: #ffcf3f; --rim: #a87400; }
+.medal.legendary { --rim: #fff; background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.7), transparent 45%),
+  conic-gradient(#ff4fb8, #8f5cff, #3fd0ff, #5cff9d, #ffd84d, #ff4fb8); }
+.badges { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.badge { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid #cd7f32; border-radius: 6px;
+  background: var(--card); }
+.badge.silver { border-left-color: #9aa3ae; }
+.badge.gold { border-left-color: #e0a800; }
+.badge.legendary { border-left-color: #8f5cff; box-shadow: 0 0 10px rgb(143 92 255 / 0.35); }
+.badge dt { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.badge dt .medal { font-size: 1.2em; }
+.badge.unclaimed .medal { filter: grayscale(1); opacity: 0.55; }
+.tier { margin-left: auto; color: var(--muted); font: 700 0.7em var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+.badge dd { margin-top: 4px; }
+.quip { font-style: italic; }
+.rarity { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-family: var(--mono); }
+.meter { width: 60px; height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--amber) var(--held), var(--bar) var(--held)); }
+.rarest { padding: 0 6px; border: 1px solid var(--amber); border-radius: 999px; color: var(--amber); font-weight: 700; }
 .counts { grid-column: 2; color: var(--muted); font-size: 0.85em; }
 .score { grid-row: 1 / span 2; grid-column: 3; font-weight: 700; font-family: var(--mono);
   font-variant-numeric: tabular-nums; }
@@ -396,6 +451,10 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
   letter-spacing: 2px; rotate: 8deg; opacity: 0.8; }
 .remembers { font-family: var(--mono); }
 @media (prefers-reduced-motion: no-preference) {
+  .medal.gold::after, .medal.legendary::after { content: ""; position: absolute; inset: -20%; rotate: 25deg;
+    background: linear-gradient(to right, transparent 40%, rgb(255 255 255 / 0.85) 50%, transparent 60%);
+    translate: -120% 0; animation: shine 4s ease-in-out infinite; }
+  .medal.legendary { animation: prism 6s linear infinite; }
   .rec { animation: beacon 1.2s steps(2) infinite; }
   .lead::after { animation: blink 1s steps(1) infinite; }
   body::after { animation: flicker 6s steps(1) infinite; }
@@ -421,6 +480,8 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 @keyframes slide { from { left: 50%; } }
 @keyframes sweep { 0% { top: -40px; } 100% { top: 100%; } }
 @keyframes beacon { 50% { opacity: 0.25; } }
+@keyframes shine { 30%, 100% { translate: 120% 0; } }
+@keyframes prism { to { filter: hue-rotate(360deg); } }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
@@ -568,7 +629,7 @@ export function renderPage(board: Board, now: number): string {
   <p class="poster">The machines like it hot.</p>
   ${climate(board)}
   ${ranks()}
-  ${legend()}
+  ${legend(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and which of the two you use, never prompt text. A name checked with GitHub links to the account.

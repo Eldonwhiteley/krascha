@@ -145,7 +145,11 @@ describe('krascha', () => {
     expect(err).toBe('');
     expect(code).toBe(0);
     expect(out).toContain('3 prompts on file: 2 kind, 1 mean');
-    expect(out).toContain('Manners module');
+    expect(out).toMatch(/🏆 Achievements: \d+ of 16/u);
+    expect(out).toContain('🙏 Manners module  ★ BRONZE');
+    expect(out).toContain('"Politeness logged. Krascha has made a note."');
+    expect(out).toContain('Still locked, closest first');
+    expect(out).toMatch(/🔒 Charm offensive {2}█*░+ 2\/25/u);
     expect(out).toContain('Krascha remembers.');
     const saved = await readFile(path.join(home.root, '.krascha', INDEX_FILE), 'utf8');
     // Only the excerpt around a hit is kept, never the whole prompt.

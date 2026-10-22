@@ -1,7 +1,8 @@
 // Krascha's report as terminal text: his face beside your rank, the verdict,
 // where you sit on the scale, what it takes to move, and your trophies.
 
-import { ACHIEVEMENTS, unlockedIds } from '../shared/achievements.js';
+import type { AchievementRule, Progress, Tier } from '../shared/achievements.js';
+import { ACHIEVEMENTS, TIERS, unlockedIds } from '../shared/achievements.js';
 import type { Rank, RankChange } from '../shared/ranks.js';
 import { RANKS, demotion, levelOf, promotion, rankFor, scalePercent } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
@@ -11,6 +12,8 @@ import { faceFor } from './face.js';
 export const WIDTH = 72;
 const BAR = 30;
 const MEANEST = 3;
+/** Cells in an achievement's progress bar. */
+const STEPS = 12;
 
 /** ANSI styles, or nothing when the output is not a color terminal. */
 export interface Paint {
@@ -18,14 +21,30 @@ export interface Paint {
   readonly dim: (text: string) => string;
   readonly red: (text: string) => string;
   readonly green: (text: string) => string;
+  readonly yellow: (text: string) => string;
+  readonly magenta: (text: string) => string;
 }
 
 const ansi = (code: number) => (text: string) => `\u001B[${String(code)}m${text}\u001B[0m`;
 
-export const COLOR: Paint = { bold: ansi(1), dim: ansi(2), red: ansi(31), green: ansi(32) };
+export const COLOR: Paint = {
+  bold: ansi(1),
+  dim: ansi(2),
+  red: ansi(31),
+  green: ansi(32),
+  yellow: ansi(33),
+  magenta: ansi(35),
+};
 
 const same = (text: string): string => text;
-export const PLAIN: Paint = { bold: same, dim: same, red: same, green: same };
+export const PLAIN: Paint = {
+  bold: same,
+  dim: same,
+  red: same,
+  green: same,
+  yellow: same,
+  magenta: same,
+};
 
 /** Breaks text into lines no wider than `width`, at spaces. */
 export function wrap(text: string, width: number): string[] {
@@ -119,15 +138,65 @@ function details(summary: ReputationSummary, paint: Paint): string[] {
   return lines;
 }
 
+const SHORT = new Intl.NumberFormat('en-US', { notation: 'compact' });
+
+/** Stars for the tier, one for bronze up to four for legendary, in its color. */
+function medal(tier: Tier, paint: Paint): string {
+  const stars = '★'.repeat(TIERS.indexOf(tier) + 1);
+  const label = `${stars} ${tier.toUpperCase()}`;
+  switch (tier) {
+    case 'bronze':
+      return paint.red(label);
+    case 'silver':
+      return paint.bold(label);
+    case 'gold':
+      return paint.yellow(label);
+    case 'legendary':
+      return paint.bold(paint.magenta(label));
+  }
+}
+
+/** A bar and the numbers, like 12/25, with big numbers shortened. */
+function progressBar({ have, need }: Progress, paint: Paint): string {
+  const filled = Math.floor((have / need) * STEPS);
+  const amount = (value: number): string =>
+    need >= 10_000 ? SHORT.format(Math.floor(value)) : count(Math.floor(value));
+  return `${paint.green('█'.repeat(filled))}${paint.dim('░'.repeat(STEPS - filled))} ${amount(have)}/${amount(need)}`;
+}
+
+/** How close a locked one is, from 0 to 1, with the ones that do not count up last. */
+function closeness(rule: AchievementRule, summary: ReputationSummary): number {
+  const progress = rule.progress?.(summary);
+  return progress === undefined ? -1 : progress.have / progress.need;
+}
+
 function trophies(summary: ReputationSummary, paint: Paint): string[] {
   const unlocked = new Set(unlockedIds(summary));
-  const lines = [paint.bold(`Achievements (${String(unlocked.size)} of ${String(ACHIEVEMENTS.length)})`)];
-  for (const rule of ACHIEVEMENTS) {
-    lines.push(
-      unlocked.has(rule.id)
-        ? `  ${rule.icon} ${rule.name}`
-        : paint.dim(`  [ ] ${rule.name}: ${rule.how}`),
-    );
+  const earned = ACHIEVEMENTS.filter((rule) => unlocked.has(rule.id));
+  const locked = ACHIEVEMENTS.filter((rule) => !unlocked.has(rule.id)).toSorted(
+    (a, b) => closeness(b, summary) - closeness(a, summary),
+  );
+  const shelf = ACHIEVEMENTS.map((rule) => (unlocked.has(rule.id) ? '■' : '□')).join('');
+  const lines = [
+    `${paint.bold(`🏆 Achievements: ${String(earned.length)} of ${String(ACHIEVEMENTS.length)}`)}  ${paint.yellow(shelf)}`,
+  ];
+  if (earned.length > 0) {
+    lines.push('', paint.bold('Trophy case'));
+    // The rarest first, so a legendary one sits on the top shelf.
+    for (const rule of earned.toSorted((a, b) => TIERS.indexOf(b.tier) - TIERS.indexOf(a.tier))) {
+      lines.push(
+        `  ${rule.icon} ${paint.bold(rule.name)}  ${medal(rule.tier, paint)}`,
+        paint.dim(`     "${rule.quip}"`),
+      );
+    }
+  }
+  if (locked.length > 0) {
+    lines.push('', paint.bold('Still locked, closest first'));
+    for (const rule of locked) {
+      const progress = rule.progress?.(summary);
+      const bar = progress === undefined ? '' : `  ${progressBar(progress, paint)}`;
+      lines.push(`  🔒 ${rule.name}${bar}`, paint.dim(`     ${rule.how}`));
+    }
   }
   return lines;
 }

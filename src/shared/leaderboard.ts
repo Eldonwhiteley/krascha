@@ -94,6 +94,8 @@ export interface Board {
   readonly warmers?: readonly BoardEntry[];
   /** Everyone with at least MIN_PROMPTS. */
   readonly total: number;
+  /** How many of them hold each achievement, by id. Missing from a server older than the count. */
+  readonly held?: Readonly<Record<string, number>>;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
 }
@@ -181,6 +183,8 @@ export function isBoard(value: unknown): value is Board {
     (value['warmers'] === undefined ||
       (Array.isArray(value['warmers']) && value['warmers'].every(isBoardEntry))) &&
     isCount(value['total']) &&
+    (value['held'] === undefined ||
+      (isRecord(value['held']) && Object.values(value['held']).every(isCount))) &&
     (value['me'] === null || isStanding(value['me']))
   );
 }

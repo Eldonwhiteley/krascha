@@ -133,6 +133,7 @@ describe('leaderboard worker', () => {
       bunks: [],
       warmers: [],
       total: 0,
+      held: {},
       me: null,
     });
   });
@@ -207,7 +208,7 @@ describe('leaderboard worker', () => {
     const html = await page.text();
     expect(html).toContain('aria-label="Achievements: First strike, Meltdown"');
     expect(html).toContain(
-      '<span title="Meltdown: Be mean to your AI 5 times in one day.">🌋</span>',
+      '<span class="medal silver" title="Meltdown: Be mean to your AI 5 times in one day.">🌋</span>',
     );
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.achievements).toStrictEqual([]);
@@ -530,8 +531,22 @@ describe('leaderboard worker', () => {
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<h2 id="legend">🏆 Achievements</h2>');
     for (const rule of ACHIEVEMENTS) {
-      expect(page).toContain(`${escapeHtml(rule.name)}</dt><dd>${escapeHtml(rule.how)}</dd>`);
+      expect(page).toContain(`${escapeHtml(rule.name)} <span class="tier">`);
+      expect(page).toContain(`<dd>${escapeHtml(rule.how)}</dd>`);
+      expect(page).toContain(`"${escapeHtml(rule.quip)}"`);
     }
+    expect(page).toContain('Nobody has this one yet. Be the first.');
+  });
+
+  it('counts who holds each achievement and flags the rarest', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, achievements: ['first-strike', 'meltdown'] });
+    await w.upload('token-bob', { ...KIND, achievements: ['first-strike', 'manners'] });
+    expect((await w.board()).held).toStrictEqual({ 'first-strike': 2, meltdown: 1, manners: 1 });
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('2 of 2 hold it (100%)');
+    expect(page).toContain('1 of 2 hold it (50%) <span class="rarest">Rarest on the board</span>');
+    expect(page.split('class="rarest"')).toHaveLength(3);
   });
 
   it('lists every rank on the scale in order, from hunted first to kept as a pet', async () => {

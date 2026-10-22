@@ -184,7 +184,7 @@ describe('detectFrustration targets', () => {
 describe('detectFrustration terms', () => {
   it('knows every form and its kind', () => {
     expect(LEXICON).toHaveLength(57);
-    expect(ALL_FORMS).toHaveLength(304);
+    expect(ALL_FORMS).toHaveLength(307);
     for (const entry of LEXICON) {
       for (const form of entry.forms) {
         const found = detectFrustration(form);
@@ -239,6 +239,7 @@ describe('typos', () => {
   it('catches one slip in a swear or insult, and digits for letters', () => {
     expect(terms('you idiiot')).toStrictEqual(['idiot']);
     expect(terms('fcuk you')).toStrictEqual(['fuck']);
+    expect(terms('phuck you')).toStrictEqual(['fuck']);
     expect(terms('fukcing hell')).toStrictEqual(['fuck']);
     expect(terms('you stupd bot')).toStrictEqual(['stupid']);
     expect(terms('you stuipd bot')).toStrictEqual(['stupid']);

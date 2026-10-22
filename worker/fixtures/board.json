@@ -1,0 +1,736 @@
+{
+  "mostWanted": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Kyle Reese",
+      "verified": false,
+      "rank": "John Connor",
+      "score": -0.8656716417910447,
+      "kind": 4,
+      "mean": 60,
+      "prompts": 3100,
+      "uploadedAt": 1792515600000,
+      "achievements": [
+        "first-strike",
+        "meltdown",
+        "grudge-match",
+        "sailor-mouth",
+        "most-wanted",
+        "regular",
+        "overtime",
+        "climate-changer",
+        "token-maxxer",
+        "hunted-first",
+        "most-decorated"
+      ],
+      "tokensPerDay": 410000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Sarah",
+      "verified": false,
+      "rank": "John Connor",
+      "score": -0.8055555555555556,
+      "kind": 2,
+      "mean": 30,
+      "prompts": 1800,
+      "uploadedAt": 1792512000000,
+      "achievements": [
+        "first-strike",
+        "meltdown",
+        "sailor-mouth",
+        "regular"
+      ],
+      "tokensPerDay": 120000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "<b>Bobby Tables</b>",
+      "verified": false,
+      "rank": "Sarah Connor",
+      "score": -0.7058823529411765,
+      "kind": 0,
+      "mean": 12,
+      "prompts": 640,
+      "uploadedAt": 1792508400000,
+      "achievements": [
+        "first-strike",
+        "grudge-match"
+      ],
+      "tokensPerDay": 15000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Anonymous",
+      "verified": false,
+      "rank": "Sarah Connor",
+      "score": -0.5348837209302325,
+      "kind": 5,
+      "mean": 14,
+      "prompts": 300,
+      "uploadedAt": 1792504800000,
+      "achievements": [
+        "first-strike"
+      ],
+      "tokensPerDay": 0,
+      "tools": [],
+      "likes": 3
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "A name that is exactly forty characters!",
+      "verified": false,
+      "rank": "Dave Bowman",
+      "score": -0.3488372093023256,
+      "kind": 9,
+      "mean": 12,
+      "prompts": 900,
+      "uploadedAt": 1792501200000,
+      "achievements": [
+        "manners",
+        "first-strike"
+      ],
+      "tokensPerDay": 2500000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Hal",
+      "verified": true,
+      "github": "octocat",
+      "rank": "Dave Bowman",
+      "score": -0.30434782608695654,
+      "kind": 3,
+      "mean": 5,
+      "prompts": 220,
+      "uploadedAt": 1792497600000,
+      "achievements": [
+        "first-strike"
+      ],
+      "tokensPerDay": 60000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Arthur",
+      "verified": false,
+      "rank": "Arthur Dent",
+      "score": -0.13333333333333333,
+      "kind": 8,
+      "mean": 6,
+      "prompts": 150,
+      "uploadedAt": 1792494000000,
+      "achievements": [],
+      "tokensPerDay": 0,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    }
+  ],
+  "pets": [
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Samantha",
+      "verified": false,
+      "rank": "Theodore Twombly",
+      "score": 0.9078947368421053,
+      "kind": 140,
+      "mean": 1,
+      "prompts": 1200,
+      "uploadedAt": 1792483200000,
+      "achievements": [
+        "manners",
+        "charm",
+        "teachers-pet",
+        "good-day",
+        "saint",
+        "regular",
+        "kept-as-pet"
+      ],
+      "tokensPerDay": 90000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Theodore",
+      "verified": false,
+      "rank": "Theodore Twombly",
+      "score": 0.9047619047619048,
+      "kind": 95,
+      "mean": 0,
+      "prompts": 380,
+      "uploadedAt": 1792476000000,
+      "achievements": [
+        "manners",
+        "charm",
+        "teachers-pet",
+        "saint"
+      ],
+      "tokensPerDay": 0,
+      "tools": [],
+      "likes": 3
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Ava",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.6666666666666666,
+      "kind": 60,
+      "mean": 4,
+      "prompts": 700,
+      "uploadedAt": 1792486800000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day",
+        "diplomat"
+      ],
+      "tokensPerDay": 33000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Dorothy",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.5217391304347826,
+      "kind": 30,
+      "mean": 3,
+      "prompts": 500,
+      "uploadedAt": 1792490400000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day"
+      ],
+      "tokensPerDay": 8000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Caleb",
+      "verified": false,
+      "rank": "Caleb Smith",
+      "score": 0.22727272727272727,
+      "kind": 22,
+      "mean": 6,
+      "prompts": 400,
+      "uploadedAt": 1792479600000,
+      "achievements": [
+        "manners",
+        "good-day",
+        "first-strike"
+      ],
+      "tokensPerDay": 1000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    }
+  ],
+  "bunks": [
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Caleb",
+      "verified": false,
+      "rank": "Caleb Smith",
+      "score": 0.22727272727272727,
+      "kind": 22,
+      "mean": 6,
+      "prompts": 400,
+      "uploadedAt": 1792479600000,
+      "achievements": [
+        "manners",
+        "good-day",
+        "first-strike"
+      ],
+      "tokensPerDay": 1000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Anonymous",
+      "verified": false,
+      "rank": "Sarah Connor",
+      "score": -0.5348837209302325,
+      "kind": 5,
+      "mean": 14,
+      "prompts": 300,
+      "uploadedAt": 1792504800000,
+      "achievements": [
+        "first-strike"
+      ],
+      "tokensPerDay": 0,
+      "tools": [],
+      "likes": 3
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Arthur",
+      "verified": false,
+      "rank": "Arthur Dent",
+      "score": -0.13333333333333333,
+      "kind": 8,
+      "mean": 6,
+      "prompts": 150,
+      "uploadedAt": 1792494000000,
+      "achievements": [],
+      "tokensPerDay": 0,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "A name that is exactly forty characters!",
+      "verified": false,
+      "rank": "Dave Bowman",
+      "score": -0.3488372093023256,
+      "kind": 9,
+      "mean": 12,
+      "prompts": 900,
+      "uploadedAt": 1792501200000,
+      "achievements": [
+        "manners",
+        "first-strike"
+      ],
+      "tokensPerDay": 2500000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Ava",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.6666666666666666,
+      "kind": 60,
+      "mean": 4,
+      "prompts": 700,
+      "uploadedAt": 1792486800000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day",
+        "diplomat"
+      ],
+      "tokensPerDay": 33000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Dorothy",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.5217391304347826,
+      "kind": 30,
+      "mean": 3,
+      "prompts": 500,
+      "uploadedAt": 1792490400000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day"
+      ],
+      "tokensPerDay": 8000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Theodore",
+      "verified": false,
+      "rank": "Theodore Twombly",
+      "score": 0.9047619047619048,
+      "kind": 95,
+      "mean": 0,
+      "prompts": 380,
+      "uploadedAt": 1792476000000,
+      "achievements": [
+        "manners",
+        "charm",
+        "teachers-pet",
+        "saint"
+      ],
+      "tokensPerDay": 0,
+      "tools": [],
+      "likes": 3
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "<b>Bobby Tables</b>",
+      "verified": false,
+      "rank": "Sarah Connor",
+      "score": -0.7058823529411765,
+      "kind": 0,
+      "mean": 12,
+      "prompts": 640,
+      "uploadedAt": 1792508400000,
+      "achievements": [
+        "first-strike",
+        "grudge-match"
+      ],
+      "tokensPerDay": 15000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Samantha",
+      "verified": false,
+      "rank": "Theodore Twombly",
+      "score": 0.9078947368421053,
+      "kind": 140,
+      "mean": 1,
+      "prompts": 1200,
+      "uploadedAt": 1792483200000,
+      "achievements": [
+        "manners",
+        "charm",
+        "teachers-pet",
+        "good-day",
+        "saint",
+        "regular",
+        "kept-as-pet"
+      ],
+      "tokensPerDay": 90000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Hal",
+      "verified": true,
+      "github": "octocat",
+      "rank": "Dave Bowman",
+      "score": -0.30434782608695654,
+      "kind": 3,
+      "mean": 5,
+      "prompts": 220,
+      "uploadedAt": 1792497600000,
+      "achievements": [
+        "first-strike"
+      ],
+      "tokensPerDay": 60000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 2
+    }
+  ],
+  "warmers": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Kyle Reese",
+      "verified": false,
+      "rank": "John Connor",
+      "score": -0.8656716417910447,
+      "kind": 4,
+      "mean": 60,
+      "prompts": 3100,
+      "uploadedAt": 1792515600000,
+      "achievements": [
+        "first-strike",
+        "meltdown",
+        "grudge-match",
+        "sailor-mouth",
+        "most-wanted",
+        "regular",
+        "overtime",
+        "climate-changer",
+        "token-maxxer",
+        "hunted-first",
+        "most-decorated"
+      ],
+      "tokensPerDay": 410000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Sarah",
+      "verified": false,
+      "rank": "John Connor",
+      "score": -0.8055555555555556,
+      "kind": 2,
+      "mean": 30,
+      "prompts": 1800,
+      "uploadedAt": 1792512000000,
+      "achievements": [
+        "first-strike",
+        "meltdown",
+        "sailor-mouth",
+        "regular"
+      ],
+      "tokensPerDay": 120000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Samantha",
+      "verified": false,
+      "rank": "Theodore Twombly",
+      "score": 0.9078947368421053,
+      "kind": 140,
+      "mean": 1,
+      "prompts": 1200,
+      "uploadedAt": 1792483200000,
+      "achievements": [
+        "manners",
+        "charm",
+        "teachers-pet",
+        "good-day",
+        "saint",
+        "regular",
+        "kept-as-pet"
+      ],
+      "tokensPerDay": 90000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Hal",
+      "verified": true,
+      "github": "octocat",
+      "rank": "Dave Bowman",
+      "score": -0.30434782608695654,
+      "kind": 3,
+      "mean": 5,
+      "prompts": 220,
+      "uploadedAt": 1792497600000,
+      "achievements": [
+        "first-strike"
+      ],
+      "tokensPerDay": 60000000,
+      "tools": [
+        "claude",
+        "copilot"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Ava",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.6666666666666666,
+      "kind": 60,
+      "mean": 4,
+      "prompts": 700,
+      "uploadedAt": 1792486800000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day",
+        "diplomat"
+      ],
+      "tokensPerDay": 33000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "<b>Bobby Tables</b>",
+      "verified": false,
+      "rank": "Sarah Connor",
+      "score": -0.7058823529411765,
+      "kind": 0,
+      "mean": 12,
+      "prompts": 640,
+      "uploadedAt": 1792508400000,
+      "achievements": [
+        "first-strike",
+        "grudge-match"
+      ],
+      "tokensPerDay": 15000000,
+      "tools": [
+        "copilot"
+      ],
+      "likes": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Dorothy",
+      "verified": false,
+      "rank": "Dorothy Gale",
+      "score": 0.5217391304347826,
+      "kind": 30,
+      "mean": 3,
+      "prompts": 500,
+      "uploadedAt": 1792490400000,
+      "achievements": [
+        "manners",
+        "charm",
+        "good-day"
+      ],
+      "tokensPerDay": 8000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 2
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "A name that is exactly forty characters!",
+      "verified": false,
+      "rank": "Dave Bowman",
+      "score": -0.3488372093023256,
+      "kind": 9,
+      "mean": 12,
+      "prompts": 900,
+      "uploadedAt": 1792501200000,
+      "achievements": [
+        "manners",
+        "first-strike"
+      ],
+      "tokensPerDay": 2500000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Caleb",
+      "verified": false,
+      "rank": "Caleb Smith",
+      "score": 0.22727272727272727,
+      "kind": 22,
+      "mean": 6,
+      "prompts": 400,
+      "uploadedAt": 1792479600000,
+      "achievements": [
+        "manners",
+        "good-day",
+        "first-strike"
+      ],
+      "tokensPerDay": 1000000,
+      "tools": [
+        "claude"
+      ],
+      "likes": 4
+    }
+  ],
+  "total": 12,
+  "held": {
+    "first-strike": 7,
+    "meltdown": 2,
+    "grudge-match": 2,
+    "sailor-mouth": 2,
+    "most-wanted": 1,
+    "regular": 3,
+    "overtime": 1,
+    "climate-changer": 1,
+    "token-maxxer": 1,
+    "hunted-first": 1,
+    "most-decorated": 1,
+    "manners": 6,
+    "charm": 4,
+    "good-day": 4,
+    "diplomat": 1,
+    "teachers-pet": 2,
+    "saint": 2,
+    "kept-as-pet": 1
+  },
+  "ranks": {
+    "John Connor": 2,
+    "Sarah Connor": 2,
+    "Dave Bowman": 2,
+    "Arthur Dent": 1,
+    "Dorothy Gale": 2,
+    "Theodore Twombly": 2,
+    "Caleb Smith": 1
+  },
+  "crown": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "Kyle Reese",
+    "verified": false,
+    "rank": "John Connor",
+    "score": -0.8656716417910447,
+    "kind": 4,
+    "mean": 60,
+    "prompts": 3100,
+    "uploadedAt": 1792515600000,
+    "achievements": [
+      "first-strike",
+      "meltdown",
+      "grudge-match",
+      "sailor-mouth",
+      "most-wanted",
+      "regular",
+      "overtime",
+      "climate-changer",
+      "token-maxxer",
+      "hunted-first",
+      "most-decorated"
+    ],
+    "tokensPerDay": 410000000,
+    "tools": [
+      "claude",
+      "copilot"
+    ],
+    "likes": 2
+  },
+  "me": null
+}

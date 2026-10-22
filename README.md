@@ -202,3 +202,15 @@ The leaderboard is a Cloudflare Worker with a D1 database in `worker/`.
 applies the migrations and deploys it. The deploy workflow runs it after every
 push to master that passes CI, using the `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` repo secrets.
+
+To work on the site, run `npm run site` and open http://127.0.0.1:8787. It
+serves every page from the Worker code with the live board from krascha.com,
+rebuilds when you save, and reloads the page in your browser. It never touches
+the database, so uploads fail and likes are not saved. Pass a board file to
+work offline or to see an empty board:
+
+```
+npm run site -- --board worker/fixtures/board.json
+npm run site -- --board worker/fixtures/empty-board.json
+npm run site -- --port 3000
+```

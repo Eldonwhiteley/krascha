@@ -1,8 +1,8 @@
 // What Krascha remembers about your leaderboard entry, in his data folder:
 // the entry's random id, the name you last chose, how your uploads prove they
 // are yours, the key he made up if you upload without GitHub, and how many
-// prompts you had at the last upload. This machine's id sits in a file of its
-// own.
+// prompts and which achievements you had at the last upload. This machine's id
+// sits in a file of its own.
 
 import path from 'node:path';
 
@@ -23,6 +23,8 @@ export interface SavedEntry {
   readonly key: string | null;
   /** Your prompt count at the last upload, so Krascha can tell when the board is behind. */
   readonly uploadedPrompts: number | null;
+  /** Your achievement ids at the last upload, so Krascha can tell when the board is missing new ones. */
+  readonly uploadedAchievements: readonly string[] | null;
 }
 
 export const NO_ENTRY: SavedEntry = {
@@ -31,10 +33,15 @@ export const NO_ENTRY: SavedEntry = {
   auth: null,
   key: null,
   uploadedPrompts: null,
+  uploadedAchievements: null,
 };
 
 function textOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function textsOrNull(value: unknown): string[] | null {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : null;
 }
 
 export async function loadSaved(storageDir: string): Promise<SavedEntry> {
@@ -50,6 +57,7 @@ export async function loadSaved(storageDir: string): Promise<SavedEntry> {
     auth: auth === 'github' || auth === 'key' ? auth : null,
     key: textOrNull(Reflect.get(data, 'key')),
     uploadedPrompts: typeof uploadedPrompts === 'number' ? uploadedPrompts : null,
+    uploadedAchievements: textsOrNull(Reflect.get(data, 'uploadedAchievements')),
   };
 }
 

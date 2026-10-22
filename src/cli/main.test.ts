@@ -218,6 +218,7 @@ describe('krascha', () => {
       auth: 'github',
       key: null,
       uploadedPrompts: 3,
+      uploadedAchievements: expect.arrayContaining(['manners']),
     });
   });
 
@@ -236,6 +237,24 @@ describe('krascha', () => {
     expect((await home.run()).out).toContain(behind);
     expect((await home.run('silo')).out).toContain(behind);
     await home.run('remove');
+    expect((await home.run()).out).not.toContain('Tip:');
+  });
+
+  it('names the achievements the board is missing since your last upload', async () => {
+    const home = await makeHome();
+    home.use({ fetch: fakeBoard([], false) });
+    await home.run('upload', 'Kyle');
+    const file = path.join(home.root, '.krascha', SAVED_FILE);
+    const saved: unknown = JSON.parse(await readFile(file, 'utf8'));
+    const uploaded: unknown = Reflect.get(Object(saved), 'uploadedAchievements');
+    expect(uploaded).toContain('manners');
+    const older = Array.isArray(uploaded) ? uploaded.filter((id) => id !== 'manners') : [];
+    await writeFile(file, JSON.stringify({ ...Object(saved), uploadedAchievements: older }));
+    const missing =
+      "Tip: Krascha's List is missing 1 achievement you earned: Manners module. Run upload to update Krascha's List.";
+    expect((await home.run()).out).toContain(missing);
+    expect((await home.run('silo')).out).toContain(missing);
+    await home.run('upload');
     expect((await home.run()).out).not.toContain('Tip:');
   });
 

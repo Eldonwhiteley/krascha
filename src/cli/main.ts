@@ -13,7 +13,7 @@ import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay } from '../reputation/tokens.js';
-import { unlockedIds } from '../shared/achievements.js';
+import { achievementsOf, unlockedIds } from '../shared/achievements.js';
 import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
 import { LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
@@ -105,14 +105,24 @@ async function refresh(io: CliIo): Promise<Refreshed> {
  * your last upload. Empty once the board is current, and after a removal,
  * since leaving the board was your call.
  */
-export function uploadTip(saved: SavedEntry, prompts: number): string {
+export function uploadTip(saved: SavedEntry, summary: ReputationSummary): string {
   if (saved.name === null) {
     return "Tip: run upload to go on Krascha's List at krascha.com.";
   }
   if (saved.entryId === null || saved.uploadedPrompts === null) {
     return '';
   }
-  const behind = prompts - saved.uploadedPrompts;
+  const uploaded = saved.uploadedAchievements;
+  // Entries uploaded before Krascha kept the list cannot tell which ones are new.
+  const missing =
+    uploaded === null
+      ? []
+      : achievementsOf(unlockedIds(summary).filter((id) => !uploaded.includes(id)));
+  if (missing.length > 0) {
+    const names = missing.map((rule) => rule.name).join(', ');
+    return `Tip: Krascha's List is missing ${plural(missing.length, 'achievement')} you earned: ${names}. Run upload to update Krascha's List.`;
+  }
+  const behind = summary.prompts - saved.uploadedPrompts;
   if (behind <= 0) {
     return '';
   }
@@ -127,7 +137,7 @@ async function show(io: CliIo): Promise<number> {
   const saved = await loadSaved(dataDir(io));
   const { summary } = await refresh(io);
   const paint: Paint = io.color ? COLOR : PLAIN;
-  io.out(withTip(renderReport(summary, paint), uploadTip(saved, summary.prompts), paint));
+  io.out(withTip(renderReport(summary, paint), uploadTip(saved, summary), paint));
   return 0;
 }
 
@@ -221,12 +231,13 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
   await saveSaved(dir, { ...saved, key });
   const machine = await loadMachine(dir, io.newKey);
   const { summary } = await refresh(io);
+  const achievements = unlockedIds(summary);
   const standing = await uploadScore(io.fetch, boardUrl(io), credential, {
     name,
     kind: summary.kind,
     mean: summary.mean,
     prompts: summary.prompts,
-    achievements: unlockedIds(summary),
+    achievements,
     tokensPerDay: summary.tokensPerDay,
     tools: summary.tools,
     machine,
@@ -237,6 +248,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     auth: credential.kind,
     key,
     uploadedPrompts: summary.prompts,
+    uploadedAchievements: achievements,
   });
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));
   return 0;
@@ -255,7 +267,13 @@ async function remove(io: CliIo): Promise<number> {
     return 1;
   }
   await removeEntry(io.fetch, boardUrl(io), credential);
-  await saveSaved(dir, { ...saved, entryId: null, auth: null, uploadedPrompts: null });
+  await saveSaved(dir, {
+    ...saved,
+    entryId: null,
+    auth: null,
+    uploadedPrompts: null,
+    uploadedAchievements: null,
+  });
   io.out('Krascha took you off the board. He still remembers.\n');
   return 0;
 }
@@ -315,7 +333,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
   const rank = rankFor(summary.score).name;
   const sheet = renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint);
-  io.out(withTip(sheet, uploadTip(saved, summary.prompts), paint));
+  io.out(withTip(sheet, uploadTip(saved, summary), paint));
   return 0;
 }
 

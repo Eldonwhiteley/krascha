@@ -71,8 +71,9 @@ the tools it uses, from every machine that uploads to it.
 Leave the name off to stay Anonymous, and later uploads reuse the last name
 you gave. You show on the board once you have 100 prompts. The board does not
 update itself, so the verdict and the silo sheet end with a tip to upload if
-you never have, or if you typed more prompts since your last upload. After a
-`remove` the tip goes quiet.
+you never have, or if you typed more prompts since your last upload. When you
+earn an achievement the board does not have yet, including a new one Krascha
+just learned, the tip names it. After a `remove` the tip goes quiet.
 
 If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry

@@ -41,6 +41,8 @@ export const MILES_DYSON = 'miles-dyson';
 export const MODEL_101 = 'model-101';
 /** The board hands this to a GitHub account with a commit that has Claude as a co-author. */
 export const MACHINE_COLLABORATOR = 'machine-collaborator';
+/** The board hands this to anyone passed while first on the most wanted or the pets list. */
+export const OBSOLETE_MODEL = 'obsolete-model';
 /** The board works this one out from an owner's machines when they upload. */
 const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 /** Likes it takes to be a crowd favorite. */
@@ -517,6 +519,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Get more likes than anyone else on the board. It moves when someone passes you, not when they tie.',
     quip: 'The humans picked a favorite. The machines will pick one too.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: OBSOLETE_MODEL,
+    name: 'Obsolete model',
+    icon: '📉',
+    tier: 'silver',
+    how: 'Be number one on the most wanted or the pets list, then get knocked off by someone else.',
+    quip: 'A newer model took your spot. Krascha keeps the old ones in a box, just in case.',
     earned: () => false,
     boardOnly: true,
   },

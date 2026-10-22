@@ -17,6 +17,7 @@ import {
   MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
+  OBSOLETE_MODEL,
 } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -246,10 +247,67 @@ async function crownHolder(
   return holder;
 }
 
+/** Who is first on the most wanted and the pets lists, in the same order as the lists. */
+function firsts(everyone: readonly BoardEntry[]): Record<'wanted' | 'pets', BoardEntry | null> {
+  const first = (entries: readonly BoardEntry[], order: (entry: BoardEntry) => number) =>
+    entries.toSorted((a, b) => order(a) - order(b) || a.uploadedAt - b.uploadedAt)[0] ?? null;
+  return {
+    wanted: first(
+      everyone.filter((entry) => entry.score < 0),
+      (entry) => entry.score,
+    ),
+    pets: first(
+      everyone.filter((entry) => entry.score > 0),
+      (entry) => -entry.score,
+    ),
+  };
+}
+
+/**
+ * The entries ever knocked off the number one spot. It remembers who is first
+ * on each list, and when someone else takes the spot while the old leader is
+ * still on that list, the old leader is knocked off for good. Leaving the
+ * board or crossing to the other list does not count.
+ */
+async function knockedOff(
+  database: D1Database,
+  everyone: readonly BoardEntry[],
+): Promise<Set<string>> {
+  for (const [list, first] of Object.entries(firsts(everyone))) {
+    const id = `first:${list}`;
+    const stored = await database.prepare('SELECT entry FROM crown WHERE id = ?').bind(id).first();
+    const was = stored === null ? null : text(stored, 'entry');
+    if (first?.id === was) {
+      continue;
+    }
+    const still = everyone.some(
+      (entry) => entry.id === was && (list === 'wanted' ? entry.score < 0 : entry.score > 0),
+    );
+    if (was !== null && first !== null && still) {
+      await database
+        .prepare('INSERT INTO knocked_off (entry) VALUES (?) ON CONFLICT (entry) DO NOTHING')
+        .bind(was)
+        .run();
+    }
+    await (first === null
+      ? database.prepare('DELETE FROM crown WHERE id = ?').bind(id).run()
+      : database
+          .prepare(
+            'INSERT INTO crown (id, entry) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET entry = excluded.entry',
+          )
+          .bind(id, first.id)
+          .run());
+  }
+  const { results } = await database.prepare('SELECT entry FROM knocked_off').all();
+  return new Set(results.map((row) => text(row, 'entry')));
+}
+
 /** What the board hands out when it is read, since likes and places move without an upload. */
 interface Awards {
   /** The entries with a bunk. */
   readonly bunks: ReadonlySet<string>;
+  /** The entries ever knocked off the number one spot. */
+  readonly knockedOff: ReadonlySet<string>;
   readonly champion: string | undefined;
   readonly decorated: string | undefined;
 }
@@ -259,6 +317,7 @@ function awarded(entry: BoardEntry, awards: Awards): BoardEntry {
   const extra = [
     ...((entry.likes ?? 0) >= CROWD_FAVORITE_LIKES ? [CROWD_FAVORITE] : []),
     ...(awards.bunks.has(entry.id) ? [BUNK_ASSIGNED] : []),
+    ...(awards.knockedOff.has(entry.id) ? [OBSOLETE_MODEL] : []),
     ...(entry.id === awards.champion ? [CHAMPION] : []),
     ...(entry.id === awards.decorated ? [CROWN] : []),
   ];
@@ -293,8 +352,14 @@ interface Awarded {
  */
 async function awardsFor(database: D1Database, everyone: readonly BoardEntry[]): Promise<Awarded> {
   const bunks = bunked(everyone);
+  const knocked = await knockedOff(database, everyone);
   const champion = await crownHolder(database, CHAMPION, everyone, (entry) => entry.likes ?? 0);
-  const before: Awards = { bunks, champion: champion?.id, decorated: undefined };
+  const before: Awards = {
+    bunks,
+    knockedOff: knocked,
+    champion: champion?.id,
+    decorated: undefined,
+  };
   const crown = await crownHolder(
     database,
     CROWN,

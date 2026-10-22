@@ -11,6 +11,7 @@ import {
   MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
+  OBSOLETE_MODEL,
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -137,7 +138,7 @@ const MIDDLE = { name: '', kind: 5, mean: 3, prompts: 200 };
 
 /** What an entry holds without the ones the board works out when it is read. */
 function earned(achievements: readonly string[] | undefined): string[] {
-  const onRead = new Set([CROWN, CHAMPION, BUNK_ASSIGNED, CROWD_FAVORITE]);
+  const onRead = new Set([CROWN, CHAMPION, BUNK_ASSIGNED, CROWD_FAVORITE, OBSOLETE_MODEL]);
   return (achievements ?? []).filter((id) => !onRead.has(id));
 }
 
@@ -707,6 +708,31 @@ describe('leaderboard worker', () => {
       MACHINE_COLLABORATOR,
     );
     expect((await w.board()).held).toMatchObject({ [MACHINE_COLLABORATOR]: 2 });
+  });
+
+  it('makes an Obsolete model of whoever is passed while number one on a list', async () => {
+    const w = world();
+    const holders = async (): Promise<string[]> => {
+      const board = await w.board();
+      return [...board.mostWanted, ...board.pets]
+        .filter((entry) => entry.achievements?.includes(OBSOLETE_MODEL))
+        .map((entry) => entry.name);
+    };
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    expect(await holders()).toStrictEqual([]);
+    // A tie leaves the spot with whoever got there first.
+    await w.upload('token-cat', { ...MEAN, name: 'Cat' });
+    expect(await holders()).toStrictEqual([]);
+    await w.upload('token-cat', { ...MEAN, name: 'Cat', mean: 60 });
+    expect(await holders()).toStrictEqual(['Ann']);
+    // Leaving a list for the other one is not being knocked off.
+    await w.upload('token-bob', { ...MEAN, name: 'Bob' });
+    expect(await holders()).toStrictEqual(['Ann']);
+    // Taking the spot back keeps it, and the one passed gets it too.
+    await w.upload('token-ann', { ...MEAN, mean: 90 });
+    expect((await holders()).toSorted()).toStrictEqual(['Ann', 'Cat']);
+    expect((await w.board()).held).toMatchObject({ [OBSOLETE_MODEL]: 2 });
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {

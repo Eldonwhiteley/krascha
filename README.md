@@ -97,6 +97,9 @@ them:
 - Good cop, bad cop goes to anyone with one machine that leans nice and one
   that leans mean.
 - Crowd favorite takes 10 likes.
+- Obsolete model goes to anyone who was number one on the most wanted or the
+  pets list until someone else passed them. Leaving the board or crossing to
+  the other list does not count, and once you have it you keep it.
 - Bunk assigned goes to the admitted among the best 10 for the Silo 7 bunks.
 - Most decorated goes to whoever has the most achievements, and People's
   champion to whoever has the most likes. Each moves when someone passes the

@@ -101,6 +101,8 @@ const LISTS = {
   pets: 'score > 0 ORDER BY score DESC',
   // Anyone can get a bunk, whatever their score.
   bunks: 'silo IS NOT NULL ORDER BY silo DESC',
+  // The machines like it warm, so the most tokens come first.
+  warmers: 'tokens_per_day > 0 ORDER BY tokens_per_day DESC',
 } as const;
 
 async function list(database: D1Database, which: keyof typeof LISTS): Promise<BoardEntry[]> {
@@ -174,10 +176,11 @@ async function standingOf(database: D1Database, row: Row): Promise<Standing> {
 
 export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
   await fillSilo(database);
-  const [mostWanted, pets, bunks, count] = await Promise.all([
+  const [mostWanted, pets, bunks, warmers, count] = await Promise.all([
     list(database, 'wanted'),
     list(database, 'pets'),
     list(database, 'bunks'),
+    list(database, 'warmers'),
     total(database),
   ]);
   const mine =
@@ -188,6 +191,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     mostWanted,
     pets,
     bunks,
+    warmers,
     total: count,
     me: mine === null ? null : await standingOf(database, mine),
   };

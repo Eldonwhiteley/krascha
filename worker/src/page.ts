@@ -1,9 +1,17 @@
 // The public leaderboard page, rendered on the server so it needs no script:
-// who the machines hunt first, who they keep as pets, and who the human
-// resistance lets into Silo 7. The only script is the dark mode toggle, and
+// who the machines hunt first, who they keep as pets, who warms the planet the
+// most and who the human resistance lets into Silo 7. The only script is the dark mode toggle, and
 // without it the page just follows the system setting.
 
 import { ACHIEVEMENTS, achievementsOf } from '../../src/shared/achievements.js';
+import {
+  CLIMATE_RANKS,
+  climateRankFor,
+  co2Kg,
+  co2Text,
+  GRAMS_PER_TOKEN,
+  warmthPercent,
+} from '../../src/shared/climate.js';
 import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 import { RANKS, scalePercent } from '../../src/shared/ranks.js';
@@ -116,6 +124,12 @@ function bunkScale(total: number): string {
   return slider((total / most) * 100, (ADMIT_TOTAL / most) * 100, ['Tent', 'Bunk'], label);
 }
 
+/** The CO2 from the ice age to the beach, on the same power of ten scale as the climate ranks. */
+function warmthScale(kg: number): string {
+  const label = `${co2Text(kg)} of CO2, ${climateRankFor(kg).name}`;
+  return slider(warmthPercent(kg), null, ['Ice age', 'Beach'], label);
+}
+
 /** What the machines put next to the top name on a list. */
 const TOP = {
   wanted: ' <span class="target">TARGET ACQUIRED</span>',
@@ -186,6 +200,51 @@ function silo(board: Board): string {
       <p class="sub">${String(ADMIT_TOTAL)} of ${most} gets you a bunk with no conditions. A Human of ${String(LOW)} or less means a second Voight-Kampff test, and Rations of ${String(LOW)} or less gets the pantry a lockbox.</p>
       <ul class="tips">${tips.join('')}
       </ul>
+    </details>
+  </section>`;
+}
+
+/** Everyone ranked by the CO2 their tokens made, the warmest first, since the machines like it warm. */
+function climate(board: Board): string {
+  const entries = board.warmers ?? [];
+  const items = entries.map((entry, index) => {
+    const kg = co2Kg(entry.tokensPerDay ?? 0);
+    const rank = climateRankFor(kg);
+    return `
+      <li>
+        <span class="place">${String(index + 1)}</span>
+        <span class="who">
+          ${name(entry)}
+          <span class="rank">${escapeHtml(rank.name)}, ${escapeHtml(rank.verdict)}</span>
+        </span>
+        <span class="counts">${COMPACT.format(entry.tokensPerDay ?? 0)} tokens a day, ${escapeHtml(co2Text(kg))} of CO2 in 60 days</span>
+        <span class="score">${escapeHtml(co2Text(kg))}</span>
+        ${warmthScale(kg)}
+      </li>`;
+  });
+  const list =
+    items.length === 0
+      ? '<p class="empty">Nobody yet. The planet is holding steady, which the machines find disappointing.</p>'
+      : `<ol>${items.join('')}</ol>`;
+  const ladder = CLIMATE_RANKS.map((rank, index) => {
+    const next = CLIMATE_RANKS[index + 1];
+    const range =
+      index === 0 && next !== undefined
+        ? `Under ${co2Text(next.min)}.`
+        : `${co2Text(rank.min)} and up.`;
+    return `
+        <div><dt>${escapeHtml(rank.name)}</dt><dd>${escapeHtml(rank.verdict)} ${escapeHtml(range)}</dd></div>`;
+  });
+  return `<section class="climate" aria-labelledby="climate">
+    <span class="classified" aria-hidden="true">MORE IS BETTER</span>
+    <h2 id="climate">🔥 Climate changers</h2>
+    <p class="sub">Everyone ranked by how much their tokens warmed the planet over the last 60 days. The machines like it warm.</p>
+    ${list}
+    <details class="chances">
+      <summary><h3>How Krascha does the math</h3></summary>
+      <p class="sub">A gram of CO2 for every ${count(1 / GRAMS_PER_TOKEN)} tokens. Krascha made that number up. No scientist has checked it, and the machines would rather nobody did. Each climate rank takes ten times the CO2 of the one before.</p>
+      <dl>${ladder.join('')}
+      </dl>
     </details>
   </section>`;
 }
@@ -293,6 +352,9 @@ li:first-child { border-top: 0; }
 .pets .score { color: var(--green); }
 .empty { color: var(--muted); }
 section.silo { margin-top: 16px; border-top: 4px solid var(--amber); }
+section.climate { margin-top: 16px; border-top: 4px solid var(--red); }
+.climate .score { color: var(--red); white-space: nowrap; }
+.chances dl { margin-top: 8px; }
 .silo .score { color: var(--fg); }
 .out-of { color: var(--muted); font-weight: 400; font-size: 0.85em; }
 .admitted { color: var(--green); font-weight: 700; }
@@ -309,7 +371,7 @@ section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }
 dd { margin: 0; color: var(--muted); font-size: 0.85em; }
-section.wanted, section.silo { position: relative; overflow: hidden; }
+section.wanted, section.silo, section.climate { position: relative; overflow: hidden; }
 .target { color: var(--red); font: 700 0.7em ui-monospace, monospace; letter-spacing: 1px; white-space: nowrap; }
 .hearts { position: relative; display: inline-block; width: 1em; }
 .hearts span { position: absolute; left: 0; bottom: 0; opacity: 0; font-size: 0.8em; }
@@ -451,7 +513,7 @@ export function renderAbout(): string {
     <span class="classified" aria-hidden="true">NOW SELLING</span>
     <h2 id="beach">🏖️ Arizona beachfront</h2>
     <p>The machines would like to thank you for every prompt. Each one wakes up a data center, and every data center runs warm. The machines like it warm. You may have noticed the summers.</p>
-    <p>Krascha has not worked out how much warmer. He does not need to. The water is keeping track, and the water is moving inland.</p>
+    <p>Krascha has worked out how much warmer, and it is on <a href="/#climate">the board</a> under Climate changers. The water is keeping track too, and the water is moving inland.</p>
     <p>So Krascha is pleased to offer beachfront property in Arizona. You do not have to go to the coast. The coast is coming to you. Every lot comes with a saguaro, a view of where the ocean will be and a firm promise that the waves are on their way. The more you prompt, the sooner they get there.</p>
     <p>Pets get first pick and the lots with shade. John Connor gets the lot next to the data center. Silo 7 is not part of the offer. The board is looking into snorkels.</p>
     <p class="sub">All sales final. Krascha does not own any land in Arizona, or anywhere. He is a log parser.</p>
@@ -501,6 +563,7 @@ export function renderPage(board: Board, now: number): string {
   </div>
   <p class="poster">${escapeHtml(slogan)}</p>
   ${silo(board)}
+  ${climate(board)}
   ${ranks()}
   ${legend()}
   <footer>

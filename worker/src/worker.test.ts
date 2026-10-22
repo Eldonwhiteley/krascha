@@ -9,6 +9,7 @@ import {
   MAX_TOKENS_PER_DAY,
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
+import { CLIMATE_RANKS } from '../../src/shared/climate.js';
 import { RANKS } from '../../src/shared/ranks.js';
 import { reputationScore } from '../../src/shared/reputation.js';
 import { CRITERIA, rankBoard, STATUS_LABEL } from '../../src/shared/silo.js';
@@ -130,6 +131,7 @@ describe('leaderboard worker', () => {
       mostWanted: [],
       pets: [],
       bunks: [],
+      warmers: [],
       total: 0,
       me: null,
     });
@@ -303,6 +305,7 @@ describe('leaderboard worker', () => {
       'diplomat',
       'first-strike',
       'meltdown',
+      'climate-changer',
       'token-maxxer',
     ]);
     const again = await w.upload('token-ann', { ...MEAN, prompts: 500, machine: laptop });
@@ -472,6 +475,40 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<span class="end">Tent</span>');
   });
 
+  it('ranks the climate changers by CO2, the warmest first, and leaves out anyone with no tokens', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, tokensPerDay: 100_000_000 });
+    await w.upload('token-bob', { ...KIND, tokensPerDay: 200_000_000 });
+    await w.upload('token-cat', MIDDLE);
+    const board = await w.board();
+    expect(board.warmers?.map((entry) => entry.name)).toStrictEqual(['Bob', 'Ann']);
+    const page = await (await w.call('GET', '/')).text();
+    expect(page).toContain('<h2 id="climate">🔥 Climate changers</h2>');
+    const section = page.slice(page.indexOf('id="climate"'), page.indexOf('id="ranks"'));
+    expect(section).toContain(
+      '<span class="rank">Arizona beachfront, The coast is on its way to you.</span>',
+    );
+    expect(section).toContain('200M tokens a day, 1.2 tonnes of CO2 in 60 days');
+    expect(section).toContain(
+      '<span class="rank">Data center, The machines feel the warmth.</span>',
+    );
+    expect(section).toContain('<span class="score">600 kg</span>');
+    expect(section).toContain('aria-label="600 kg of CO2, Data center"');
+    expect(section).not.toContain('Anonymous');
+    for (const rank of CLIMATE_RANKS) {
+      expect(section).toContain(`<dt>${escapeHtml(rank.name)}</dt>`);
+    }
+    expect(section).toContain(
+      '<dt>Ice age</dt><dd>Barely a puff. The machines are disappointed. Under 1 kg.</dd>',
+    );
+    expect(page.indexOf('id="climate"')).toBeGreaterThan(page.indexOf('id="silo"'));
+  });
+
+  it('says the climate changers list is empty until someone sends tokens', async () => {
+    const page = await (await world().call('GET', '/')).text();
+    expect(page).toContain('Nobody yet. The planet is holding steady');
+  });
+
   it('explains every achievement on the page, earned or not', async () => {
     const w = world();
     const page = await (await w.call('GET', '/')).text();
@@ -577,6 +614,7 @@ describe('leaderboard worker', () => {
     expect(page).toContain('<section class="story beach" aria-labelledby="beach">');
     expect(page).toContain('<h2 id="beach">🏖️ Arizona beachfront</h2>');
     expect(page).toContain('The coast is coming to you.');
+    expect(page).toContain('<a href="/#climate">the board</a>');
     expect(page).toContain('Krascha does not own any land in Arizona, or anywhere.');
     expect(page.indexOf('id="beach"')).toBeGreaterThan(page.indexOf('id="boom"'));
   });

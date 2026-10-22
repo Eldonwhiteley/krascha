@@ -90,6 +90,8 @@ export interface Board {
   readonly pets: readonly BoardEntry[];
   /** The best Silo 7 totals out of everyone. Missing from a server older than the silo on the board. */
   readonly bunks?: readonly BoardEntry[];
+  /** The most tokens a day, the warmest first. Missing from a server older than climate on the board. */
+  readonly warmers?: readonly BoardEntry[];
   /** Everyone with at least MIN_PROMPTS. */
   readonly total: number;
   /** The caller's own entry, when the request named one. */
@@ -176,6 +178,8 @@ export function isBoard(value: unknown): value is Board {
     value['pets'].every(isBoardEntry) &&
     (value['bunks'] === undefined ||
       (Array.isArray(value['bunks']) && value['bunks'].every(isBoardEntry))) &&
+    (value['warmers'] === undefined ||
+      (Array.isArray(value['warmers']) && value['warmers'].every(isBoardEntry))) &&
     isCount(value['total']) &&
     (value['me'] === null || isStanding(value['me']))
   );

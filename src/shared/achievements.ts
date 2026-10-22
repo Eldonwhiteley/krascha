@@ -2,6 +2,7 @@
 // thousand prompts, a token habit. Shared so the report can show yours, the upload
 // can send which ones you have, and the leaderboard can show everyone's.
 
+import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
 import { RANKS, rankFor } from './ranks.js';
 import type { ReputationSummary, ReputationTally } from './reputation.js';
 import { reputationScore } from './reputation.js';
@@ -114,6 +115,14 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     icon: '📜',
     how: 'Get 1,000 prompts on file.',
     earned: (state) => state.prompts >= 1000,
+    fromCounts: true,
+  },
+  {
+    id: 'climate-changer',
+    name: 'Climate changer',
+    icon: '🌡️',
+    how: `Warm the planet by ${String(CLIMATE_CHANGER_KG)} kg of CO2 over the last 60 days, by Krascha's math.`,
+    earned: (state) => co2Kg(state.tokensPerDay) >= CLIMATE_CHANGER_KG,
     fromCounts: true,
   },
   {

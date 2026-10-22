@@ -5,10 +5,12 @@
 // belongs to one of two ways. A GitHub token is checked once with GitHub and
 // then dropped, never stored or logged, and its entry shows as verified and
 // links to the account, so only the user id and login are kept. The same
-// check asks GitHub whether they got a pull request merged into Krascha. A key the CLI
+// check asks GitHub whether they got a pull request merged into Krascha, and
+// whether theirs was the first. A key the CLI
 // made up is stored only as a hash, so it ties uploads together without saying
 // who anyone is.
 
+import { SHANEP } from '../../src/shared/achievements.js';
 import {
   GITHUB_LOGIN_PATTERN,
   isScoreUpload,
@@ -100,19 +102,66 @@ async function mergedPull(token: string, login: string, deps: Deps): Promise<boo
   return typeof total === 'number' ? total > 0 : null;
 }
 
+/**
+ * Who opened one pull request in GitHub's list and when it was merged, or
+ * null when it was not merged or came from Shane or a bot.
+ */
+function mergedBy(pull: unknown): { readonly id: number; readonly at: string } | null {
+  if (typeof pull !== 'object' || pull === null) {
+    return null;
+  }
+  const at: unknown = Reflect.get(pull, 'merged_at');
+  const user: unknown = Reflect.get(pull, 'user');
+  const id: unknown = typeof user === 'object' && user !== null ? Reflect.get(user, 'id') : null;
+  const type: unknown =
+    typeof user === 'object' && user !== null ? Reflect.get(user, 'type') : null;
+  return typeof at === 'string' && typeof id === 'number' && id !== SHANEP && type !== 'Bot'
+    ? { id, at }
+    : null;
+}
+
+/**
+ * Whether this GitHub user id is behind the first pull request merged into
+ * Krascha, or null when GitHub could not say. It reads the oldest 100 closed
+ * pull requests and takes the earliest merge, since GitHub only sorts them by
+ * when they were opened.
+ */
+async function firstMerge(token: string, id: number, deps: Deps): Promise<boolean | null> {
+  const response = await deps.fetch(
+    `https://api.github.com/repos/${REPO}/pulls?state=closed&sort=created&direction=asc&per_page=100`,
+    { headers: githubHeaders(token) },
+  );
+  if (!response.ok) {
+    return null;
+  }
+  const pulls: unknown = await response.json();
+  if (!Array.isArray(pulls)) {
+    return null;
+  }
+  const first = pulls
+    .map((pull) => mergedBy(pull))
+    .filter((merge) => merge !== null)
+    .toSorted((a, b) => a.at.localeCompare(b.at))[0];
+  return first === undefined ? false : first.id === id;
+}
+
 async function githubOwner(token: string, deps: Deps): Promise<Owner | null> {
   const response = await deps.fetch('https://api.github.com/user', {
     headers: githubHeaders(token),
   });
   const user = response.ok ? githubUserOf(await response.json()) : null;
-  return user === null
-    ? null
-    : {
-        id: `github:${String(user.id)}`,
-        verified: true,
-        github: user.login,
-        contributor: await mergedPull(token, user.login, deps),
-      };
+  if (user === null) {
+    return null;
+  }
+  const contributor = await mergedPull(token, user.login, deps);
+  return {
+    id: `github:${String(user.id)}`,
+    verified: true,
+    github: user.login,
+    contributor,
+    // Only a contributor can be first, so everyone else skips the second call.
+    first: contributor === true ? await firstMerge(token, user.id, deps) : contributor,
+  };
 }
 
 /**

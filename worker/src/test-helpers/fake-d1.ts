@@ -43,10 +43,25 @@ const GITHUB_USERS: Readonly<Record<string, { readonly id: number; readonly logi
   'token-not-shane': { id: 4, login: 'shanep' },
   'token-dan': { id: 5, login: 'dan' },
   'token-eve': { id: 6, login: 'eve' },
+  'token-fay': { id: 7, login: 'fay' },
 };
 
+/**
+ * Krascha's closed pull requests, oldest opened first, like GitHub lists
+ * them. Shane's own and the bot's merged before anyone's but do not count.
+ * Fay opened hers before Eve but Eve's was merged first, and Bob's was closed
+ * without a merge.
+ */
+const PULLS = [
+  { user: { id: 1378027, type: 'User' }, merged_at: '2026-01-01T00:00:00Z' },
+  { user: { id: 99, type: 'Bot' }, merged_at: '2026-01-02T00:00:00Z' },
+  { user: { id: 2, type: 'User' }, merged_at: null },
+  { user: { id: 7, type: 'User' }, merged_at: '2026-03-01T00:00:00Z' },
+  { user: { id: 6, type: 'User' }, merged_at: '2026-02-01T00:00:00Z' },
+];
+
 /** The logins with a pull request merged into Krascha. */
-const MERGED: ReadonlySet<string> = new Set(['eve']);
+const MERGED: ReadonlySet<string> = new Set(['eve', 'fay']);
 /** The logins whose search fails, like when GitHub rate limits it. */
 const SEARCH_FAILS: ReadonlySet<string> = new Set(['dan']);
 
@@ -57,6 +72,9 @@ export async function fakeGitHub(url: string, init: RequestInit): Promise<Respon
   const user = GITHUB_USERS[auth.replace('Bearer ', '')];
   if (user === undefined) {
     return new Response('{"message":"Bad credentials"}', { status: 401 });
+  }
+  if (url.startsWith('https://api.github.com/repos/shanep/krascha/pulls?')) {
+    return Response.json(PULLS);
   }
   if (url.startsWith('https://api.github.com/search/issues?')) {
     const query = new URL(url).searchParams.get('q') ?? '';

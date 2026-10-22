@@ -9,6 +9,7 @@ import {
   CROWD_FAVORITE,
   CROWN,
   MILES_DYSON,
+  MODEL_101,
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -675,6 +676,18 @@ describe('leaderboard worker', () => {
       MILES_DYSON,
     );
     expect((await w.board()).held).toMatchObject({ [MILES_DYSON]: 2 });
+  });
+
+  it('gives Model 101 only to the account behind the first pull request merged into Krascha', async () => {
+    const w = world();
+    const eve = await w.upload('token-eve', { ...KIND, name: 'Eve' });
+    const fay = await w.upload('token-fay', { ...KIND, name: 'Fay' });
+    expect(eve.entry.achievements).toContain(MODEL_101);
+    expect(fay.entry.achievements).toContain(MILES_DYSON);
+    expect(fay.entry.achievements).not.toContain(MODEL_101);
+    const claim = { ...KIND, achievements: [MODEL_101] };
+    expect((await w.upload('token-shane', claim)).entry.achievements).not.toContain(MODEL_101);
+    expect((await w.board()).held).toMatchObject({ [MODEL_101]: 1 });
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {

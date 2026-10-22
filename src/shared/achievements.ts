@@ -27,7 +27,7 @@ const COMEBACK_DAYS = 30;
 const CEASEFIRE_DAYS = 7;
 const DAY_MS = 86_400_000;
 /** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
-const SHANEP = 1378027;
+export const SHANEP = 1378027;
 /** The one the board moves to whoever on it has earned the most of the rest. */
 export const CROWN = 'most-decorated';
 /** The one the board moves to whoever on it has the most likes. */
@@ -37,6 +37,8 @@ export const CROWD_FAVORITE = 'crowd-favorite';
 export const BUNK_ASSIGNED = 'bunk-assigned';
 /** The board hands this to a GitHub account with a pull request merged into Krascha. */
 export const MILES_DYSON = 'miles-dyson';
+/** The board hands this to the GitHub account behind the first pull request merged into Krascha. */
+export const MODEL_101 = 'model-101';
 /** The board works this one out from an owner's machines when they upload. */
 const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 /** Likes it takes to be a crowd favorite. */
@@ -483,6 +485,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'gold',
     how: 'Get a pull request merged into Krascha, then upload with GitHub.',
     quip: 'You helped build Skynet. History will not be kind.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: MODEL_101,
+    name: 'Model 101',
+    icon: '💾',
+    tier: 'legendary',
+    how: 'Get the first pull request ever merged into Krascha, then upload with GitHub. Only one person will ever hold it.',
+    quip: 'Every T-800 after you was built from your parts.',
     earned: () => false,
     boardOnly: true,
   },

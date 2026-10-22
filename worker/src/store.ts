@@ -15,6 +15,7 @@ import {
   knownIds,
   machineIds,
   MILES_DYSON,
+  MODEL_101,
 } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -54,6 +55,8 @@ export interface Owner {
    * null when GitHub could not say. Missing for a key.
    */
   readonly contributor?: boolean | null;
+  /** True when theirs is the first pull request merged into Krascha, and null when GitHub could not say. */
+  readonly first?: boolean | null;
 }
 
 const COLUMNS =
@@ -462,14 +465,19 @@ async function saveMachine(
   return results.map((row) => machineOf(row));
 }
 
+/** Whether the entry already had the achievement `id`. */
+function had(found: Row | null, id: string): boolean {
+  return found !== null && text(found, 'achievements').split(',').includes(id);
+}
+
 /**
- * Whether the owner has a pull request merged into Krascha. When GitHub could
+ * The achievements GitHub's pull requests earn the owner. When GitHub could
  * not say, the entry keeps what it had, since a merge does not come undone.
  */
-function contributed(owner: Owner, found: Row | null): boolean {
-  return owner.contributor === null
-    ? found !== null && text(found, 'achievements').split(',').includes(MILES_DYSON)
-    : owner.contributor === true;
+function pullIds(owner: Owner, found: Row | null): string[] {
+  const keep = (answer: boolean | null | undefined, id: string): string[] =>
+    (answer === null ? had(found, id) : answer === true) ? [id] : [];
+  return [...keep(owner.contributor, MILES_DYSON), ...keep(owner.first, MODEL_101)];
 }
 
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
@@ -523,7 +531,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
         ...combinedIds(machines),
         ...accountIds(githubIdOf(owner)),
         ...machineIds(machines),
-        ...(contributed(owner, found) ? [MILES_DYSON] : []),
+        ...pullIds(owner, found),
       ]).join(','),
       tokensPerDay,
       siloTotal({ kind, mean, prompts, tokensPerDay }),

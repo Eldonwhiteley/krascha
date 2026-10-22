@@ -134,6 +134,7 @@ describe('leaderboard worker', () => {
       warmers: [],
       total: 0,
       held: {},
+      ranks: {},
       me: null,
     });
   });
@@ -554,15 +555,36 @@ describe('leaderboard worker', () => {
     const page = await (await w.call('GET', '/')).text();
     expect(page).toContain('<h2 id="ranks">🎖️ Ranks</h2>');
     const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('id="legend"'));
-    const spots = RANKS.map((rank) => {
+    const spots = RANKS.map((rank, index) => {
       expect(ladder).toContain(
-        `<dt>${escapeHtml(rank.name)}, ${escapeHtml(rank.title)}</dt><dd>${escapeHtml(rank.source)}. Hunted: ${escapeHtml(rank.hunted)}. Score ${String(Math.round(rank.min * 100))} and up.</dd>`,
+        `${escapeHtml(rank.icon)}</span> ${escapeHtml(rank.name)} <span class="title">${escapeHtml(rank.title)}</span> <span class="tier">Level ${String(index + 1)}</span></dt>`,
       );
-      return ladder.indexOf(`<dt>${escapeHtml(rank.name)},`);
+      expect(ladder).toContain(
+        `<span class="reel">🎞️ ${escapeHtml(rank.source)}</span> <span class="hunt">Hunted: ${escapeHtml(rank.hunted)}</span>`,
+      );
+      expect(ladder).toContain(`"${escapeHtml(rank.taunt)}"`);
+      return ladder.indexOf(`</span> ${escapeHtml(rank.name)} <span class="title">`);
     });
     expect(spots).toStrictEqual(spots.toSorted((a, b) => a - b));
-    expect(ladder).toContain('<dt>John Connor,');
-    expect(ladder).toContain('<dt>Theodore Twombly,');
+    expect(ladder).toContain('aria-label="Scores -100 to -71"');
+    expect(ladder).toContain('aria-label="Scores 71 to 100"');
+    expect(ladder.split('Nobody here yet.')).toHaveLength(RANKS.length + 1);
+  });
+
+  it('counts who holds each rank and flags the most crowded', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-bob', KIND);
+    await w.upload('token-cat', { ...KIND, name: 'Cat' });
+    const pet = RANKS.at(-1)?.name ?? '';
+    const hunted = RANKS[0]?.name ?? '';
+    expect((await w.board()).ranks).toStrictEqual({ [hunted]: 1, [pet]: 2 });
+    const page = await (await w.call('GET', '/')).text();
+    const ladder = page.slice(page.indexOf('id="ranks"'), page.indexOf('id="legend"'));
+    expect(ladder).toContain('1 of 3 are here (33%)</dd>');
+    expect(ladder).toContain('2 of 3 are here (67%) <span class="crowded">Most crowded</span>');
+    expect(ladder.split('class="crowded"')).toHaveLength(2);
+    expect(ladder.split('Nobody here yet.')).toHaveLength(RANKS.length - 1);
   });
 
   it('ranks everyone on the board for Silo 7, like krascha silo board', async () => {

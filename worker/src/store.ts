@@ -188,15 +188,27 @@ async function held(database: D1Database): Promise<Record<string, number>> {
   return counts;
 }
 
+/** How many listed entries hold each rank, by rank name. */
+async function ranked(database: D1Database): Promise<Record<string, number>> {
+  const { results } = await database.prepare(`SELECT score FROM scores WHERE ${LISTED}`).all();
+  const counts: Record<string, number> = {};
+  for (const row of results) {
+    const { name } = rankFor(number_(row, 'score'));
+    counts[name] = (counts[name] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
   await fillSilo(database);
-  const [mostWanted, pets, bunks, warmers, count, holders] = await Promise.all([
+  const [mostWanted, pets, bunks, warmers, count, holders, ranks] = await Promise.all([
     list(database, 'wanted'),
     list(database, 'pets'),
     list(database, 'bunks'),
     list(database, 'warmers'),
     total(database),
     held(database),
+    ranked(database),
   ]);
   const mine =
     me === null
@@ -209,6 +221,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     warmers,
     total: count,
     held: holders,
+    ranks,
     me: mine === null ? null : await standingOf(database, mine),
   };
 }

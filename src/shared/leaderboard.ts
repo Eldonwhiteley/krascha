@@ -96,6 +96,8 @@ export interface Board {
   readonly total: number;
   /** How many of them hold each achievement, by id. Missing from a server older than the count. */
   readonly held?: Readonly<Record<string, number>>;
+  /** How many of them hold each rank, by rank name. Missing from a server older than the count. */
+  readonly ranks?: Readonly<Record<string, number>>;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
 }
@@ -185,6 +187,8 @@ export function isBoard(value: unknown): value is Board {
     isCount(value['total']) &&
     (value['held'] === undefined ||
       (isRecord(value['held']) && Object.values(value['held']).every(isCount))) &&
+    (value['ranks'] === undefined ||
+      (isRecord(value['ranks']) && Object.values(value['ranks']).every(isCount))) &&
     (value['me'] === null || isStanding(value['me']))
   );
 }

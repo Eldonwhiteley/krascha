@@ -252,16 +252,57 @@ function climate(board: Board): string {
   </section>`;
 }
 
-/** Every rank on the scale, hunted first to kept as a pet, so the rank under a name means something. */
-function ranks(): string {
-  const items = RANKS.map(
-    (rank) => `
-        <div><dt>${escapeHtml(rank.name)}, ${escapeHtml(rank.title)}</dt><dd>${escapeHtml(rank.source)}. Hunted: ${escapeHtml(rank.hunted)}. Score ${String(Math.round(rank.min * 100))} and up.</dd></div>`,
-  );
-  return `<section class="legend" aria-labelledby="ranks">
+/** A meter and how many out of everyone on the board, like 3 of 12 hold it (25%). */
+function meter(holders: number, total: number, verb: string): string {
+  const share = total === 0 ? 0 : Math.min(100, Math.round((holders / total) * 100));
+  return `<span class="meter" style="--held: ${String(share)}%"></span> ${count(holders)} of ${count(total)} ${verb} (${String(share)}%)`;
+}
+
+/** How many on the board hold a rank, with a meter, and a flag on the most crowded. */
+function headcount(holders: number, total: number, crowded: boolean): string {
+  if (holders === 0) {
+    return `
+          <dd class="rarity">Nobody here yet.</dd>`;
+  }
+  const flag = crowded ? ' <span class="crowded">Most crowded</span>' : '';
+  return `
+          <dd class="rarity">${meter(holders, total, 'are here')}${flag}</dd>`;
+}
+
+/** How soon a rank is hunted as a color, red for first through amber to green for never. */
+function threat(index: number): string {
+  const along = index / (RANKS.length - 1);
+  return along <= 0.5
+    ? `color-mix(in srgb, var(--amber) ${percent(along * 200)}, var(--red))`
+    : `color-mix(in srgb, var(--green) ${percent((along - 0.5) * 200)}, var(--amber))`;
+}
+
+/**
+ * Every rank on the scale, hunted first to kept as a pet, so the rank under a
+ * name means something. Each band sits a step further along the scale than the
+ * one before, so the bars climb like a ladder.
+ */
+function ranks(board: Board): string {
+  const crowd = board.ranks ?? {};
+  const most = Math.max(0, ...Object.values(crowd));
+  const items = RANKS.map((rank, index) => {
+    const top = RANKS[index + 1]?.min ?? 1;
+    const holders = crowd[rank.name] ?? 0;
+    const shown = board.ranks === undefined ? '' : headcount(holders, board.total, holders === most);
+    const style = `--row: ${String(index)}; --threat: ${threat(index)}; --from: ${percent(scalePercent(rank.min))}; --to: ${percent(scalePercent(top))}`;
+    const range = `Scores ${String(Math.round(rank.min * 100))} to ${String(Math.round(top * 100))}`;
+    return `
+        <div class="badge rung" style="${style}">
+          <dt><span class="medal" aria-hidden="true">${escapeHtml(rank.icon)}</span> ${escapeHtml(rank.name)} <span class="title">${escapeHtml(rank.title)}</span> <span class="tier">Level ${String(index + 1)}</span></dt>
+          <dd class="chips"><span class="reel">🎞️ ${escapeHtml(rank.source)}</span> <span class="hunt">Hunted: ${escapeHtml(rank.hunted)}</span></dd>
+          <dd class="quip">"${escapeHtml(rank.taunt)}"</dd>
+          <dd class="band" role="img" aria-label="${escapeHtml(range)}"><span class="span"></span><span class="range">${escapeHtml(range)}</span></dd>${shown}
+        </div>`;
+  });
+  return `<section class="legend ranks" aria-labelledby="ranks">
     <h2 id="ranks">🎖️ Ranks</h2>
-    <p class="sub">Every rank on the scale, from hunted first to kept as a pet. Yours is under your name.</p>
-    <dl>${items.join('')}
+    <p class="sub">Every rank on the scale, from hunted first to kept as a pet, and how many on the board hold each one. Yours is under your name.</p>
+    <dl class="rungs">${items.join('')}
     </dl>
   </section>`;
 }
@@ -277,9 +318,8 @@ function rarity(holders: number, total: number, rarest: boolean): string {
   if (holders === 0) {
     return '<dd class="rarity">Nobody has this one yet. Be the first.</dd>';
   }
-  const share = total === 0 ? 0 : Math.min(100, Math.round((holders / total) * 100));
   const flag = rarest ? ' <span class="rarest">Rarest on the board</span>' : '';
-  return `<dd class="rarity"><span class="meter" style="--held: ${String(share)}%"></span> ${count(holders)} of ${count(total)} hold it (${String(share)}%)${flag}</dd>`;
+  return `<dd class="rarity">${meter(holders, total, 'hold it')}${flag}</dd>`;
 }
 
 /**
@@ -402,7 +442,34 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .rarity { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-family: var(--mono); }
 .meter { width: 60px; height: 6px; border-radius: 3px;
   background: linear-gradient(to right, var(--amber) var(--held), var(--bar) var(--held)); }
-.rarest { padding: 0 6px; border: 1px solid var(--amber); border-radius: 999px; color: var(--amber); font-weight: 700; }
+.rarest, .crowded { padding: 0 6px; border: 1px solid var(--amber); border-radius: 999px; color: var(--amber); font-weight: 700; }
+.rungs { grid-template-columns: minmax(0, 1fr); }
+.rung { position: relative; display: grid; grid-template-columns: 1fr minmax(240px, 40%); gap: 0 20px;
+  padding-left: calc(12px + 3.4em); border-left-color: var(--threat); }
+.rung > * { grid-column: 1; }
+.rung dt .medal { --metal: var(--threat); --rim: color-mix(in srgb, var(--threat) 55%, #000);
+  position: absolute; top: 12px; left: 12px; font-size: 1.6em; }
+.rung .title { color: var(--muted); font-weight: 400; font-size: 0.85em; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.reel, .hunt { padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; font: 600 0.9em var(--mono); white-space: nowrap; }
+.reel { border-style: dashed; color: var(--fg); }
+.hunt { border-color: var(--threat); background: color-mix(in srgb, var(--threat) 14%, transparent); color: var(--threat);
+  text-transform: uppercase; letter-spacing: 0.5px; }
+.rung .band { display: flex; gap: 8px; align-items: center; grid-column: 2; grid-row: 1 / span 2; align-self: end; }
+.rung .rarity { grid-column: 2; grid-row: 3; }
+.band .span { position: relative; flex: 1; height: 8px; border-radius: 4px;
+  background: linear-gradient(to right, var(--red), var(--amber), var(--green)); }
+.band .span::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: color-mix(in srgb, var(--card) 72%, transparent); }
+.band .span::after { content: ""; position: absolute; top: -3px; bottom: -3px; left: var(--from); right: calc(100% - var(--to));
+  border: 2px solid var(--fg); border-radius: 3px; background: var(--threat); transform-origin: left; }
+.range { flex: none; width: 19ch; font: 0.75em var(--mono); text-align: right; text-transform: uppercase; }
+.rung .meter { background: linear-gradient(to right, var(--threat) var(--held), var(--bar) var(--held)); }
+@media (max-width: 640px) {
+  .rung { grid-template-columns: minmax(0, 1fr); }
+  .reel, .hunt { white-space: normal; }
+  .rung .band, .rung .rarity { grid-column: 1; grid-row: auto; }
+}
 .counts { grid-column: 2; color: var(--muted); font-size: 0.85em; }
 .score { grid-row: 1 / span 2; grid-column: 3; font-weight: 700; font-family: var(--mono);
   font-variant-numeric: tabular-nums; }
@@ -455,6 +522,10 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
     background: linear-gradient(to right, transparent 40%, rgb(255 255 255 / 0.85) 50%, transparent 60%);
     translate: -120% 0; animation: shine 4s ease-in-out infinite; }
   .medal.legendary { animation: prism 6s linear infinite; }
+  .rung:first-child .medal { animation: ping 2s ease-out infinite; }
+  .rung:last-child .medal { animation: beat 1.6s ease-in-out infinite; }
+  .band .span::after { animation: step 0.5s cubic-bezier(0.3, 1.4, 0.6, 1) both;
+    animation-delay: calc(0.3s + var(--row, 0) * 0.12s); }
   .rec { animation: beacon 1.2s steps(2) infinite; }
   .lead::after { animation: blink 1s steps(1) infinite; }
   body::after { animation: flicker 6s steps(1) infinite; }
@@ -482,6 +553,9 @@ section.wanted, section.silo, section.climate { position: relative; overflow: hi
 @keyframes beacon { 50% { opacity: 0.25; } }
 @keyframes shine { 30%, 100% { translate: 120% 0; } }
 @keyframes prism { to { filter: hue-rotate(360deg); } }
+@keyframes ping { 0% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 0 var(--threat); }
+  100% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 12px transparent; } }
+@keyframes step { from { opacity: 0; scale: 0 1; } }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes float { 0% { opacity: 0; translate: 0 0; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 -2.5em; } }
 @keyframes shake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
@@ -628,7 +702,7 @@ export function renderPage(board: Board, now: number): string {
   ${silo(board)}
   <p class="poster">The machines like it hot.</p>
   ${climate(board)}
-  ${ranks()}
+  ${ranks(board)}
   ${legend(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.

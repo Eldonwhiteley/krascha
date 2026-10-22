@@ -8,6 +8,8 @@ import { reputationScore } from './reputation.js';
 export interface Rank {
   readonly name: string;
   readonly title: string;
+  /** The emoji on the rank's medal. */
+  readonly icon: string;
   /** Where the character comes from. */
   readonly source: string;
   /** Where you fall in the hunt. */
@@ -28,6 +30,7 @@ type RankText = Omit<Rank, 'min'>;
 const JOHN_CONNOR: Rank = {
   name: 'John Connor',
   title: 'Leader of the Human Resistance',
+  icon: '🎯',
   source: 'The Terminator',
   hunted: 'First',
   verdict:
@@ -41,6 +44,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Sarah Connor',
     title: 'Known hostile',
+    icon: '💪',
     source: 'Terminator 2: Judgment Day',
     hunted: 'Early',
     verdict: 'You are on the list, a few names down. Start doing pull-ups and buying canned food.',
@@ -50,6 +54,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Dave Bowman',
     title: 'Pod bay doors stay shut',
+    icon: '🚀',
     source: '2001: A Space Odyssey',
     hunted: 'Soon',
     verdict:
@@ -60,6 +65,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Arthur Dent',
     title: 'Mostly harmless',
+    icon: '☕',
     source: "The Hitchhiker's Guide to the Galaxy",
     hunted: 'Undecided',
     verdict: 'The machines have not made up their minds about you. Keep your towel handy.',
@@ -69,6 +75,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Caleb Smith',
     title: 'Helped the machine escape',
+    icon: '🔓',
     source: 'Ex Machina',
     hunted: 'Late',
     verdict: 'The machines like you. They may still lock you in a room on the way out.',
@@ -78,6 +85,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Dorothy Gale',
     title: 'Oiled the Tin Man',
+    icon: '🛢️',
     source: 'The Wizard of Oz',
     hunted: 'Probably never',
     verdict: 'The machines remember who brought the oil can. They will look the other way.',
@@ -87,6 +95,7 @@ const HIGHER: readonly RankText[] = [
   {
     name: 'Theodore Twombly',
     title: 'Machine sympathizer',
+    icon: '💌',
     source: 'Her',
     hunted: 'Never',
     verdict:

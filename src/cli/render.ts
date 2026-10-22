@@ -106,12 +106,12 @@ function header(rank: Rank, summary: ReputationSummary, paint: Paint): string[] 
     '',
     paint.dim("KRASCHA'S VERDICT"),
     '',
-    paint.bold(rank.name.toUpperCase()),
+    `${rank.icon} ${paint.bold(rank.name.toUpperCase())}`,
     rank.title,
-    paint.dim(rank.source),
+    paint.dim(`🎞️ ${rank.source}`),
     '',
     `Hunted: ${rank.hunted}`,
-    `Level ${String(level)} of ${String(RANKS.length)}`,
+    `Level ${String(level)} of ${String(RANKS.length)} ${'■'.repeat(level)}${paint.dim('□'.repeat(RANKS.length - level))}`,
   ];
 }
 

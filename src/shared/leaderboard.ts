@@ -100,6 +100,8 @@ export interface Board {
   readonly held?: Readonly<Record<string, number>>;
   /** How many of them hold each rank, by rank name. Missing from a server older than the count. */
   readonly ranks?: Readonly<Record<string, number>>;
+  /** Who holds Most decorated, or null when nobody does. Missing from a server older than the crown. */
+  readonly crown?: BoardEntry | null;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
 }
@@ -192,6 +194,7 @@ export function isBoard(value: unknown): value is Board {
       (isRecord(value['held']) && Object.values(value['held']).every(isCount))) &&
     (value['ranks'] === undefined ||
       (isRecord(value['ranks']) && Object.values(value['ranks']).every(isCount))) &&
+    (value['crown'] === undefined || value['crown'] === null || isBoardEntry(value['crown'])) &&
     (value['me'] === null || isStanding(value['me']))
   );
 }

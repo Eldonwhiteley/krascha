@@ -4,7 +4,7 @@
 // Cloudflare type package.
 
 import type { MachineCounts } from '../../src/shared/achievements.js';
-import { accountIds, combinedIds, knownIds } from '../../src/shared/achievements.js';
+import { accountIds, combinedIds, CROWN, knownIds } from '../../src/shared/achievements.js';
 import type { Board, BoardEntry, ScoreUpload, Standing } from '../../src/shared/leaderboard.js';
 import {
   ANONYMOUS,
@@ -180,14 +180,60 @@ async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   return { entry, place, siloPlace };
 }
 
+/** Everyone on the board, for the crown and the holder counts. */
+async function listed(database: D1Database): Promise<BoardEntry[]> {
+  const { results } = await database.prepare(`SELECT ${COLUMNS} FROM scores WHERE ${LISTED}`).all();
+  return results.map((row) => entryOf(row));
+}
+
+/** How many achievements an entry holds, not counting the crown itself. */
+function decorations(entry: BoardEntry): number {
+  return (entry.achievements ?? []).filter((id) => id !== CROWN).length;
+}
+
+/**
+ * The listed entry with the most achievements, who holds the crown, or null
+ * when nobody has any. A tie leaves it with the holder, so it moves only to
+ * someone with more. When the holder has left the board it goes to whoever
+ * has the most, the earliest upload first.
+ */
+async function crownHolder(
+  database: D1Database,
+  everyone: readonly BoardEntry[],
+): Promise<BoardEntry | null> {
+  const top = everyone.reduce((best, entry) => Math.max(best, decorations(entry)), 0);
+  const stored = await database.prepare('SELECT entry FROM crown WHERE id = ?').bind(CROWN).first();
+  const was = stored === null ? null : text(stored, 'entry');
+  const leaders = everyone.filter((entry) => top > 0 && decorations(entry) === top);
+  const holder =
+    leaders.find((entry) => entry.id === was) ??
+    leaders.toSorted((a, b) => a.uploadedAt - b.uploadedAt)[0] ??
+    null;
+  if (holder === null && was !== null) {
+    await database.prepare('DELETE FROM crown WHERE id = ?').bind(CROWN).run();
+  } else if (holder !== null && holder.id !== was) {
+    await database
+      .prepare(
+        'INSERT INTO crown (id, entry) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET entry = excluded.entry',
+      )
+      .bind(CROWN, holder.id)
+      .run();
+  }
+  return holder === null ? null : crowned(holder, holder.id);
+}
+
+/** The entry with the crown added when it is the holder's. */
+function crowned(entry: BoardEntry, holder: string | undefined): BoardEntry {
+  return entry.id === holder
+    ? { ...entry, achievements: knownIds([...(entry.achievements ?? []), CROWN]) }
+    : entry;
+}
+
 /** How many listed entries hold each achievement, by id. */
-async function held(database: D1Database): Promise<Record<string, number>> {
-  const { results } = await database
-    .prepare(`SELECT achievements FROM scores WHERE ${LISTED}`)
-    .all();
+function held(everyone: readonly BoardEntry[], holder: BoardEntry | null): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const row of results) {
-    for (const id of knownIds(text(row, 'achievements').split(','))) {
+  for (const entry of everyone) {
+    for (const id of crowned(entry, holder?.id).achievements ?? []) {
       counts[id] = (counts[id] ?? 0) + 1;
     }
   }
@@ -207,28 +253,33 @@ async function ranked(database: D1Database): Promise<Record<string, number>> {
 
 export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
   await fillSilo(database);
-  const [mostWanted, pets, bunks, warmers, count, holders, ranks] = await Promise.all([
+  const [mostWanted, pets, bunks, warmers, count, everyone, ranks] = await Promise.all([
     list(database, 'wanted'),
     list(database, 'pets'),
     list(database, 'bunks'),
     list(database, 'warmers'),
     total(database),
-    held(database),
+    listed(database),
     ranked(database),
   ]);
+  const holder = await crownHolder(database, everyone);
+  const crown = (entries: readonly BoardEntry[]): BoardEntry[] =>
+    entries.map((entry) => crowned(entry, holder?.id));
   const mine =
     me === null
       ? null
       : await database.prepare(`SELECT ${COLUMNS} FROM scores WHERE entry_id = ?`).bind(me).first();
+  const standing = mine === null ? null : await standingOf(database, mine);
   return {
-    mostWanted,
-    pets,
-    bunks,
-    warmers,
+    mostWanted: crown(mostWanted),
+    pets: crown(pets),
+    bunks: crown(bunks),
+    warmers: crown(warmers),
     total: count,
-    held: holders,
+    held: held(everyone, holder),
     ranks,
-    me: mine === null ? null : await standingOf(database, mine),
+    crown: holder,
+    me: standing === null ? null : { ...standing, entry: crowned(standing.entry, holder?.id) },
   };
 }
 
@@ -397,9 +448,15 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   if (row === null) {
     throw new Error('the saved score could not be read back');
   }
+  const standing = await standingOf(database, row);
+  const holder = await crownHolder(database, await listed(database));
   return {
     ok: true,
-    standing: { ...(await standingOf(database, row)), machines: machines.length },
+    standing: {
+      ...standing,
+      entry: crowned(standing.entry, holder?.id),
+      machines: machines.length,
+    },
   };
 }
 

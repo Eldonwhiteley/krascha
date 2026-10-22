@@ -5,7 +5,13 @@
 // without it post a plain form and come back to the board.
 
 import type { AchievementRule } from '../../src/shared/achievements.js';
-import { ACHIEVEMENTS, TIERS, achievementsOf } from '../../src/shared/achievements.js';
+import {
+  ACHIEVEMENTS,
+  COUNTED_ACHIEVEMENTS,
+  CROWN,
+  TIERS,
+  achievementsOf,
+} from '../../src/shared/achievements.js';
 import {
   CLIMATE_RANKS,
   climateRankFor,
@@ -342,18 +348,38 @@ function rarity(holders: number, total: number, rarest: boolean): string {
   return `<dd class="rarity">${meter(holders, total, 'hold it')}${flag}</dd>`;
 }
 
+/** Who holds the crown, in place of a meter, since only one can. */
+function holderLine(holder: BoardEntry | null): string {
+  if (holder === null) {
+    return '<dd class="rarity">Nobody has this one yet. Be the first.</dd>';
+  }
+  const earned = (holder.achievements ?? []).filter((id) => id !== CROWN).length;
+  const medals = earned === 1 ? '1 achievement' : `${count(earned)} achievements`;
+  // One span, since the row is a flex box and would split the sentence at the link.
+  return `<dd class="rarity"><span>Held by ${shownName(holder)}${holder.verified ? CHECK : ''}, with ${medals}.</span></dd>`;
+}
+
 /**
  * Every trophy, earned by anyone or not, so the medals next to names mean
  * something. Bronze first and legendary last, each with how many have it.
  */
 function legend(board: Board): string {
   const held = board.held ?? {};
-  const claimed = ACHIEVEMENTS.map((rule) => held[rule.id] ?? 0).filter((holders) => holders > 0);
+  // The board hands some to one entry by design, so only the earned ones can be the rarest.
+  const claimed = COUNTED_ACHIEVEMENTS.map((rule) => held[rule.id] ?? 0).filter(
+    (holders) => holders > 0,
+  );
   const fewest = claimed.length === 0 ? 0 : Math.min(...claimed);
   const ordered = ACHIEVEMENTS.toSorted((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier));
   const items = ordered.map((rule) => {
     const holders = held[rule.id] ?? 0;
-    const shown = board.held === undefined ? '' : rarity(holders, board.total, holders === fewest);
+    const rarest = rule.boardOnly !== true && holders === fewest;
+    const shown =
+      board.held === undefined
+        ? ''
+        : rule.id === CROWN && board.crown !== undefined
+          ? holderLine(board.crown)
+          : rarity(holders, board.total, rarest);
     const unclaimed = board.held !== undefined && holders === 0 ? ' unclaimed' : '';
     return `
         <div class="badge ${rule.tier}${unclaimed}" id="${escapeHtml(achievementAnchor(rule.id))}">

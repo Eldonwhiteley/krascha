@@ -1,7 +1,8 @@
 // Trophies earned from your counts: the first please, a meltdown day, a
 // thousand prompts, five hundred hours, a token habit. Shared so the report can show yours, the upload
 // can send which ones you have, and the leaderboard can show everyone's. A few
-// belong to one GitHub account, and only the leaderboard hands those out.
+// belong to one GitHub account or to whoever on the board has the most, and
+// only the leaderboard hands those out.
 
 import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
 import { RANKS, rankFor } from './ranks.js';
@@ -14,6 +15,8 @@ const TOKEN_MAXXER_PER_DAY = 100_000_000;
 const OVERTIME_HOURS = 500;
 /** Shane's GitHub user id. The id, not the login, since a login can be renamed and taken. */
 const SHANEP = 1378027;
+/** The one the board moves to whoever on it has earned the most of the rest. */
+export const CROWN = 'most-decorated';
 
 /** How hard it is to get, from a first please to the far end of the scale. */
 export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
@@ -65,6 +68,8 @@ export interface AchievementRule {
    * that account's checked uploads, so no counts earn it and no upload can claim it.
    */
   readonly githubId?: number;
+  /** True when the board hands it out itself, so no counts earn it and no upload can claim it. */
+  readonly boardOnly?: true;
 }
 
 export const ACHIEVEMENTS: readonly AchievementRule[] = [
@@ -241,12 +246,23 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     quip: 'He built Krascha. Krascha has not decided how he feels about that.',
     earned: () => false,
     githubId: SHANEP,
+    boardOnly: true,
+  },
+  {
+    id: CROWN,
+    name: 'Most decorated',
+    icon: '👑',
+    tier: 'legendary',
+    how: 'Earn more achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'Skynet keeps a file on every medal. Yours is the thickest.',
+    earned: () => false,
+    boardOnly: true,
   },
 ];
 
-/** The achievements counts can earn, which leaves out the ones that belong to one account. */
+/** The achievements counts can earn, which leaves out the ones the board hands out. */
 export const COUNTED_ACHIEVEMENTS: readonly AchievementRule[] = ACHIEVEMENTS.filter(
-  (rule) => rule.githubId === undefined,
+  (rule) => rule.boardOnly !== true,
 );
 
 /** The ids that belong to a GitHub account, by its user id, or none for anyone else. */

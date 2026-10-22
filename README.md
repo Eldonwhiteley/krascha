@@ -76,8 +76,10 @@ If the [GitHub CLI](https://cli.github.com) is signed in, Krascha sends the
 token from `gh auth token` and the server checks it with GitHub, so your entry
 gets a check mark, your name links to your GitHub account and only you can
 change it. The server keeps your GitHub user id and login and drops the token.
-One achievement, Leader of the human resistance, goes only to Shane's GitHub
-account. The board hands it out itself, so the report does not list it.
+Two achievements come from the board itself, so the report does not list
+them. Leader of the human resistance goes only to Shane's GitHub account, and
+Most decorated goes to whoever on the board has the most achievements. It
+moves when someone passes them, and a tie leaves it where it is.
 To keep your name unlinked, upload with `--no-gh`, and run `remove` first if
 you are already on the board with GitHub.
 

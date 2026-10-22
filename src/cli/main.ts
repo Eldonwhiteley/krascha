@@ -102,7 +102,7 @@ async function refresh(io: CliIo): Promise<Refreshed> {
   const usage = await loadUsage(claude);
   const copilot = indexUsage(index);
   const tokens = {
-    tokensPerDay: averageTokensPerDay(usage.days, now),
+    tokensPerDay: averageTokensPerDay(usage.days, now, usage.through),
     lifetimeTokens: usage.lifetimeTokens,
     copilotTokensPerDay: averageTokensPerDay(copilot, now),
     copilotLifetimeTokens: totalTokens(copilot),

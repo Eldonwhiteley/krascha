@@ -32,6 +32,16 @@ describe('averageTokensPerDay', () => {
     expect(averageTokensPerDay(days, NOW)).toBe(1000);
   });
 
+  it('ends the window on the day the stats were worked out through', () => {
+    const days = [day('2026-10-13', { opus: 4000 }), day('2026-10-14', { opus: 2000 })];
+    // Worked out through the 14th, so the 15th and 16th are not days with no tokens yet.
+    expect(averageTokensPerDay(days, NOW, '2026-10-14')).toBe(3000);
+    expect(averageTokensPerDay(days, NOW, '2026-10-15')).toBe(2000);
+    // A date after today never stretches the window past it.
+    expect(averageTokensPerDay(days, NOW, '2026-12-01')).toBe(1500);
+    expect(averageTokensPerDay(days, NOW)).toBe(1500);
+  });
+
   it('counts days with activity but no tokens toward the span', () => {
     const days = [day('2026-10-15', {}), day('2026-10-16', { opus: 500 })];
     expect(averageTokensPerDay(days, NOW)).toBe(250);
@@ -44,10 +54,7 @@ describe('indexUsage', () => {
     setTokens(index, 's1', { '2026-10-16': 100, '2026-10-14': 50 });
     setTokens(index, 's2', { '2026-10-16': 20 });
     const days = indexUsage(index);
-    expect(days).toStrictEqual([
-      day('2026-10-14', { all: 50 }),
-      day('2026-10-16', { all: 120 }),
-    ]);
+    expect(days).toStrictEqual([day('2026-10-14', { all: 50 }), day('2026-10-16', { all: 120 })]);
     expect(totalTokens(days)).toBe(170);
     expect(averageTokensPerDay(days, NOW)).toBe(57);
   });

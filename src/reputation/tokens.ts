@@ -1,7 +1,9 @@
 // How hard you run Claude: the average tokens a day over the last
 // TOKEN_WINDOW_DAYS days, from the daily totals in Claude Code's usage stats.
 // Someone newer than the window is averaged over the days since their first.
-// Copilot CLI's tokens come from the index instead, and are kept apart.
+// Claude Code only adds to its stats now and then, so the window ends on the
+// last day they were worked out through, not today, or every day the stats
+// lag would count as a day with no tokens. Copilot CLI's tokens come from the index instead, and are kept apart.
 
 import type { DailyUsage } from '../usage.js';
 import { TOKEN_WINDOW_DAYS } from '../shared/reputation.js';
@@ -21,19 +23,28 @@ function tokensOf(day: DailyUsage): number {
   return Object.values(day.tokensByModel).reduce((sum, tokens) => sum + tokens, 0);
 }
 
-/** Whole tokens a day, or 0 with no history. `days` is sorted oldest first, as dailyUsage returns it. */
-export function averageTokensPerDay(days: readonly DailyUsage[], now: number): number {
+/**
+ * Whole tokens a day, or 0 with no history. `days` is sorted oldest first, as
+ * dailyUsage returns it. The window ends on `through`, a YYYY-MM-DD local
+ * date, or today when that is null or later.
+ */
+export function averageTokensPerDay(
+  days: readonly DailyUsage[],
+  now: number,
+  through: string | null = null,
+): number {
   const first = days[0]?.date;
   if (first === undefined) {
     return 0;
   }
   const today = noonOf(dayOf(now));
-  const start = Math.max(noonOf(first), today - (TOKEN_WINDOW_DAYS - 1) * DAY_MS);
-  if (start > today) {
+  const end = through === null ? today : Math.min(today, noonOf(through));
+  const start = Math.max(noonOf(first), end - (TOKEN_WINDOW_DAYS - 1) * DAY_MS);
+  if (start > end) {
     return 0;
   }
-  const span = Math.round((today - start) / DAY_MS) + 1;
-  const [from, to] = [dayOf(start), dayOf(today)];
+  const span = Math.round((end - start) / DAY_MS) + 1;
+  const [from, to] = [dayOf(start), dayOf(end)];
   const tokens = days
     .filter((day) => day.date >= from && day.date <= to)
     .reduce((sum, day) => sum + tokensOf(day), 0);

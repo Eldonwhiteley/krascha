@@ -39,7 +39,10 @@ const usageSchema = z.object({
   type: z.literal('session.usage_record'),
   timestamp: z.string(),
   data: z.object({
-    usage: z.object({ inputTokens: z.number().nonnegative(), outputTokens: z.number().nonnegative() }),
+    usage: z.object({
+      inputTokens: z.number().nonnegative(),
+      outputTokens: z.number().nonnegative(),
+    }),
   }),
 });
 

@@ -74,12 +74,30 @@ export function lifetimeTokens(stats: unknown): number {
   return Math.max(tallied, daily);
 }
 
+/**
+ * The last day the daily totals were worked out through: the stats' own
+ * lastComputedDate, or the newest day in them, or null with no days.
+ */
+export function computedThrough(stats: unknown): string | null {
+  const computed: unknown = isRecord(stats) ? stats['lastComputedDate'] : undefined;
+  if (typeof computed === 'string' && DATE.test(computed)) {
+    return computed;
+  }
+  return dailyUsage(stats).at(-1)?.date ?? null;
+}
+
 export interface Usage {
   readonly days: readonly DailyUsage[];
   readonly lifetimeTokens: number;
+  /** From computedThrough. */
+  readonly through: string | null;
 }
 
 export async function loadUsage(claudeConfigDir: string): Promise<Usage> {
   const stats = await readJsonOrUndefined(path.join(claudeConfigDir, 'stats-cache.json'));
-  return { days: dailyUsage(stats), lifetimeTokens: lifetimeTokens(stats) };
+  return {
+    days: dailyUsage(stats),
+    lifetimeTokens: lifetimeTokens(stats),
+    through: computedThrough(stats),
+  };
 }

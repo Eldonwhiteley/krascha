@@ -20,9 +20,8 @@ Then ask Krascha for his verdict:
 /krascha:krascha
 ```
 
-Claude Code only updates a plugin from this marketplace on its own if you turn
-on auto-update for `shanep` under `/plugin`. To update by hand, run
-`claude plugin update krascha@shanep` and restart Claude Code.
+Krascha keeps himself up to date, so there is nothing to update by hand. See
+[Updates](#updates).
 
 The board only takes uploads from a current Krascha. An older copy gets told
 to update instead, and a copy that can update himself starts on it right away.
@@ -48,7 +47,9 @@ copilot --allow-tool='shell(node:*)'
 ```
 
 That lets Copilot run any `node` command without asking, not only Krascha.
-To update, run `copilot plugin update krascha@shanep` and restart Copilot.
+
+If you installed before Krascha could update himself, run
+`copilot plugin update krascha@shanep` once to get that.
 
 ## Commands
 
@@ -82,12 +83,7 @@ you gave. You show on the board once you have 100 prompts. The board does not
 update itself, so the verdict and the silo sheet end with a tip to upload if
 you never have, or if you typed more prompts since your last upload. When you
 earn an achievement the board does not have yet, including a new one Krascha
-just learned, the tip names it. After a `remove` the tip goes quiet. When
-`board`, `silo board` or `upload` finds the board knows something your copy
-of Krascha does not, like an achievement it cannot count yet, Krascha
-updates himself in the background, at most once a day, and the verdict tells
-you to restart. Set `KRASCHA_NO_UPDATE=1` to stop that, and the verdict gives
-you the command to run instead.
+just learned, the tip names it. After a `remove` the tip goes quiet.
 
 Some achievements you can earn again, like each meltdown day, each session
 you rage quit or every 1,000 prompts. The report shows how many times next to
@@ -163,6 +159,21 @@ not also `import` one machine's counts into the other, or the board counts
 them twice. Each machine keeps its id in `~/.krascha/machine-id`, so if you
 lose that file, run `remove` and then `upload` again from every machine.
 
+## Updates
+
+Every 6 hours Krascha asks krascha.com for the newest build that passed CI,
+which is the commit and the SHA-256 of its `dist/cli.js`. When you do not have
+it, he downloads that `dist/cli.js` from GitHub at that commit in the
+background, checks the hash and keeps it in `~/.krascha/bin/cli.mjs`. From
+the next run on, the plugin runs that copy instead of its own, so you never
+have to restart Claude Code or Copilot CLI. The verdict says once when he
+updated. He also runs `claude plugin update` and `copilot plugin update` so
+the rest of the plugin keeps up.
+
+A copy that fails to start is deleted and never tried again, and the plugin
+runs its own build. Running from a checkout of the repo never updates. Set
+`KRASCHA_NO_UPDATE=1` to turn it all off.
+
 ## The silo
 
 The ranks say who the machines hunt first. `silo` asks the other question:
@@ -209,8 +220,9 @@ The counts live in `~/.krascha/reputation.json` (or `KRASCHA_HOME`), so they
 outlive the transcripts Claude Code cleans up after 30 days. Prompt text is
 never stored, only a short excerpt around each kind or mean word and a short
 hash of each kind or mean prompt, so Krascha can tell when one is typed over
-and over. Nothing
-leaves your machine unless you run `board` or `upload`.
+and over. Nothing leaves your machine unless you run `board` or `upload`. The
+update check only asks krascha.com which build is newest and sends nothing
+about you.
 
 When an update changes the words Krascha counts, he reads every transcript
 that is still there again, so your old prompts are judged by the new words.

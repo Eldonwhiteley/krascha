@@ -1,6 +1,6 @@
 # Deploys the leaderboard Worker to krascha.com once check passes on master.
-# The plugin itself ships from the master commit, so this is the only part
-# that needs publishing. Needs the CLOUDFLARE_API_TOKEN and
+# The deploy also tells the CLI which commit is newest, so Krascha updates
+# himself only to a build that passed check. Needs the CLOUDFLARE_API_TOKEN and
 # CLOUDFLARE_ACCOUNT_ID repo secrets.
 
 name: deploy

@@ -1390,6 +1390,20 @@ describe('leaderboard worker', () => {
     expect(response.headers.get('location')).toBe('https://board.test/ranks?me=abc');
   });
 
+  it('names the newest CLI build only when the deploy knows it', async () => {
+    const deps: Deps = { fetch: fakeGitHub, now: () => START, newId: () => 'entry-1' };
+    const ask = async (env: Parameters<typeof handle>[1]): Promise<Response> =>
+      handle(new Request('https://board.test/api/version'), env, deps);
+    const commit = 'a'.repeat(40);
+    const sha256 = 'b'.repeat(64);
+    const known = await ask({ DB: fakeD1(''), LATEST_COMMIT: commit, LATEST_SHA256: sha256 });
+    expect(known.status).toBe(200);
+    expect(known.headers.get('cache-control')).toBe('public, max-age=300');
+    expect(await known.json()).toStrictEqual({ commit, sha256 });
+    expect((await ask({ DB: fakeD1('') })).status).toBe(404);
+    expect((await ask({ DB: fakeD1(''), LATEST_COMMIT: commit })).status).toBe(404);
+  });
+
   it('answers HEAD on every page like GET, without the body', async () => {
     const w = world();
     for (const path of ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute']) {

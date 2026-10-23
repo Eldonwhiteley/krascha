@@ -41,7 +41,7 @@ export async function readJsonOrUndefined(file: string): Promise<unknown> {
  * Writes to a temp file in the same folder, then renames it over the target,
  * so readers see the old file or the new one and never half of either.
  */
-export async function writeFileAtomic(target: string, content: string): Promise<void> {
+export async function writeFileAtomic(target: string, content: string | Uint8Array): Promise<void> {
   const dir = path.dirname(target);
   await mkdir(dir, { recursive: true });
   const scratch = path.join(dir, `.${path.basename(target)}.${randomUUID()}.tmp`);

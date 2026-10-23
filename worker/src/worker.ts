@@ -1,7 +1,7 @@
 // The Cloudflare Worker behind Krascha's List. It serves the public page at
 // /, every rank at /ranks, every achievement at /achievements, the hunt and
-// the adoption at /judgment, the board as JSON at /api/board, takes uploads
-// and removals at /api/scores and likes at /api/likes. An upload proves who it
+// the adoption at /judgment, the board as JSON at /api/board, the newest
+// CLI build at /api/version, takes uploads and removals at /api/scores and likes at /api/likes. An upload proves who it
 // belongs to one of two ways. A GitHub token is checked once with GitHub and
 // then dropped, never stored or logged, and its entry shows as verified and
 // links to the account, so only the user id and login are kept. The same
@@ -37,6 +37,10 @@ import { likeEntry, readBoard, removeScore, saveScore, utcDay } from './store.js
 
 export interface Env {
   readonly DB: D1Database;
+  /** The commit this deploy came from, so the CLI can fetch its dist/cli.js from GitHub. */
+  readonly LATEST_COMMIT?: string;
+  /** The SHA-256 of that commit's dist/cli.js, so the CLI can check what it fetched. */
+  readonly LATEST_SHA256?: string;
 }
 
 /** Where a merged pull request earns Miles Dyson. */
@@ -411,6 +415,14 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
       const board = await readBoard(env.DB, me === '' ? null : me);
       const cache = me === null ? 'public, max-age=60' : 'no-store';
       return json({ ...board, counted: COUNTED, features: FEATURES }, 200, cache);
+    }
+    case 'GET /api/version': {
+      const commit = env.LATEST_COMMIT ?? '';
+      const sha256 = env.LATEST_SHA256 ?? '';
+      if (commit === '' || sha256 === '') {
+        return fail(404, 'This deploy does not know its build.');
+      }
+      return json({ commit, sha256 }, 200, 'public, max-age=300');
     }
     case 'POST /api/scores': {
       return upload(request, env, deps);

@@ -7,7 +7,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import type { FetchFunction } from '../leaderboard/client.js';
 import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
-import { CHEATER, COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
+import { CHEATER } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
 import { FEATURES, TOO_OLD } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
@@ -17,6 +17,8 @@ import { faceFor } from './face.js';
 import type { CliIo } from './main.js';
 import { INDEX_FILE, dataDir, main } from './main.js';
 import { PLAIN, renderReport, wrap } from './render.js';
+import type { SelfBuild } from './update.js';
+import { sha256Of } from './update.js';
 
 interface Run {
   readonly code: number;
@@ -38,6 +40,7 @@ interface Fakes {
   readonly githubToken: () => Promise<string | null>;
   readonly env: NodeJS.ProcessEnv;
   readonly now: number;
+  readonly self: SelfBuild | null;
 }
 
 interface Sent {
@@ -119,6 +122,7 @@ async function makeHome(): Promise<Home> {
     githubToken: () => Promise.resolve(null),
     env: {},
     now: Date.parse('2026-10-03T12:00:00.000Z'),
+    self: null,
   };
   const launched: (readonly string[])[] = [];
   const use = (next: Partial<Fakes>): void => {
@@ -137,6 +141,7 @@ async function makeHome(): Promise<Home> {
       launch: (command) => {
         launched.push(command);
       },
+      self: fakes.self,
       color: false,
       out: (text) => {
         out += text;
@@ -234,9 +239,6 @@ describe('krascha', () => {
       key: null,
       uploadedPrompts: 3,
       uploadedAchievements: expect.arrayContaining(['manners']),
-      boardAchievements: null,
-      boardFeatures: null,
-      updateTriedAt: null,
     });
   });
 
@@ -318,75 +320,104 @@ describe('krascha', () => {
     expect((await home.run()).out).not.toContain('Tip:');
   });
 
-  it('updates himself once a day when the board can count achievements this copy cannot', async () => {
+  it('updates himself in the background when the board names a newer build', async () => {
     const home = await makeHome();
-    const here = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name }));
-    const answer =
-      (counted: readonly { id: string; name: string }[], features?: number): FetchFunction =>
-      async (url, init) => {
-        const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
-        return Response.json({ ...Object(standing), counted, features });
-      };
-    const both = [
-      ['claude', 'plugin', 'update', 'krascha@shanep'],
-      ['copilot', 'plugin', 'update', 'krascha@shanep'],
-    ];
-    home.use({ fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]) });
-    await home.run('upload', 'Kyle');
-    expect(home.launched).toStrictEqual(both);
-    const tip =
-      'Tip: Krascha updated himself to count Skynet online. Restart Claude Code and Copilot CLI to use it.';
-    expect((await home.run()).out).toContain(tip);
-    expect((await home.run('silo')).out).toContain(tip);
-    await home.run('upload');
-    expect(home.launched).toStrictEqual(both);
-    home.use({ now: Date.parse('2026-10-04T12:00:00.000Z') });
-    await home.run('upload');
-    expect(home.launched).toStrictEqual([...both, ...both]);
-    home.use({ fetch: answer(here, FEATURES) });
-    await home.run('upload');
-    expect((await home.run()).out).not.toContain('Tip:');
-    home.use({ fetch: answer(here, FEATURES + 1) });
-    await home.run('upload');
-    expect((await home.run()).out).toContain('Tip: Krascha updated himself to a newer copy.');
-    expect(home.launched).toHaveLength(6);
-  });
-
-  it('updates himself when the board turns this copy away as too old', async () => {
-    const home = await makeHome();
-    const error = 'This copy of Krascha is too old for the board.';
-    home.use({ fetch: async () => Response.json({ error }, { status: TOO_OLD }) });
-    const { code, err } = await home.run('upload', 'Kyle');
-    expect(code).toBe(1);
-    expect(err).toBe(`Krascha: ${error}\n`);
+    const build = new TextEncoder().encode('export {};\n');
+    const latest = { commit: 'c'.repeat(40), sha256: sha256Of(build) };
+    const asked: string[] = [];
+    const fetch: FetchFunction = async (url) => {
+      asked.push(url);
+      if (url === 'https://krascha.com/api/version') {
+        return Response.json(latest);
+      }
+      if (url === `https://raw.githubusercontent.com/shanep/krascha/${latest.commit}/dist/cli.js`) {
+        return new Response(build);
+      }
+      throw new Error('offline');
+    };
+    const old = { command: ['node', '/plugin/dist/cli.js'], sha256: 'a'.repeat(64) };
+    const selfUpdate = [...old.command, 'self-update'];
+    home.use({ fetch, self: old });
+    await home.run();
+    expect(home.launched).toStrictEqual([selfUpdate]);
+    await home.run('board');
+    expect(asked.filter((url) => url.endsWith('/api/version'))).toHaveLength(1);
+    expect((await home.run('self-update')).code).toBe(0);
+    const copy = path.join(home.root, '.krascha', 'bin', 'cli.mjs');
+    expect(await readFile(copy, 'utf8')).toBe('export {};\n');
     expect(home.launched).toStrictEqual([
+      selfUpdate,
       ['claude', 'plugin', 'update', 'krascha@shanep'],
       ['copilot', 'plugin', 'update', 'krascha@shanep'],
     ]);
-    expect((await home.run()).out).toContain('Tip: Krascha updated himself to a newer copy.');
+    // The copy is there, so a later check has nothing to download.
+    home.use({ now: Date.parse('2026-10-04T12:00:00.000Z') });
+    await home.run();
+    expect(home.launched).toHaveLength(3);
+    expect(asked.filter((url) => url.endsWith('/api/version'))).toHaveLength(2);
+    // Running as the new build, the report says so once.
+    home.use({ self: { ...old, sha256: latest.sha256 } });
+    const notice = 'Krascha updated himself to ccccccc.';
+    expect((await home.run()).out).toContain(notice);
+    expect((await home.run()).out).not.toContain(notice);
   });
 
-  it('says how to update when updating himself is turned off', async () => {
+  it('asks for the newest build right away when the board turns this copy away as too old', async () => {
     const home = await makeHome();
-    const here = COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name }));
-    const answer =
-      (counted: readonly { id: string; name: string }[]): FetchFunction =>
-      async (url, init) => {
-        const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
-        return Response.json({ ...Object(standing), counted });
-      };
+    const latest = { commit: 'c'.repeat(40), sha256: 'b'.repeat(64) };
+    let deployed = false;
+    const error = 'This copy of Krascha is too old for the board.';
     home.use({
-      fetch: answer([...here, { id: 'skynet', name: 'Skynet online' }]),
+      fetch: async (url) => {
+        if (url.endsWith('/api/version')) {
+          return deployed
+            ? Response.json(latest)
+            : Response.json({ error: 'No build' }, { status: 404 });
+        }
+        return Response.json({ error }, { status: TOO_OLD });
+      },
+      self: { command: ['node', '/plugin/dist/cli.js'], sha256: 'a'.repeat(64) },
+    });
+    await home.run();
+    expect(home.launched).toStrictEqual([]);
+    // A new deploy raised the minimum, so the next upload is turned away before the usual check is due.
+    deployed = true;
+    const { code, err } = await home.run('upload', 'Kyle');
+    expect(code).toBe(1);
+    expect(err).toBe(`Krascha: ${error}\n`);
+    expect(home.launched).toStrictEqual([['node', '/plugin/dist/cli.js', 'self-update']]);
+  });
+
+  it('keeps no download whose hash is not the one the board named', async () => {
+    const home = await makeHome();
+    const latest = { commit: 'c'.repeat(40), sha256: 'b'.repeat(64) };
+    home.use({
+      fetch: async (url) =>
+        url.endsWith('/api/version') ? Response.json(latest) : new Response('tampered'),
+      self: { command: ['node', '/plugin/dist/cli.js'], sha256: 'a'.repeat(64) },
+    });
+    await home.run();
+    expect((await home.run('self-update')).code).toBe(1);
+    await expect(readFile(path.join(home.root, '.krascha', 'bin', 'cli.mjs'))).rejects.toThrow();
+    expect(home.launched).toHaveLength(1);
+  });
+
+  it('never asks about updates when turned off or run from a checkout', async () => {
+    const home = await makeHome();
+    const asked: string[] = [];
+    home.use({
+      fetch: async (url) => {
+        asked.push(url);
+        return Response.json({ commit: 'c'.repeat(40), sha256: 'b'.repeat(64) });
+      },
+      self: { command: ['node', '/plugin/dist/cli.js'], sha256: 'a'.repeat(64) },
       env: { KRASCHA_NO_UPDATE: '1' },
     });
-    await home.run('upload', 'Kyle');
+    await home.run();
+    home.use({ self: null, env: {} });
+    await home.run();
+    expect(asked).toStrictEqual([]);
     expect(home.launched).toStrictEqual([]);
-    expect((await home.run()).out).toContain(
-      'Tip: Krascha learned 1 achievement this copy cannot count yet: Skynet online. Run claude plugin update krascha@shanep and copilot plugin update krascha@shanep in a terminal, then restart Claude Code and Copilot CLI.',
-    );
-    home.use({ fetch: answer(here) });
-    await home.run('upload');
-    expect((await home.run()).out).not.toContain('Tip:');
   });
 
   it('sends the same machine id every time and says when machines add up', async () => {

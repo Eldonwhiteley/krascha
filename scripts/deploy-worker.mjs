@@ -1,12 +1,15 @@
 // Deploys Krascha's List, the leaderboard Worker, to Cloudflare at
 // krascha.com. The first run creates the D1 database and writes its id into
-// worker/wrangler.toml. Every run applies new migrations and deploys.
+// worker/wrangler.toml. Every run applies new migrations and deploys. The
+// deploy names the commit it came from and the SHA-256 of its dist/cli.js, so
+// the CLI knows which build is newest and can check the copy it downloads.
 //
 //   node scripts/deploy-worker.mjs
 //
 // Needs a Cloudflare sign-in on this machine first: npx wrangler login
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +58,22 @@ function databaseId() {
   return created[0];
 }
 
+/** The --var flags that name this build, or none when dist/cli.js is not the committed one. */
+function latestBuild() {
+  try {
+    execFileSync('git', ['diff', '--quiet', 'HEAD', '--', 'dist/cli.js'], { cwd: ROOT });
+  } catch {
+    say('dist/cli.js differs from HEAD, so this deploy does not name a CLI build.');
+    return [];
+  }
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  const sha256 = createHash('sha256')
+    .update(readFileSync(path.join(ROOT, 'dist', 'cli.js')))
+    .digest('hex');
+  say(`Naming CLI build ${commit.slice(0, 12)} (${sha256.slice(0, 12)}).`);
+  return ['--var', `LATEST_COMMIT:${commit}`, '--var', `LATEST_SHA256:${sha256}`];
+}
+
 const toml = readFileSync(TOML, 'utf8');
 if (toml.includes(PLACEHOLDER)) {
   const id = databaseId();
@@ -63,5 +82,5 @@ if (toml.includes(PLACEHOLDER)) {
 }
 
 wrangler(['d1', 'migrations', 'apply', DATABASE, '--remote']);
-wrangler(['deploy']);
+wrangler(['deploy', ...latestBuild()]);
 say('Krascha\'s List is live at https://krascha.com');

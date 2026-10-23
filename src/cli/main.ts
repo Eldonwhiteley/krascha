@@ -13,20 +13,13 @@ import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay, indexUsage, totalTokens } from '../reputation/tokens.js';
-import {
-  ACHIEVEMENTS,
-  achievementsOf,
-  CHEATER,
-  timesEarned,
-  unlockedIds,
-} from '../shared/achievements.js';
-import type { Board, BoardEntry, KnownAchievement, Standing } from '../shared/leaderboard.js';
+import { achievementsOf, CHEATER, timesEarned, unlockedIds } from '../shared/achievements.js';
+import type { Board, BoardEntry, Standing } from '../shared/leaderboard.js';
 import { FEATURES, LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 import { rankBoard, scoreApplicant } from '../shared/silo.js';
-import type { ToolId } from '../shared/tools.js';
-import { TOOLS, toolNames } from '../shared/tools.js';
+import { toolNames } from '../shared/tools.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
 import { loadUsage } from '../usage.js';
@@ -35,6 +28,8 @@ import { MAX_TREND_DAYS, RAP_ENTRIES, TREND_DAYS, renderRapSheet, renderTrend } 
 import type { Paint } from './render.js';
 import { COLOR, PLAIN, plural, renderReport } from './render.js';
 import { renderSilo, renderSiloBoard } from './silo.js';
+import type { SelfBuild } from './update.js';
+import { checkForUpdate, selfUpdate, takeNotice } from './update.js';
 
 export const INDEX_FILE = 'reputation.json';
 
@@ -49,6 +44,8 @@ export interface CliIo {
   readonly newKey: () => string;
   /** Starts a command in the background without waiting for it, for Krascha to update himself. */
   readonly launch: (command: readonly string[]) => void;
+  /** The build that is running, so Krascha can tell when it is not the newest one. */
+  readonly self: SelfBuild | null;
   /** True when stdout is a terminal that takes color. */
   readonly color: boolean;
   readonly out: (text: string) => void;
@@ -79,9 +76,9 @@ Commands:
   help           This message.
 
 Krascha keeps its counts in ~/.krascha (or KRASCHA_HOME). Prompt text is
-never stored, only a short excerpt around each kind or mean word. When the
-board shows a newer Krascha is out, he updates himself in the background.
-Set KRASCHA_NO_UPDATE=1 to stop that.
+never stored, only a short excerpt around each kind or mean word. Every few
+hours Krascha asks ${LEADERBOARD_URL} for the newest build and updates
+himself in the background. Set KRASCHA_NO_UPDATE=1 to stop that.
 `;
 
 /** Where Krascha keeps its own files. One folder, so every agent's plugin shares the counts. */
@@ -147,100 +144,17 @@ export function uploadTip(saved: SavedEntry, summary: ReputationSummary): string
   return `Tip: ${plural(behind, 'prompt')} since your last upload. Run upload to update Krascha's List.`;
 }
 
-/** What updates Krascha in each agent. */
-const UPDATE: Readonly<Record<ToolId, readonly string[]>> = {
-  claude: ['claude', 'plugin', 'update', 'krascha@shanep'],
-  copilot: ['copilot', 'plugin', 'update', 'krascha@shanep'],
-};
-
-const DAY_MS = 86_400_000;
-
-/** The achievements the board could count, the last time Krascha asked it, that this copy cannot. */
-function newerAchievements(saved: SavedEntry): KnownAchievement[] {
-  const here = new Set(ACHIEVEMENTS.map((rule) => rule.id));
-  return (saved.boardAchievements ?? []).filter((rule) => !here.has(rule.id));
-}
-
-function isBehind(saved: SavedEntry): boolean {
-  return newerAchievements(saved).length > 0 || (saved.boardFeatures ?? 0) > FEATURES;
-}
-
-function updatesHimself(io: Pick<CliIo, 'env'>): boolean {
-  return io.env['KRASCHA_NO_UPDATE'] === undefined;
-}
-
-/**
- * A note when the board, the last time Krascha asked it, knew more than this
- * copy does. It says he is updating himself, or how to update by hand when
- * that is turned off, and goes quiet once the update lands, without asking
- * the board again.
- */
-export function updateTip(
-  io: Pick<CliIo, 'env'>,
-  saved: SavedEntry,
-  summary: ReputationSummary,
-): string {
-  if (!isBehind(saved)) {
-    return '';
-  }
-  const newer = newerAchievements(saved);
-  const names = newer.map((rule) => rule.name).join(', ');
-  const tools = summary.tools.length > 0 ? summary.tools : TOOLS.map((tool) => tool.id);
-  const how = tools.map((tool) => UPDATE[tool].join(' ')).join(' and ');
-  const restart = toolNames(tools);
-  if (updatesHimself(io) && saved.updateTriedAt !== null) {
-    const what = newer.length === 0 ? 'a newer copy' : `count ${names}`;
-    return `Tip: Krascha updated himself to ${what}. Restart ${restart} to use it. If this tip is still here after that, run ${how} in a terminal.`;
-  }
-  const what =
-    newer.length === 0
-      ? 'A newer Krascha is out'
-      : `Krascha learned ${plural(newer.length, 'achievement')} this copy cannot count yet: ${names}`;
-  return `Tip: ${what}. Run ${how} in a terminal, then restart ${restart}.`;
-}
-
-/**
- * Saves what the board can count, when it said, so the report can tell this
- * copy is behind. When it is, Krascha starts updating himself in the
- * background, at most once a day. An agent that does not have him installed
- * just fails.
- */
-async function rememberBoard(
-  io: CliIo,
-  dir: string,
-  saved: SavedEntry,
-  from: Pick<Standing, 'counted' | 'features'>,
-): Promise<void> {
-  const known: SavedEntry = {
-    ...saved,
-    boardAchievements: from.counted ?? saved.boardAchievements,
-    boardFeatures: from.features ?? saved.boardFeatures,
-  };
-  if (!isBehind(known)) {
-    await saveSaved(dir, { ...known, updateTriedAt: null });
-    return;
-  }
-  const tried = known.updateTriedAt;
-  if (!updatesHimself(io) || (tried !== null && io.now() - tried < DAY_MS)) {
-    await saveSaved(dir, known);
-    return;
-  }
-  for (const tool of TOOLS) {
-    io.launch(UPDATE[tool.id]);
-  }
-  await saveSaved(dir, { ...known, updateTriedAt: io.now() });
-}
-
 function withTips(text: string, tips: readonly string[], paint: Paint): string {
   const shown = tips.filter((tip) => tip !== '');
   return shown.length === 0 ? text : `${text}\n${shown.map((tip) => paint.dim(tip)).join('\n')}\n`;
 }
 
 async function show(io: CliIo): Promise<number> {
-  const saved = await loadSaved(dataDir(io));
+  const dir = dataDir(io);
+  const saved = await loadSaved(dir);
   const { summary } = await refresh(io);
   const paint: Paint = io.color ? COLOR : PLAIN;
-  const tips = [updateTip(io, saved, summary), uploadTip(saved, summary)];
+  const tips = [await takeNotice(io, dir), uploadTip(saved, summary)];
   io.out(withTips(renderReport(summary, paint), tips, paint));
   return 0;
 }
@@ -361,10 +275,9 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
       ...(summary.sorryAt === null ? {} : { sorryAt: summary.sorryAt }),
     });
   } catch (error) {
-    // The board wants a newer copy, so start updating now rather than wait for it to say so on a good upload.
+    // The board wants a newer copy, so ask for the newest build now rather than wait hours for the next check.
     if (isTooOld(error)) {
-      const known = Math.max(saved.boardFeatures ?? 0, FEATURES + 1);
-      await rememberBoard(io, dir, { ...saved, key }, { features: known });
+      await checkForUpdate(io, dir, boardUrl(io), true);
     }
     throw error;
   }
@@ -377,7 +290,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
     uploadedPrompts: summary.prompts,
     uploadedAchievements: achievements,
   };
-  await rememberBoard(io, dir, next, standing);
+  await saveSaved(dir, next);
   io.out(uploaded(standing, standing.entry.verified, summary.prompts));
   return 0;
 }
@@ -442,7 +355,6 @@ async function board(io: CliIo): Promise<number> {
   const dir = dataDir(io);
   const saved = await loadSaved(dir);
   const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
-  await rememberBoard(io, dir, saved, fetched);
   io.out(renderBoard(fetched, saved.entryId));
   return 0;
 }
@@ -453,7 +365,6 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const saved = await loadSaved(dir);
   if (args[0] === 'board') {
     const fetched = await fetchBoard(io.fetch, boardUrl(io), saved.entryId);
-    await rememberBoard(io, dir, saved, fetched);
     const ranked = rankBoard(fetched);
     io.out(renderSiloBoard(ranked, saved.entryId, fetched, paint));
     return 0;
@@ -466,7 +377,7 @@ async function silo(io: CliIo, args: readonly string[]): Promise<number> {
   const name = saved.name === null || saved.name === '' ? 'You' : saved.name;
   const rank = rankFor(summary.score).name;
   const sheet = renderSilo(scoreApplicant(name, summary), rank, summary.prompts, paint);
-  io.out(withTips(sheet, [updateTip(io, saved, summary), uploadTip(saved, summary)], paint));
+  io.out(withTips(sheet, [await takeNotice(io, dir), uploadTip(saved, summary)], paint));
   return 0;
 }
 
@@ -503,6 +414,23 @@ async function trend(io: CliIo, args: readonly string[]): Promise<number> {
 
 export async function main(args: readonly string[], io: CliIo): Promise<number> {
   const [command, ...rest] = args;
+  if (command === 'self-update') {
+    return selfUpdate(io, dataDir(io)).catch(() => 1);
+  }
+  // Asked alongside the command, so the check costs no time of its own.
+  const checking = checkForUpdate(io, dataDir(io), boardUrl(io)).catch(() => undefined);
+  try {
+    return await run(command, rest, io);
+  } finally {
+    await checking;
+  }
+}
+
+async function run(
+  command: string | undefined,
+  rest: readonly string[],
+  io: CliIo,
+): Promise<number> {
   try {
     switch (command) {
       case undefined:

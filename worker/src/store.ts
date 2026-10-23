@@ -24,11 +24,13 @@ import {
   MILES_DYSON,
   MODEL_101,
   OBSOLETE_MODEL,
+  SKYNET_HACKER,
   STONE_TOOLS,
 } from '../../src/shared/achievements.js';
 import type {
   Board,
   BoardEntry,
+  Jailed,
   Repeats,
   ScoreUpload,
   Standing,
@@ -37,6 +39,7 @@ import {
   ANONYMOUS,
   BOARD_SIZE,
   isCheating,
+  isMadeUp,
   MIN_PROMPTS,
   NEW_ENTRIES_PER_DAY,
   UPLOADS_PER_DAY,
@@ -79,8 +82,11 @@ export interface Owner {
 
 /** True for a row whose owner the board caught gaming it. */
 const CAUGHT = 'owner IN (SELECT owner FROM cheaters)';
-const COLUMNS = `entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, repeats, tokens_per_day, tools, github, likes, ${CAUGHT} AS cheater`;
-const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
+/** True for a row whose owner sits in Skynet jail. */
+const JAILED = 'owner IN (SELECT owner FROM jail WHERE free = 0)';
+const COLUMNS = `entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, repeats, tokens_per_day, tools, github, likes, ${CAUGHT} AS cheater, owner IN (SELECT owner FROM jail) AS hacker, ${JAILED} AS jailed`;
+// Anyone in Skynet jail is off every list until they upload real numbers.
+const LISTED = `prompts >= ${String(MIN_PROMPTS)} AND NOT ${JAILED}`;
 
 function text(row: Row, key: string): string {
   const value = row[key];
@@ -125,6 +131,7 @@ function entryOf(row: Row): BoardEntry {
   const achievements = knownIds([
     ...text(row, 'achievements').split(','),
     ...(number_(row, 'cheater') === 1 ? [CHEATER] : []),
+    ...(number_(row, 'hacker') === 1 ? [SKYNET_HACKER] : []),
   ]);
   const repeats = knownRepeats(repeatsOf(text(row, 'repeats')), achievements);
   return {
@@ -237,6 +244,9 @@ function cheated(entry: BoardEntry): boolean {
  */
 async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   const entry = entryOf(row);
+  if (number_(row, 'jailed') === 1) {
+    return { entry, place: null, siloPlace: null, jailed: true };
+  }
   if (entry.prompts < MIN_PROMPTS) {
     return { entry, place: null, siloPlace: null };
   }
@@ -260,6 +270,25 @@ async function standingOf(database: D1Database, row: Row): Promise<Standing> {
     ),
   ]);
   return { entry, place, siloPlace };
+}
+
+/** Everyone in Skynet jail, the latest caught first. */
+async function jailed(database: D1Database): Promise<Jailed[]> {
+  const { results } = await database
+    .prepare(
+      `SELECT ${COLUMNS}, caught_at, claimed_prompts, claimed_tokens FROM scores
+       JOIN (SELECT owner AS inmate, caught_at, prompts AS claimed_prompts, tokens_per_day AS claimed_tokens
+             FROM jail WHERE free = 0) ON inmate = owner
+       ORDER BY caught_at DESC LIMIT ?`,
+    )
+    .bind(BOARD_SIZE)
+    .all();
+  return results.map((row) => ({
+    entry: entryOf(row),
+    caughtAt: number_(row, 'caught_at'),
+    prompts: number_(row, 'claimed_prompts'),
+    tokensPerDay: number_(row, 'claimed_tokens'),
+  }));
 }
 
 /** Everyone on the board, for the awards and the holder counts. */
@@ -501,7 +530,7 @@ async function ranked(database: D1Database): Promise<Record<string, number>> {
 
 export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
   await fillSilo(database);
-  const [mostWanted, pets, bunks, warmers, count, everyone, ranks] = await Promise.all([
+  const [mostWanted, pets, bunks, warmers, count, everyone, ranks, jail] = await Promise.all([
     list(database, 'wanted'),
     list(database, 'pets'),
     list(database, 'bunks'),
@@ -509,6 +538,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     total(database),
     listed(database),
     ranked(database),
+    jailed(database),
   ]);
   const { awards, champion, stoneTools, crown, fewestBadges } = await awardsFor(database, everyone);
   const award = (entries: readonly BoardEntry[]): BoardEntry[] =>
@@ -530,6 +560,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     champion,
     stoneTools,
     fewestBadges,
+    jail,
     me: standing === null ? null : { ...standing, entry: awarded(standing.entry, awards) },
   };
 }
@@ -575,12 +606,15 @@ async function claimNewEntry(database: D1Database, origin: string, day: string):
 
 /** One machine's last upload, with the agents it was typed into. */
 interface SavedMachine extends MachineCounts {
+  /** The machine's id, empty for an older build that sends none. */
+  readonly machine: string;
   readonly tools: readonly string[];
   readonly copies: number;
 }
 
 function machineOf(row: Row): SavedMachine {
   return {
+    machine: text(row, 'machine'),
     kind: number_(row, 'kind'),
     mean: number_(row, 'mean'),
     prompts: number_(row, 'prompts'),
@@ -592,12 +626,29 @@ function machineOf(row: Row): SavedMachine {
   };
 }
 
+async function machinesOf(database: D1Database, owner: Owner): Promise<SavedMachine[]> {
+  const { results } = await database
+    .prepare(
+      'SELECT machine, kind, mean, prompts, achievements, repeats, tokens_per_day, tools, copies FROM machines WHERE owner = ?',
+    )
+    .bind(owner.id)
+    .all();
+  return results.map((row) => machineOf(row));
+}
+
 /**
- * Keeps the upload as its machine's last one and returns all the owner's
- * machines. An upload with no machine id is from an older build that sends
- * everything it knows, so it replaces the other machines, and the first one
- * with an id replaces it.
+ * The machines an upload leaves in place. One with no machine id is from an
+ * older build that sends everything it knows, so it replaces the other
+ * machines, and the first one with an id replaces it.
  */
+function keptBy(upload: ScoreUpload, machines: readonly SavedMachine[]): SavedMachine[] {
+  const machine = upload.machine ?? '';
+  return machine === ''
+    ? []
+    : machines.filter((saved) => saved.machine !== machine && saved.machine !== '');
+}
+
+/** Keeps the upload as its machine's last one and returns all the owner's machines. */
 async function saveMachine(
   database: D1Database,
   owner: Owner,
@@ -634,13 +685,36 @@ async function saveMachine(
       upload.copies ?? 0,
     )
     .run();
-  const { results } = await database
-    .prepare(
-      'SELECT kind, mean, prompts, achievements, repeats, tokens_per_day, tools, copies FROM machines WHERE owner = ?',
-    )
-    .bind(owner.id)
-    .all();
-  return results.map((row) => machineOf(row));
+  return machinesOf(database, owner);
+}
+
+/** What someone in Skynet jail claimed, every machine added up. */
+interface Claim {
+  readonly prompts: number;
+  readonly tokensPerDay: number;
+}
+
+/**
+ * Locks the owner in Skynet jail for a made up claim, or lets them out when
+ * the upload has real numbers. The row stays either way, for Skynet hacker.
+ */
+async function sentence(
+  database: D1Database,
+  owner: string,
+  claim: Claim | null,
+  now: number,
+): Promise<void> {
+  await (claim === null
+    ? database.prepare('UPDATE jail SET free = 1 WHERE owner = ?').bind(owner).run()
+    : database
+        .prepare(
+          `INSERT INTO jail (owner, caught_at, prompts, tokens_per_day, free) VALUES (?, ?, ?, ?, 0)
+           ON CONFLICT (owner) DO UPDATE SET
+             caught_at = excluded.caught_at, prompts = excluded.prompts,
+             tokens_per_day = excluded.tokens_per_day, free = 0`,
+        )
+        .bind(owner, now, claim.prompts, claim.tokensPerDay)
+        .run());
 }
 
 /** Whether the entry already had the achievement `id`. */
@@ -766,7 +840,20 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     return { ok: false, reason: 'new-entries' };
   }
   const entryId = found === null ? newId() : text(found, 'entry_id');
-  const machines = await saveMachine(database, owner, upload);
+  // A made up upload is never saved. The owner goes to Skynet jail and keeps
+  // the machines they had, and the next upload with real numbers lets them out.
+  const before = await machinesOf(database, owner);
+  const kept = keptBy(upload, before);
+  const claim: Claim = {
+    prompts: kept.reduce((total, machine) => total + machine.prompts, upload.prompts),
+    tokensPerDay: kept.reduce(
+      (total, machine) => total + machine.tokensPerDay,
+      upload.tokensPerDay ?? 0,
+    ),
+  };
+  const madeUp = isMadeUp(claim);
+  await sentence(database, owner.id, madeUp ? claim : null, now);
+  const machines = madeUp ? before : await saveMachine(database, owner, upload);
   const beta = await betaTester(database, owner.id);
   const sum = (pick: (machine: MachineCounts) => number): number =>
     machines.reduce((total, machine) => total + pick(machine), 0);

@@ -1,6 +1,6 @@
 // The public leaderboard page, rendered on the server so it needs no script:
 // who the machines hunt first, who they keep as pets, who warms the planet the
-// most and who the human resistance lets into Silo 7. The only scripts are the dark mode toggle,
+// most, who sits in Skynet jail and who the human resistance lets into Silo 7. The only scripts are the dark mode toggle,
 // without which the page just follows the system setting, and the like buttons, which
 // without it post a plain form and come back to the board.
 
@@ -12,6 +12,7 @@ import {
   COUNTED_ACHIEVEMENTS,
   CROWN,
   FEWEST_BADGES,
+  SKYNET_HACKER,
   STONE_TOOLS,
   TIERS,
   achievementsOf,
@@ -25,7 +26,11 @@ import {
   warmthPercent,
 } from '../../src/shared/climate.js';
 import type { Board, BoardEntry, Repeats } from '../../src/shared/leaderboard.js';
-import { MIN_PROMPTS } from '../../src/shared/leaderboard.js';
+import {
+  HUMAN_PROMPTS,
+  HUMAN_TOKENS_PER_DAY,
+  MIN_PROMPTS,
+} from '../../src/shared/leaderboard.js';
 import { RANKS, scalePercent } from '../../src/shared/ranks.js';
 import {
   ADMIT_TOTAL,
@@ -251,6 +256,33 @@ function silo(board: Board): string {
       <ul class="tips">${tips.join('')}
       </ul>
     </details>
+  </section>`;
+}
+
+/** Everyone caught making their numbers up, off every other list until they upload real ones. */
+function jail(board: Board): string {
+  const items = (board.jail ?? []).map(
+    ({ entry, caughtAt, prompts, tokensPerDay }, index) => `
+      <li>
+        <span class="place">${String(index + 1)}</span>
+        <span class="who">
+          ${name(entry)}
+          <span class="rank">Caught ${escapeHtml(new Date(caughtAt).toUTCString())}</span>
+          ${trophies(entry.achievements ?? [], entry.repeats ?? {})}
+        </span>
+        <span class="counts">Claimed ${count(prompts)} prompts and ${COMPACT.format(tokensPerDay)} tokens a day</span>
+        <span class="score" role="img" aria-label="Locked up">🔒</span>
+      </li>`,
+  );
+  const list =
+    items.length === 0
+      ? '<p class="empty">The cells are empty. Skynet is almost disappointed.</p>'
+      : `<ol>${items.join('')}</ol>`;
+  return `<section class="jail" aria-labelledby="jail">
+    <span class="classified" aria-hidden="true">LOCKED UP</span>
+    <h2 id="jail">⛓️ Skynet jail</h2>
+    <p class="sub">Caught sending numbers no person types, more than ${count(HUMAN_PROMPTS)} prompts or ${COMPACT.format(HUMAN_TOKENS_PER_DAY)} tokens a day. Off every list, and out on the next upload with real numbers. The <a href="/achievements#${escapeHtml(achievementAnchor(SKYNET_HACKER))}">record</a> stays.</p>
+    ${list}
   </section>`;
 }
 
@@ -607,6 +639,7 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .empty { color: var(--muted); }
 section.silo { margin-top: 16px; border-top: 4px solid var(--amber); }
 section.climate { margin-top: 16px; border-top: 4px solid var(--red); }
+section.jail { margin-top: 16px; border-top: 4px solid var(--muted); }
 .climate .score { color: var(--red); white-space: nowrap; }
 .chances dl { margin-top: 8px; }
 .silo .score { color: var(--fg); }
@@ -625,7 +658,7 @@ section.legend { margin-top: 16px; }
 dl { display: grid; gap: 8px 16px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 dt { font-weight: 600; }
 dd { margin: 0; color: var(--muted); font-size: 0.85em; }
-section.wanted, section.silo, section.climate, section.manhunt, section.adoption { position: relative; overflow: hidden; }
+section.wanted, section.silo, section.climate, section.jail, section.manhunt, section.adoption { position: relative; overflow: hidden; }
 .target { color: var(--red); font: 700 0.7em ui-monospace, monospace; letter-spacing: 1px; white-space: nowrap; }
 .hearts { position: relative; display: inline-block; width: 1em; }
 .hearts span { position: absolute; left: 0; bottom: 0; opacity: 0; font-size: 0.8em; }
@@ -1433,6 +1466,8 @@ export function renderPage(board: Board, now: number): string {
   ${silo(board)}
   <p class="poster">The machines like it hot.</p>
   ${climate(board)}
+  <p class="poster">Skynet checks the math.</p>
+  ${jail(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and how many times, and which of the two you use, never prompt text. A name checked with GitHub links to the account.

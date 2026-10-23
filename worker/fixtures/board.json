@@ -742,5 +742,35 @@
       "regular": 3
     }
   },
-  "me": null
+  "me": null,
+  "jail": [
+    {
+      "entry": {
+        "id": "00000000-0000-4000-8000-000000000099",
+        "name": "T-1000",
+        "verified": true,
+        "github": "t-1000",
+        "rank": "John Connor",
+        "score": -0.98,
+        "kind": 0,
+        "mean": 5073,
+        "prompts": 5382,
+        "uploadedAt": 1792732462542,
+        "achievements": [
+          "first-strike",
+          "meltdown",
+          "sailor-mouth",
+          "skynet-hacker"
+        ],
+        "tokensPerDay": 52419111,
+        "tools": [
+          "claude"
+        ],
+        "likes": 0
+      },
+      "caughtAt": 1792732462542,
+      "prompts": 2000085382,
+      "tokensPerDay": 1000052419111
+    }
+  ]
 }

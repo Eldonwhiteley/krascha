@@ -138,6 +138,12 @@ them:
   forgive me", "my bad", "soz", typos count) and upload again. Krascha
   forgives you and starts your counts over, so only cheating after that can
   catch you again.
+- Skynet hacker goes to anyone who sends the board numbers no person types:
+  more than 1,000,000 prompts or 100 billion tokens a day, with all your
+  machines added up. The board does not save that upload. It locks you in
+  Skynet jail instead, which takes you off every list and puts you in the
+  jail at the bottom of the page with the numbers you claimed. Your next
+  upload with real numbers lets you out, but Skynet hacker stays.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you

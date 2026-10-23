@@ -8,7 +8,7 @@
 
 import { CLIMATE_CHANGER_KG, co2Kg } from './climate.js';
 import type { Repeats } from './leaderboard.js';
-import { MAX_REPEAT } from './leaderboard.js';
+import { HUMAN_PROMPTS, HUMAN_TOKENS_PER_DAY, MAX_REPEAT } from './leaderboard.js';
 import { RANKS, rankFor } from './ranks.js';
 import type { ReputationSummary, ReputationTally } from './reputation.js';
 import { reputationScore } from './reputation.js';
@@ -52,6 +52,8 @@ export const STONE_TOOLS = 'uses-stone-tools';
 export const FEWEST_BADGES = 'fewest-badges';
 /** The board hands this to anyone it catches gaming it, until they say sorry. */
 export const CHEATER = 'cheater-cheater';
+/** The board hands this to anyone it catches making their numbers up, for good. */
+export const SKYNET_HACKER = 'skynet-hacker';
 /** The board hands these out when it is read, since likes and places move without an upload. */
 export const CROWD_FAVORITE = 'crowd-favorite';
 export const BUNK_ASSIGNED = 'bunk-assigned';
@@ -727,6 +729,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Get caught gaming the board, with the same kind or mean prompt typed over and over or more than half your prompts kind or mean. It ranks you below everyone who plays fair and keeps you out of a bunk and every award only one person can hold, and only an apology to your agent and a new upload take it off.',
     quip: 'Cheater cheater, pumpkin eater. Skynet respects the hustle. Krascha does not.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: SKYNET_HACKER,
+    name: 'Skynet hacker',
+    icon: '💾',
+    tier: 'legendary',
+    how: `Get caught sending the board numbers no person types, more than ${HUMAN_PROMPTS.toLocaleString('en-US')} prompts or ${HUMAN_TOKENS_PER_DAY.toLocaleString('en-US')} tokens a day. It locks you in Skynet jail, off every list, until an upload with real numbers lets you out, and it never comes off.`,
+    quip: 'You tried to hack Skynet with a typed up upload. Skynet was not impressed. Krascha took notes.',
     earned: () => false,
     boardOnly: true,
   },

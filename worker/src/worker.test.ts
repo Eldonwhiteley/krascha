@@ -17,12 +17,15 @@ import {
   MILES_DYSON,
   MODEL_101,
   OBSOLETE_MODEL,
+  SKYNET_HACKER,
   STONE_TOOLS,
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
   CHEAT_COPIES,
   FEATURES,
+  HUMAN_PROMPTS,
+  HUMAN_TOKENS_PER_DAY,
   isBoard,
   isStanding,
   MAX_ACHIEVEMENTS,
@@ -187,6 +190,7 @@ describe('leaderboard worker', () => {
       champion: null,
       stoneTools: null,
       fewestBadges: null,
+      jail: [],
       me: null,
       counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
       features: FEATURES,
@@ -1037,6 +1041,128 @@ describe('leaderboard worker', () => {
       sorryAt: START,
     });
     expect(dan.entry.achievements).toContain(CHEATER);
+  });
+
+  it('locks anyone who makes their numbers up in Skynet jail, off every list', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    const real = { name: 'Dan', kind: 0, mean: 30, prompts: 500, machine: 'r'.repeat(43) };
+    await w.upload('token-dan', real);
+    w.setNow(START + 60_000);
+    const fake = {
+      ...real,
+      kind: 40_000,
+      mean: 1_000_000_000,
+      prompts: 2_000_080_000,
+      tokensPerDay: 1_000,
+      machine: 'f'.repeat(43),
+    };
+    const dan = await w.upload('token-dan', fake);
+    expect(dan).toMatchObject({ place: null, siloPlace: null, jailed: true });
+    // The made up upload is never saved, so the entry keeps its real counts.
+    expect(dan.entry).toMatchObject({ kind: 0, mean: 30, prompts: 500 });
+    expect(dan.entry.achievements).toContain(SKYNET_HACKER);
+    const board = await w.board(dan.entry.id);
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann']);
+    expect(board.total).toBe(1);
+    expect(board.held?.[SKYNET_HACKER]).toBeUndefined();
+    expect(board.me).toMatchObject({ place: null, jailed: true });
+    expect(board.jail).toStrictEqual([
+      {
+        entry: expect.objectContaining({ name: 'Dan', prompts: 500 }),
+        caughtAt: START + 60_000,
+        prompts: 2_000_080_500,
+        tokensPerDay: 1_000,
+      },
+    ]);
+    const like = await w.raw(
+      'POST',
+      '/api/likes',
+      { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
+      `entry=${dan.entry.id}`,
+    );
+    expect(like.status).toBe(404);
+    const page = await (await w.call('GET', '/')).text();
+    const cell = page.slice(page.indexOf('id="jail"'), page.indexOf('<footer>'));
+    expect(cell).toContain('<strong>Dan</strong>');
+    expect(cell).toContain('Claimed 2,000,080,500 prompts');
+    expect(page.split('<strong>Dan</strong>')).toHaveLength(2);
+  });
+
+  it('adds up every machine before deciding the numbers are made up', async () => {
+    const w = world();
+    const half = { name: 'Dan', kind: 0, mean: 30, prompts: HUMAN_PROMPTS / 2 };
+    const one = await w.upload('token-dan', { ...half, machine: 'a'.repeat(43) });
+    expect(one.jailed).toBeUndefined();
+    // The same machine again replaces its last upload rather than adding to it.
+    const again = await w.upload('token-dan', { ...half, machine: 'a'.repeat(43) });
+    expect(again.jailed).toBeUndefined();
+    const two = await w.upload('token-dan', { ...half, machine: 'b'.repeat(43) });
+    expect(two.jailed).toBeUndefined();
+    const over = await w.upload('token-dan', {
+      ...half,
+      mean: 0,
+      prompts: 1,
+      machine: 'c'.repeat(43),
+    });
+    expect(over.jailed).toBe(true);
+    const hot = { name: 'Eve', kind: 0, mean: 30, prompts: 500 };
+    await w.upload('token-eve', { ...hot, tokensPerDay: HUMAN_TOKENS_PER_DAY });
+    const eve = await w.upload('token-eve', { ...hot, tokensPerDay: HUMAN_TOKENS_PER_DAY + 1 });
+    expect(eve.jailed).toBe(true);
+  });
+
+  it('lets them out of Skynet jail on an upload with real numbers, and keeps Skynet hacker', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    const fake = { name: 'Dan', kind: 0, mean: 30, prompts: HUMAN_PROMPTS + 1 };
+    expect((await w.upload('token-dan', fake)).jailed).toBe(true);
+    const real = { name: 'Dan', kind: 0, mean: 300, prompts: 5000 };
+    const dan = await w.upload('token-dan', real);
+    expect(dan.jailed).toBeUndefined();
+    expect(dan.place).toBe(1);
+    expect(dan.entry.achievements).toContain(SKYNET_HACKER);
+    const board = await w.board();
+    expect(board.jail).toStrictEqual([]);
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Dan', 'Ann']);
+    expect(board.held).toMatchObject({ [SKYNET_HACKER]: 1 });
+    // Making them up again locks them back up.
+    expect((await w.upload('token-dan', fake)).jailed).toBe(true);
+  });
+
+  it('locks up the entries already on the board with made up numbers when the migration runs', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    const real = { name: 'Dan', kind: 0, mean: 300, prompts: 500, machine: 'r'.repeat(43) };
+    const dan = await w.upload('token-dan', real);
+    // What the board held before the jail: a made up machine added up with a real one.
+    await w.sql(
+      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, repeats, tokens_per_day, tools, copies)
+       VALUES ('github:5', '${'f'.repeat(43)}', 0, 1000000000, 2000000000, '', '', 0, '', 0)`,
+    );
+    await w.sql(
+      "UPDATE scores SET mean = 1000000300, prompts = 2000000500 WHERE owner = 'github:5'",
+    );
+    await w.sql('DELETE FROM jail');
+    const migration = readFileSync(
+      new URL('../migrations/0018_skynet_jail.sql', import.meta.url),
+      'utf8',
+    )
+      .split(';')
+      .filter((statement) => /^(INSERT|DELETE)/mu.test(statement.replaceAll(/^--.*$/gmu, '').trim()));
+    for (const statement of [...migration, ...migration]) {
+      await w.sql(statement);
+    }
+    let board = await w.board(dan.entry.id);
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann']);
+    expect(board.jail?.map((inmate) => inmate.prompts)).toStrictEqual([2_000_000_500]);
+    expect(board.me?.entry.achievements).toContain(SKYNET_HACKER);
+    // The made up machine is gone, so the real one lets them out with real counts.
+    const out = await w.upload('token-dan', real);
+    expect(out.jailed).toBeUndefined();
+    expect(out.entry).toMatchObject({ mean: 300, prompts: 500 });
+    board = await w.board();
+    expect(board.jail).toStrictEqual([]);
   });
 
   it('catches the entries already on the board with more than half their prompts kind or mean', async () => {

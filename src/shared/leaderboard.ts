@@ -54,6 +54,10 @@ export const COPIES_PER_DAY = 10;
 export const CHEAT_COPIES = 50;
 /** More than this share of prompts kind or mean is past anything a person types. */
 export const CHEAT_SHARE = 0.5;
+/** More prompts than anyone types in years of Claude, so an owner past it made their numbers up. */
+export const HUMAN_PROMPTS = 1_000_000;
+/** More tokens a day than anyone runs, swarms and all, so an owner past it made their numbers up. */
+export const HUMAN_TOKENS_PER_DAY = 100_000_000_000;
 /** Shown for anyone who uploads without a name. */
 export const ANONYMOUS = 'Anonymous';
 
@@ -99,6 +103,15 @@ export function isCheating(
     (counts.copies ?? 0) >= CHEAT_COPIES ||
     (counts.prompts >= MIN_PROMPTS && counts.kind + counts.mean > counts.prompts * CHEAT_SHARE)
   );
+}
+
+/**
+ * Whether an owner's counts, every machine added up, are past anything a
+ * person sends. No copy of Krascha counts that high, so only someone typing
+ * their own upload gets there.
+ */
+export function isMadeUp(counts: Pick<ScoreUpload, 'prompts' | 'tokensPerDay'>): boolean {
+  return counts.prompts > HUMAN_PROMPTS || (counts.tokensPerDay ?? 0) > HUMAN_TOKENS_PER_DAY;
 }
 
 /** One person on the board. The id is random, not their GitHub id. */
@@ -147,6 +160,18 @@ export interface Standing {
   readonly features?: number;
   /** True when this upload's apology got the entry forgiven for cheating. Only in the answer to an upload. */
   readonly forgiven?: boolean;
+  /** True while the entry sits in Skynet jail. Missing otherwise, and from older servers. */
+  readonly jailed?: boolean;
+}
+
+/** Someone in Skynet jail, with when they were caught and the numbers they made up. */
+export interface Jailed {
+  readonly entry: BoardEntry;
+  readonly caughtAt: number;
+  /** The prompts they claimed, every machine added up. */
+  readonly prompts: number;
+  /** The tokens a day they claimed, every machine added up. */
+  readonly tokensPerDay: number;
 }
 
 export interface Board {
@@ -172,6 +197,8 @@ export interface Board {
   readonly stoneTools?: BoardEntry | null;
   /** Who holds Fewest badges, or null when nobody does. Missing from a server older than it. */
   readonly fewestBadges?: BoardEntry | null;
+  /** Everyone caught making their numbers up, off every other list, the latest caught first. Missing from a server older than the jail. */
+  readonly jail?: readonly Jailed[];
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
   /** The achievements counts can earn on the server. Only from /api/board, and missing from older servers. */
@@ -279,7 +306,18 @@ export function isStanding(value: unknown): value is Standing {
     (value['machines'] === undefined || isCount(value['machines'])) &&
     (value['counted'] === undefined || isKnownList(value['counted'])) &&
     (value['features'] === undefined || isCount(value['features'])) &&
-    (value['forgiven'] === undefined || typeof value['forgiven'] === 'boolean')
+    (value['forgiven'] === undefined || typeof value['forgiven'] === 'boolean') &&
+    (value['jailed'] === undefined || typeof value['jailed'] === 'boolean')
+  );
+}
+
+function isJailed(value: unknown): value is Jailed {
+  return (
+    isRecord(value) &&
+    isBoardEntry(value['entry']) &&
+    isCount(value['caughtAt']) &&
+    isCount(value['prompts']) &&
+    isCount(value['tokensPerDay'])
   );
 }
 
@@ -309,6 +347,8 @@ export function isBoard(value: unknown): value is Board {
     (value['fewestBadges'] === undefined ||
       value['fewestBadges'] === null ||
       isBoardEntry(value['fewestBadges'])) &&
+    (value['jail'] === undefined ||
+      (Array.isArray(value['jail']) && value['jail'].every(isJailed))) &&
     (value['me'] === null || isStanding(value['me'])) &&
     (value['counted'] === undefined || isKnownList(value['counted'])) &&
     (value['features'] === undefined || isCount(value['features']))

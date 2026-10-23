@@ -921,6 +921,13 @@ describe('leaderboard worker', () => {
     expect((await w.board()).held).toMatchObject({ 'caught-the-hacker': 1 });
     const page = await (await w.call('GET', '/achievements')).text();
     expect(page).toContain('★★★★★ Ultra legendary');
+    const heads = [...page.matchAll(/<h3 class="tier-head [a-z-]+" id="tier-([a-z-]+)">/g)].map(
+      (match) => match[1],
+    );
+    expect(heads).toStrictEqual(['bronze', 'silver', 'gold', 'legendary', 'ultra-legendary']);
+    const ultra = page.slice(page.indexOf('id="tier-ultra-legendary"'));
+    expect(ultra).toContain('id="achievement-caught-the-hacker"');
+    expect(ultra).toContain('id="achievement-alpha-tester"');
   });
 
   it('hands Caught the hacker to the shanep entry already on the board', async () => {

@@ -107,7 +107,7 @@ them:
 - Leader of the human resistance goes only to Shane's GitHub account.
 - Kyle Reese goes only to lhindman's GitHub account.
 - Caught the cheater goes only to Shane's GitHub account.
-- Caught the hacker goes only to Shane's GitHub account too. It is the only ultra legendary achievement, one tier above legendary.
+- Caught the hacker goes only to Shane's GitHub account too. It is ultra legendary, one tier above legendary.
 - Miles Dyson goes to anyone with a pull request merged into Krascha, on their
   next upload with gh. Model 101 goes only to whoever got the first one merged.
 - Machine collaborator goes to anyone GitHub finds a commit for with Claude as
@@ -117,7 +117,7 @@ them:
   that leans mean.
 - Beta tester went to the first 5 people to upload. Those spots are gone, and
   a `remove` does not free one.
-- Alpha tester went to the first 2 of those 5.
+- Alpha tester went to the first 2 of those 5. It is ultra legendary too.
 - Crowd favorite takes 10 likes.
 - Obsolete model goes to anyone who was number one on the most wanted or the
   pets list until someone else passed them. Leaving the board or crossing to

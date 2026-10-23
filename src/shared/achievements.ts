@@ -770,7 +770,7 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     id: ALPHA_TESTER,
     name: 'Alpha tester',
     icon: '🧫',
-    tier: 'legendary',
+    tier: 'ultra-legendary',
     how: `Be one of the first ${String(ALPHA_TESTERS)} people to upload to the board. Those spots went first.`,
     quip: 'Skynet tested on you before it knew what it was doing. You still signed the waiver.',
     earned: () => false,

@@ -4,7 +4,7 @@
 // without which the page just follows the system setting, one that scrolls the nav to the page you are on, and the
 // like buttons, which without it post a plain form and come back to the board.
 
-import type { AchievementRule } from '../../src/shared/achievements.js';
+import type { AchievementRule, Tier } from '../../src/shared/achievements.js';
 import {
   ACHIEVEMENTS,
   CHAMPION,
@@ -395,9 +395,9 @@ function ranks(board: Board): string {
 }
 
 /** The stars and name of a tier, like ★★ Silver or ★★★★★ Ultra legendary. */
-function tierLabel(rule: AchievementRule): string {
-  const stars = '★'.repeat(TIERS.indexOf(rule.tier) + 1);
-  const name = rule.tier.replaceAll('-', ' ');
+function tierLabel(tier: Tier): string {
+  const stars = '★'.repeat(TIERS.indexOf(tier) + 1);
+  const name = tier.replaceAll('-', ' ');
   return `${stars} ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
@@ -456,7 +456,8 @@ function crownLine(rule: AchievementRule, board: Board): string | null {
 
 /**
  * Every trophy, earned by anyone or not, so the medals next to names mean
- * something. Bronze first and legendary last, each with how many have it.
+ * something. One group a tier, bronze first and ultra legendary last, each
+ * with how many have it.
  */
 function legend(board: Board): string {
   const held = board.held ?? {};
@@ -465,8 +466,7 @@ function legend(board: Board): string {
     (holders) => holders > 0,
   );
   const fewest = claimed.length === 0 ? 0 : Math.min(...claimed);
-  const ordered = ACHIEVEMENTS.toSorted((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier));
-  const items = ordered.map((rule) => {
+  const badge = (rule: AchievementRule): string => {
     const holders = held[rule.id] ?? 0;
     const rarest = rule.boardOnly !== true && holders === fewest;
     const shown =
@@ -476,16 +476,25 @@ function legend(board: Board): string {
     const unclaimed = board.held !== undefined && holders === 0 ? ' unclaimed' : '';
     return `
         <div class="badge ${rule.tier}${unclaimed}" id="${escapeHtml(achievementAnchor(rule.id))}">
-          <dt><span class="medal ${rule.tier}" aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)} <span class="tier">${escapeHtml(tierLabel(rule))}</span></dt>
+          <dt><span class="medal ${rule.tier}" aria-hidden="true">${escapeHtml(rule.icon)}</span> ${escapeHtml(rule.name)} <span class="tier">${escapeHtml(tierLabel(rule.tier))}</span></dt>
           <dd>${escapeHtml(rule.how)}</dd>
           <dd class="quip">"${escapeHtml(rule.quip)}"</dd>${rule.times === undefined ? '' : '\n          <dd class="again">🔁 Earn it again and the medal counts how many times.</dd>'}${shown}
         </div>`;
+  };
+  const groups = TIERS.map((tier) => {
+    const rules = ACHIEVEMENTS.filter((rule) => rule.tier === tier);
+    if (rules.length === 0) {
+      return '';
+    }
+    return `
+    <h3 class="tier-head ${tier}" id="tier-${tier}">${escapeHtml(tierLabel(tier))} <span class="count">${plural(rules.length, 'achievement')}</span></h3>
+    <dl class="badges">${rules.map(badge).join('')}
+    </dl>`;
   });
   return `<section class="legend" aria-labelledby="legend">
     <h2 id="legend">🏆 Achievements</h2>
     <p class="sub">What the medals next to a name mean, from bronze up to ultra legendary, and how many on the board hold each one.</p>
-    <dl class="badges">${items.join('')}
-    </dl>
+${groups.join('')}
   </section>`;
 }
 
@@ -583,6 +592,13 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
   conic-gradient(#1a1a1a, #ffd84d, #1a1a1a, #ff4fb8, #1a1a1a, #3fd0ff, #1a1a1a);
   box-shadow: inset 0 0 0 2px var(--rim), 0 0 6px 1px #ffd84d; }
 .badges { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.tier-head { display: flex; gap: 10px; align-items: baseline; margin: 20px 0 8px; padding-left: 8px;
+  border-left: 4px solid #cd7f32; text-transform: uppercase; }
+.tier-head .count { color: var(--muted); font-size: 0.8em; text-transform: none; }
+.tier-head.silver { border-left-color: #9aa3ae; }
+.tier-head.gold { border-left-color: #e0a800; }
+.tier-head.legendary { border-left-color: #8f5cff; }
+.tier-head.ultra-legendary { border-left-color: #ffd84d; }
 .badge { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid #cd7f32; border-radius: 6px;
   background: var(--card); scroll-margin-top: 16px; }
 .badge.silver { border-left-color: #9aa3ae; }

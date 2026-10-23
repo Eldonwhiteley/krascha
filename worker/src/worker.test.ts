@@ -653,6 +653,21 @@ describe('leaderboard worker', () => {
     expect(page.split('class="sticker"')).toHaveLength(2);
   });
 
+  it('sticks Known cheater on every cheater on every list and nobody else', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, tokensPerDay: 100_000_000 });
+    const cheat = { name: 'Dan', kind: 0, mean: 300, prompts: 500, tokensPerDay: 1_000 };
+    await w.upload('token-dan', cheat);
+    const page = await (await w.call('GET', '/')).text();
+    const sticker =
+      '<span class="sticker cheater" role="img" aria-label="Known cheater">Known <span class="beat">🚨</span> cheater</span>';
+    const check = '<span class="verified" title="Checked with GitHub">✓</span>';
+    expect(page).toContain(`<strong>Dan</strong></a> ${check} ${sticker}`);
+    // Most wanted, the Silo 7 line and the climate changers.
+    expect(page.split(sticker)).toHaveLength(4);
+    expect(page).not.toMatch(/Ann<\/strong>(?:<\/a>)?[^<]*<span class="sticker cheater"/u);
+  });
+
   it('says the climate changers list is empty until someone sends tokens', async () => {
     const page = await (await world().call('GET', '/')).text();
     expect(page).toContain('Nobody yet. The planet is holding steady');

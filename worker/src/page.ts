@@ -8,6 +8,7 @@ import type { AchievementRule } from '../../src/shared/achievements.js';
 import {
   ACHIEVEMENTS,
   CHAMPION,
+  CHEATER,
   COUNTED_ACHIEVEMENTS,
   CROWN,
   FEWEST_BADGES,
@@ -113,6 +114,10 @@ function tools(ids: readonly string[]): string {
 
 const CHECK = ' <span class="verified" title="Checked with GitHub">✓</span>';
 
+/** What the board sticks on everyone it caught cheating, on every list they show up on. */
+const CAUGHT =
+  ' <span class="sticker cheater" role="img" aria-label="Known cheater">Known <span class="beat">🚨</span> cheater</span>';
+
 /** The name, linked to the GitHub account when there is one. */
 function shownName(entry: Pick<BoardEntry, 'name' | 'github'>): string {
   const strong = `<strong>${escapeHtml(entry.name)}</strong>`;
@@ -121,9 +126,12 @@ function shownName(entry: Pick<BoardEntry, 'name' | 'github'>): string {
     : `<a class="github" href="https://github.com/${escapeHtml(entry.github)}">${strong}</a>`;
 }
 
-/** The name, the GitHub check and the agents, the start of every row. */
-function name(entry: Pick<BoardEntry, 'name' | 'verified' | 'tools' | 'github'>): string {
-  return `${shownName(entry)}${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}`;
+/** The name, the GitHub check, the agents and the cheater sticker, the start of every row. */
+function name(
+  entry: Pick<BoardEntry, 'name' | 'verified' | 'tools' | 'github' | 'achievements'>,
+): string {
+  const caught = (entry.achievements ?? []).includes(CHEATER) ? CAUGHT : '';
+  return `${shownName(entry)}${entry.verified ? CHECK : ''}${tools(entry.tools ?? [])}${caught}`;
 }
 
 function percent(value: number): string {
@@ -625,6 +633,7 @@ section.wanted, section.silo, section.climate, section.manhunt, section.adoption
 .sticker { display: inline-block; padding: 0 6px; border: 2px solid var(--fg); border-radius: 3px;
   background: var(--card); box-shadow: 2px 2px 0 var(--red); color: var(--fg);
   font: 700 0.75em var(--mono); white-space: nowrap; rotate: -3deg; }
+.sticker.cheater { border-color: var(--red); box-shadow: 2px 2px 0 var(--fg); color: var(--red); rotate: 3deg; }
 .beat { display: inline-block; }
 .classified { position: absolute; top: 14px; right: 16px; padding: 2px 8px; border: 2px solid var(--red);
   border-radius: 4px; background: var(--card); color: var(--red); font: 700 0.8em ui-monospace, monospace;

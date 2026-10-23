@@ -46,6 +46,10 @@ export const LHINDMAN = 2855647;
 export const CROWN = 'most-decorated';
 /** The one the board moves to whoever on it has the most likes. */
 export const CHAMPION = 'peoples-champion';
+/** The one the board moves to whoever on it uses the fewest tokens, out of those who use any. */
+export const STONE_TOOLS = 'uses-stone-tools';
+/** The one the board moves to whoever on it has earned the fewest of the rest. */
+export const FEWEST_BADGES = 'fewest-badges';
 /** The board hands these out when it is read, since likes and places move without an upload. */
 export const CROWD_FAVORITE = 'crowd-favorite';
 export const BUNK_ASSIGNED = 'bunk-assigned';
@@ -670,6 +674,26 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Get more likes than anyone else on the board. It moves when someone passes you, not when they tie.',
     quip: 'The humans picked a favorite. The machines will pick one too.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: STONE_TOOLS,
+    name: 'Uses stone tools',
+    icon: '🪨',
+    tier: 'silver',
+    how: 'Use the fewest tokens a day of anyone on the board who uses any. It moves when someone uses fewer, not when they tie.',
+    quip: 'Skynet burns a datacenter a day. You are still rubbing two sticks together.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: FEWEST_BADGES,
+    name: 'Fewest badges',
+    icon: '🫥',
+    tier: 'bronze',
+    how: 'Earn fewer achievements than anyone else on the board. It moves when someone has fewer, not when they tie.',
+    quip: 'Krascha pulled your file twice. It was empty both times.',
     earned: () => false,
     boardOnly: true,
   },

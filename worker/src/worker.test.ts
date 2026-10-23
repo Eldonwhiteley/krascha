@@ -11,10 +11,12 @@ import {
   COUNTED_ACHIEVEMENTS,
   CROWD_FAVORITE,
   CROWN,
+  FEWEST_BADGES,
   MACHINE_COLLABORATOR,
   MILES_DYSON,
   MODEL_101,
   OBSOLETE_MODEL,
+  STONE_TOOLS,
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -156,7 +158,15 @@ const MIDDLE = { name: '', kind: 5, mean: 3, prompts: 200 };
 
 /** What an entry holds without the ones the board works out when it is read. */
 function earned(achievements: readonly string[] | undefined): string[] {
-  const onRead = new Set([CROWN, CHAMPION, BUNK_ASSIGNED, CROWD_FAVORITE, OBSOLETE_MODEL]);
+  const onRead = new Set([
+    CROWN,
+    CHAMPION,
+    STONE_TOOLS,
+    FEWEST_BADGES,
+    BUNK_ASSIGNED,
+    CROWD_FAVORITE,
+    OBSOLETE_MODEL,
+  ]);
   return (achievements ?? []).filter((id) => !onRead.has(id));
 }
 
@@ -173,6 +183,8 @@ describe('leaderboard worker', () => {
       ranks: {},
       crown: null,
       champion: null,
+      stoneTools: null,
+      fewestBadges: null,
       me: null,
       counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
       features: FEATURES,
@@ -295,7 +307,10 @@ describe('leaderboard worker', () => {
       '<span class="repeated"><a class="medal silver" href="/achievements#achievement-meltdown" title="Meltdown, earned 12 times: Be mean to your AI 5 times in one day." aria-label="Meltdown, earned 12 times: Be mean to your AI 5 times in one day.">🌋</a><span class="times" aria-hidden="true">12</span></span>',
     );
     // Ann's 12 meltdowns count once, so Bob's 4 pass her 3 with the bunk.
-    await w.upload('token-bob', { ...KIND, achievements: ['manners', 'charm', 'saint', 'diplomat'] });
+    await w.upload('token-bob', {
+      ...KIND,
+      achievements: ['manners', 'charm', 'saint', 'diplomat'],
+    });
     expect((await w.board()).crown?.name).toBe('Bob');
     // Two machines that share a calendar day keep the most either one sent.
     const laptop = 'b'.repeat(32);
@@ -692,11 +707,13 @@ describe('leaderboard worker', () => {
     expect(ann.entry.achievements).toContain(CROWN);
     // A tie leaves it where it is.
     const tie = await w.upload('token-bob', { ...KIND, achievements: ['manners', 'charm'] });
-    expect(tie.entry.achievements).toStrictEqual(['manners', 'charm']);
+    expect(earned(tie.entry.achievements)).toStrictEqual(['manners', 'charm']);
     expect(await holders()).toStrictEqual(['Ann']);
     // Nobody can send it in an upload.
     const claim = { ...KIND, name: 'Cat', achievements: [CROWN, 'manners'] };
-    expect((await w.upload('token-cat', claim)).entry.achievements).toStrictEqual(['manners']);
+    expect(earned((await w.upload('token-cat', claim)).entry.achievements)).toStrictEqual([
+      'manners',
+    ]);
     // Ann's bunk counts, so Bob needs 4 to pass her 3.
     const passed = await w.upload('token-bob', {
       ...KIND,
@@ -880,7 +897,7 @@ describe('leaderboard worker', () => {
     const board = await w.board();
     expect(board.held).toMatchObject({ [BETA_TESTER]: 5 });
     const fay = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'fay');
-    expect(fay?.achievements).toStrictEqual(['manners']);
+    expect(earned(fay?.achievements)).toStrictEqual(['manners']);
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {
@@ -924,6 +941,66 @@ describe('leaderboard worker', () => {
     const champion = page.slice(page.indexOf(`id="achievement-${CHAMPION}"`));
     expect(champion.slice(0, champion.indexOf('</div>'))).toContain(
       '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 3 likes.</span></dd>',
+    );
+  });
+
+  it('gives Uses stone tools to the fewest tokens a day, leaving out anyone who uses none', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', { ...MEAN, tokensPerDay: 5_000_000 });
+    // The least of one is no contest.
+    expect(ann.entry.achievements).not.toContain(STONE_TOOLS);
+    expect((await w.board()).stoneTools).toBeNull();
+    // Using none does not count as using the fewest.
+    await w.upload('token-cat', MIDDLE);
+    expect((await w.board()).stoneTools).toBeNull();
+    // A tie on the first read goes to the earliest upload, and later ties leave it there.
+    await w.upload('token-bob', { ...KIND, tokensPerDay: 5_000_000 });
+    expect((await w.board()).stoneTools?.name).toBe('Ann');
+    await w.upload('token-bob', { ...KIND, tokensPerDay: 2_000_000 });
+    expect((await w.board()).stoneTools?.name).toBe('Bob');
+    await w.upload('token-ann', { ...MEAN, tokensPerDay: 2_000_000 });
+    const board = await w.board();
+    expect(board.stoneTools?.name).toBe('Bob');
+    expect(board.stoneTools?.achievements).toContain(STONE_TOOLS);
+    expect(board.held).toMatchObject({ [STONE_TOOLS]: 1 });
+    // Nobody can send it in an upload.
+    const claim = { ...MEAN, achievements: [STONE_TOOLS], tokensPerDay: 2_000_000 };
+    expect((await w.upload('token-ann', claim)).entry.achievements).not.toContain(STONE_TOOLS);
+    const page = await (await w.call('GET', '/achievements')).text();
+    const stone = page.slice(page.indexOf(`id="achievement-${STONE_TOOLS}"`));
+    expect(stone.slice(0, stone.indexOf('</div>'))).toContain(
+      '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 2M tokens a day.</span></dd>',
+    );
+  });
+
+  it('gives Fewest badges to the fewest achievements, counting the other board awards but not itself', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', { ...MEAN, achievements: ['first-strike'] });
+    // The least of one is no contest.
+    expect(ann.entry.achievements).not.toContain(FEWEST_BADGES);
+    expect((await w.board()).fewestBadges).toBeNull();
+    // Ann has first strike, a bunk and the crown, so Bob with 1 has the fewest.
+    const bob = await w.upload('token-bob', { ...KIND, achievements: ['manners'] });
+    expect(bob.entry.achievements).toContain(FEWEST_BADGES);
+    // Holding it does not make Bob's 2 a tie with Cat's 2, so Bob keeps it.
+    const two = ['manners', 'charm'];
+    await w.upload('token-cat', { ...KIND, name: 'Cat', achievements: two });
+    expect((await w.board()).fewestBadges?.name).toBe('Bob');
+    await w.upload('token-bob', { ...KIND, achievements: two });
+    expect((await w.board()).fewestBadges?.name).toBe('Bob');
+    await w.upload('token-cat', { ...KIND, name: 'Cat', achievements: [] });
+    const board = await w.board();
+    expect(board.fewestBadges?.name).toBe('Cat');
+    expect(board.held).toMatchObject({ [FEWEST_BADGES]: 1 });
+    // It does not count toward Most decorated, or Cat would gain on Ann by holding it.
+    expect(board.crown?.name).toBe('Ann');
+    // Nobody can send it in an upload.
+    const claim = { ...KIND, achievements: [FEWEST_BADGES, 'manners', 'charm'] };
+    expect((await w.upload('token-bob', claim)).entry.achievements).not.toContain(FEWEST_BADGES);
+    const page = await (await w.call('GET', '/achievements')).text();
+    const fewest = page.slice(page.indexOf(`id="achievement-${FEWEST_BADGES}"`));
+    expect(fewest.slice(0, fewest.indexOf('</div>'))).toContain(
+      '<strong>Cat</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 0 achievements.</span></dd>',
     );
   });
 
@@ -1018,6 +1095,7 @@ describe('leaderboard worker', () => {
       manners: 1,
       [CROWN]: 1,
       [BUNK_ASSIGNED]: 1,
+      [FEWEST_BADGES]: 1,
     });
     const page = await (await w.call('GET', '/achievements')).text();
     expect(page).toContain('2 of 2 hold it (100%)');
@@ -1096,8 +1174,8 @@ describe('leaderboard worker', () => {
       expect(lists).toContain(`href="/achievements#achievement-${id}"`);
       expect(achievements).toContain(`id="achievement-${id}"`);
     }
-    // Three earned, and Ann's crown and bunk.
-    expect(lists.split('<a class="medal ')).toHaveLength(6);
+    // Three earned, Ann's crown and bunk, and Bob's Fewest badges.
+    expect(lists.split('<a class="medal ')).toHaveLength(7);
     // Each medal is its own link, so none hide inside one big image for screen readers.
     expect(lists).not.toContain('class="trophies" role="img"');
     expect(page).toContain('.badge:target {');

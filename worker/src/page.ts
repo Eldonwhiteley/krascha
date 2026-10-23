@@ -10,6 +10,8 @@ import {
   CHAMPION,
   COUNTED_ACHIEVEMENTS,
   CROWN,
+  FEWEST_BADGES,
+  STONE_TOOLS,
   TIERS,
   achievementsOf,
 } from '../../src/shared/achievements.js';
@@ -87,7 +89,9 @@ function trophies(ids: readonly string[], repeats: Repeats): string {
   const medals = earned.map((rule) => {
     const times = repeats[rule.id] ?? 1;
     const about = escapeHtml(
-      times > 1 ? `${rule.name}, earned ${count(times)} times: ${rule.how}` : `${rule.name}: ${rule.how}`,
+      times > 1
+        ? `${rule.name}, earned ${count(times)} times: ${rule.how}`
+        : `${rule.name}: ${rule.how}`,
     );
     const medal = `<a class="medal ${rule.tier}" href="/achievements#${escapeHtml(achievementAnchor(rule.id))}" title="${about}" aria-label="${about}">${escapeHtml(rule.icon)}</a>`;
     return times > 1
@@ -376,11 +380,28 @@ function holderLine(holder: BoardEntry | null, what: (holder: BoardEntry) => str
 function crownLine(rule: AchievementRule, board: Board): string | null {
   if (rule.id === CROWN && board.crown !== undefined) {
     return holderLine(board.crown, (holder) =>
-      plural((holder.achievements ?? []).filter((id) => id !== CROWN).length, 'achievement'),
+      plural(
+        (holder.achievements ?? []).filter((id) => id !== CROWN && id !== FEWEST_BADGES).length,
+        'achievement',
+      ),
     );
   }
   if (rule.id === CHAMPION && board.champion !== undefined) {
     return holderLine(board.champion, (holder) => plural(holder.likes ?? 0, 'like'));
+  }
+  if (rule.id === STONE_TOOLS && board.stoneTools !== undefined) {
+    return holderLine(
+      board.stoneTools,
+      (holder) => `${COMPACT.format(holder.tokensPerDay ?? 0)} tokens a day`,
+    );
+  }
+  if (rule.id === FEWEST_BADGES && board.fewestBadges !== undefined) {
+    return holderLine(board.fewestBadges, (holder) =>
+      plural(
+        (holder.achievements ?? []).filter((id) => id !== FEWEST_BADGES).length,
+        'achievement',
+      ),
+    );
   }
   return null;
 }
@@ -1112,7 +1133,11 @@ const KEEPER = `<svg class="keeper" viewBox="0 0 64 64" aria-hidden="true">
 const PET_NAMES = ['Meatbag', 'Carbon unit', 'Organic', 'Little buddy'] as const;
 
 /** What Krascha says to his new pet, one at a time. Without motion only the first one shows. */
-const SAYINGS = ["Who's a good human?", 'You are. Statistically.', 'Hold still. Vet check.'] as const;
+const SAYINGS = [
+  "Who's a good human?",
+  'You are. Statistically.',
+  'Hold still. Vet check.',
+] as const;
 
 /**
  * Krascha rolling in to adopt whoever tops the kept as pets list, closer the

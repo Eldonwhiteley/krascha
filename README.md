@@ -126,6 +126,10 @@ them:
 - Most decorated goes to whoever has the most achievements, and People's
   champion to whoever has the most likes. Each moves when someone passes the
   holder, and a tie leaves it where it is.
+- Uses stone tools goes to whoever uses the fewest tokens a day, out of those
+  who use any, and Fewest badges to whoever has the fewest achievements. Each
+  needs at least two on the board to pick from, moves when someone drops
+  below the holder, and stays put on a tie.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you

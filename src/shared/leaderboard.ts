@@ -141,6 +141,10 @@ export interface Board {
   readonly crown?: BoardEntry | null;
   /** Who holds People's champion, or null when nobody does. Missing from a server older than it. */
   readonly champion?: BoardEntry | null;
+  /** Who holds Uses stone tools, or null when nobody does. Missing from a server older than it. */
+  readonly stoneTools?: BoardEntry | null;
+  /** Who holds Fewest badges, or null when nobody does. Missing from a server older than it. */
+  readonly fewestBadges?: BoardEntry | null;
   /** The caller's own entry, when the request named one. */
   readonly me: Standing | null;
   /** The achievements counts can earn on the server. Only from /api/board, and missing from older servers. */
@@ -269,6 +273,12 @@ export function isBoard(value: unknown): value is Board {
     (value['champion'] === undefined ||
       value['champion'] === null ||
       isBoardEntry(value['champion'])) &&
+    (value['stoneTools'] === undefined ||
+      value['stoneTools'] === null ||
+      isBoardEntry(value['stoneTools'])) &&
+    (value['fewestBadges'] === undefined ||
+      value['fewestBadges'] === null ||
+      isBoardEntry(value['fewestBadges'])) &&
     (value['me'] === null || isStanding(value['me'])) &&
     (value['counted'] === undefined || isKnownList(value['counted'])) &&
     (value['features'] === undefined || isCount(value['features']))

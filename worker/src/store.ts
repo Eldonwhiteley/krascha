@@ -15,6 +15,7 @@ import {
   CROWD_FAVORITE,
   CROWD_FAVORITE_LIKES,
   CROWN,
+  FEWEST_BADGES,
   knownIds,
   knownRepeats,
   machineIds,
@@ -22,6 +23,7 @@ import {
   MILES_DYSON,
   MODEL_101,
   OBSOLETE_MODEL,
+  STONE_TOOLS,
 } from '../../src/shared/achievements.js';
 import type {
   Board,
@@ -99,7 +101,9 @@ function repeatsOf(stored: string): Record<string, number> {
     stored
       .split(',')
       .map((pair) => pair.split(':'))
-      .flatMap(([id, times]) => (id === undefined || times === undefined ? [] : [[id, Number(times)]])),
+      .flatMap(([id, times]) =>
+        id === undefined || times === undefined ? [] : [[id, Number(times)]],
+      ),
   );
 }
 
@@ -239,27 +243,40 @@ async function listed(database: D1Database): Promise<BoardEntry[]> {
   return results.map((row) => entryOf(row));
 }
 
-/** How many achievements an entry holds, not counting the crown itself. */
+/**
+ * How many achievements an entry holds, not counting the crown itself or
+ * Fewest badges, which goes out after it.
+ */
 function decorations(entry: BoardEntry): number {
-  return (entry.achievements ?? []).filter((id) => id !== CROWN).length;
+  return (entry.achievements ?? []).filter((id) => id !== CROWN && id !== FEWEST_BADGES).length;
+}
+
+/** How many achievements an entry holds, not counting Fewest badges itself. */
+function badges(entry: BoardEntry): number {
+  return (entry.achievements ?? []).filter((id) => id !== FEWEST_BADGES).length;
 }
 
 /**
- * The listed entry with the most of `measure`, who holds the crown `id`, or
- * null when nobody has any. A tie leaves it with the holder, so it moves only
- * to someone with more. When the holder has left the board it goes to whoever
- * has the most, the earliest upload first.
+ * The listed entry with the most of `measure`, or the least when `pick` says
+ * so, who holds the crown `id`. Most is null when nobody has any, and least is
+ * null with fewer than two to pick from, since the least of one is no
+ * contest. A tie leaves it with the holder, so it moves only to someone who
+ * does better. When the holder has left the board it goes to whoever does
+ * best, the earliest upload first.
  */
 async function crownHolder(
   database: D1Database,
   id: string,
   everyone: readonly BoardEntry[],
   measure: (entry: BoardEntry) => number,
+  pick: 'most' | 'least' = 'most',
 ): Promise<BoardEntry | null> {
-  const top = everyone.reduce((best, entry) => Math.max(best, measure(entry)), 0);
+  const values = everyone.map(measure);
+  const best = pick === 'most' ? Math.max(0, ...values) : Math.min(...values);
+  const contest = pick === 'most' ? best > 0 : everyone.length > 1;
   const stored = await database.prepare('SELECT entry FROM crown WHERE id = ?').bind(id).first();
   const was = stored === null ? null : text(stored, 'entry');
-  const leaders = everyone.filter((entry) => top > 0 && measure(entry) === top);
+  const leaders = everyone.filter((entry) => contest && measure(entry) === best);
   const holder =
     leaders.find((entry) => entry.id === was) ??
     leaders.toSorted((a, b) => a.uploadedAt - b.uploadedAt)[0] ??
@@ -339,7 +356,9 @@ interface Awards {
   /** The entries ever knocked off the number one spot. */
   readonly knockedOff: ReadonlySet<string>;
   readonly champion: string | undefined;
+  readonly stoneTools: string | undefined;
   readonly decorated: string | undefined;
+  readonly fewestBadges: string | undefined;
 }
 
 /** The entry with what the board hands out on read added. */
@@ -349,7 +368,9 @@ function awarded(entry: BoardEntry, awards: Awards): BoardEntry {
     ...(awards.bunks.has(entry.id) ? [BUNK_ASSIGNED] : []),
     ...(awards.knockedOff.has(entry.id) ? [OBSOLETE_MODEL] : []),
     ...(entry.id === awards.champion ? [CHAMPION] : []),
+    ...(entry.id === awards.stoneTools ? [STONE_TOOLS] : []),
     ...(entry.id === awards.decorated ? [CROWN] : []),
+    ...(entry.id === awards.fewestBadges ? [FEWEST_BADGES] : []),
   ];
   return extra.length === 0
     ? entry
@@ -373,22 +394,35 @@ function bunked(everyone: readonly BoardEntry[]): Set<string> {
 interface Awarded {
   readonly awards: Awards;
   readonly champion: BoardEntry | null;
+  readonly stoneTools: BoardEntry | null;
   readonly crown: BoardEntry | null;
+  readonly fewestBadges: BoardEntry | null;
 }
 
 /**
- * Works out who gets what on read. The likes crown goes first, so it counts
- * toward Most decorated along with the rest.
+ * Works out who gets what on read. The likes and tokens crowns go first, so
+ * they count toward Most decorated along with the rest. Fewest badges goes
+ * last, so it counts every other one, Most decorated included.
  */
 async function awardsFor(database: D1Database, everyone: readonly BoardEntry[]): Promise<Awarded> {
   const bunks = bunked(everyone);
   const knocked = await knockedOff(database, everyone);
   const champion = await crownHolder(database, CHAMPION, everyone, (entry) => entry.likes ?? 0);
+  // Nobody wins it for using none, which is everyone who just installed or only uses Copilot CLI.
+  const stoneTools = await crownHolder(
+    database,
+    STONE_TOOLS,
+    everyone.filter((entry) => (entry.tokensPerDay ?? 0) > 0),
+    (entry) => entry.tokensPerDay ?? 0,
+    'least',
+  );
   const before: Awards = {
     bunks,
     knockedOff: knocked,
     champion: champion?.id,
+    stoneTools: stoneTools?.id,
     decorated: undefined,
+    fewestBadges: undefined,
   };
   const crown = await crownHolder(
     database,
@@ -396,11 +430,23 @@ async function awardsFor(database: D1Database, everyone: readonly BoardEntry[]):
     everyone.map((entry) => awarded(entry, before)),
     decorations,
   );
-  const awards: Awards = { ...before, decorated: crown?.id };
+  const crowned: Awards = { ...before, decorated: crown?.id };
+  const fewestBadges = await crownHolder(
+    database,
+    FEWEST_BADGES,
+    everyone.map((entry) => awarded(entry, crowned)),
+    badges,
+    'least',
+  );
+  const awards: Awards = { ...crowned, fewestBadges: fewestBadges?.id };
+  const shown = (entry: BoardEntry | null): BoardEntry | null =>
+    entry === null ? null : awarded(entry, awards);
   return {
     awards,
-    champion: champion === null ? null : awarded(champion, awards),
-    crown: crown === null ? null : awarded(crown, awards),
+    champion: shown(champion),
+    stoneTools: shown(stoneTools),
+    crown: shown(crown),
+    fewestBadges: shown(fewestBadges),
   };
 }
 
@@ -437,7 +483,7 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     listed(database),
     ranked(database),
   ]);
-  const { awards, champion, crown } = await awardsFor(database, everyone);
+  const { awards, champion, stoneTools, crown, fewestBadges } = await awardsFor(database, everyone);
   const award = (entries: readonly BoardEntry[]): BoardEntry[] =>
     entries.map((entry) => awarded(entry, awards));
   const mine =
@@ -455,6 +501,8 @@ export async function readBoard(database: D1Database, me: string | null): Promis
     ranks,
     crown,
     champion,
+    stoneTools,
+    fewestBadges,
     me: standing === null ? null : { ...standing, entry: awarded(standing.entry, awards) },
   };
 }

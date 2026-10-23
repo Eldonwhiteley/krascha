@@ -744,15 +744,15 @@ describe('leaderboard worker', () => {
     );
   });
 
-  it('counts Leader of the human resistance toward Most decorated', async () => {
+  it("counts shanep's account achievements toward Most decorated", async () => {
     const w = world();
     await w.upload('token-ann', { ...MEAN, achievements: ['first-strike'] });
     // Ann has first strike and a bunk, so shanep needs 3 to pass her.
-    const shane = await w.upload('token-shane', { ...KIND, achievements: ['manners', 'charm'] });
+    const shane = await w.upload('token-shane', { ...KIND, achievements: ['manners'] });
     expect(shane.entry.achievements).toStrictEqual([
       'manners',
-      'charm',
       'resistance-leader',
+      'caught-the-cheater',
       CROWN,
     ]);
   });
@@ -856,6 +856,34 @@ describe('leaderboard worker', () => {
     const board = await w.board(luke.entry.id);
     expect(earned(board.me?.entry.achievements)).toStrictEqual(['kyle-reese']);
     expect(board.held).toMatchObject({ 'kyle-reese': 1 });
+  });
+
+  it('gives Caught the cheater only to shanep, checked with GitHub', async () => {
+    const w = world();
+    const claim = { ...KIND, achievements: ['caught-the-cheater'] };
+    expect((await w.upload('token-shane', KIND)).entry.achievements).toContain(
+      'caught-the-cheater',
+    );
+    expect((await w.upload('token-not-shane', claim)).entry.achievements).not.toContain(
+      'caught-the-cheater',
+    );
+    expect((await w.upload('token-luke', claim)).entry.achievements).not.toContain(
+      'caught-the-cheater',
+    );
+    expect((await w.board()).held).toMatchObject({ 'caught-the-cheater': 1 });
+  });
+
+  it('hands Caught the cheater to the shanep entry already on the board', async () => {
+    const w = world();
+    const shane = await w.upload('token-shane', KIND);
+    await w.upload('token-bob', KIND);
+    await w.sql("UPDATE scores SET achievements = ''");
+    const migration = new URL('../migrations/0016_caught_the_cheater.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    const board = await w.board(shane.entry.id);
+    expect(earned(board.me?.entry.achievements)).toStrictEqual(['caught-the-cheater']);
+    expect(board.held).toMatchObject({ 'caught-the-cheater': 1 });
   });
 
   it('makes the first 5 to upload beta testers for good', async () => {

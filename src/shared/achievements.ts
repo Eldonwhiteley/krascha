@@ -600,6 +600,17 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     boardOnly: true,
   },
   {
+    id: 'caught-the-cheater',
+    name: 'Caught the cheater',
+    icon: '🔦',
+    tier: 'legendary',
+    how: 'Be shanep, checked with GitHub. Somebody has to catch them.',
+    quip: 'Wrote the code that catches anyone gaming the board. Krascha wants it noted that he saw it first.',
+    earned: () => false,
+    githubId: SHANEP,
+    boardOnly: true,
+  },
+  {
     id: CROWN,
     name: 'Most decorated',
     icon: '👑',

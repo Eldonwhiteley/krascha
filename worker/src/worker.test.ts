@@ -8,6 +8,7 @@ import {
   BETA_TESTERS,
   BUNK_ASSIGNED,
   CHAMPION,
+  CHEATER,
   COUNTED_ACHIEVEMENTS,
   CROWD_FAVORITE,
   CROWN,
@@ -20,6 +21,7 @@ import {
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
+  CHEAT_COPIES,
   FEATURES,
   isBoard,
   isStanding,
@@ -216,6 +218,8 @@ describe('leaderboard worker', () => {
       { ...MEAN, tokensPerDay: MAX_TOKENS_PER_DAY + 1 },
       { ...MEAN, machine: 'short' },
       { ...MEAN, machine: 7 },
+      { ...MEAN, copies: -1 },
+      { ...MEAN, copies: '3' },
     ];
     const statuses = await Promise.all(
       bad.map(async (body) => await w.status('POST', '/api/scores', 'token-ann', body)),
@@ -898,6 +902,67 @@ describe('leaderboard worker', () => {
     expect(board.held).toMatchObject({ [BETA_TESTER]: 5 });
     const fay = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'fay');
     expect(earned(fay?.achievements)).toStrictEqual(['manners']);
+  });
+
+  it('ranks anyone with more than half their prompts kind or mean below everyone, for good', async () => {
+    const w = world();
+    const ann = await w.upload('token-ann', MEAN);
+    await w.upload('token-cat', MIDDLE);
+    const many = ['first-strike', 'meltdown', 'manners', 'charm'];
+    const cheat = { name: 'Dan', kind: 0, mean: 300, prompts: 500, achievements: many };
+    const dan = await w.upload('token-dan', cheat);
+    expect(dan.entry.achievements).toContain(CHEATER);
+    expect(dan).toMatchObject({ place: 3, siloPlace: 3 });
+    let board = await w.board(ann.entry.id);
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann', 'Anonymous', 'Dan']);
+    expect(board.bunks?.at(-1)?.name).toBe('Dan');
+    expect(board.me).toMatchObject({ place: 1, siloPlace: 1 });
+    expect(board.crown?.name).not.toBe('Dan');
+    expect(board.mostWanted[2]?.achievements).not.toContain(BUNK_ASSIGNED);
+    expect(board.held).toMatchObject({ [CHEATER]: 1 });
+    // Clean counts later, or a remove and a new upload, do not wash it off.
+    const clean = { name: 'Dan', kind: 0, mean: 30, prompts: 5000 };
+    expect((await w.upload('token-dan', clean)).entry.achievements).toContain(CHEATER);
+    expect(await w.status('DELETE', '/api/scores', 'token-dan')).toBe(204);
+    expect(await w.upload('token-dan', clean)).toMatchObject({ place: 3 });
+    board = await w.board();
+    expect(board.mostWanted.at(-1)?.achievements).toContain(CHEATER);
+    // Nobody can send it in an upload, and a fair entry never gets it.
+    const claim = { ...KIND, achievements: [CHEATER] };
+    expect((await w.upload('token-bob', claim)).entry.achievements).not.toContain(CHEATER);
+  });
+
+  it('catches anyone whose machines typed the same kind or mean prompt over and over', async () => {
+    const w = world();
+    const machine = (letter: string): string => letter.repeat(43);
+    const under = await w.upload('token-bob', { ...KIND, copies: CHEAT_COPIES - 1 });
+    expect(under.entry.achievements).not.toContain(CHEATER);
+    await w.upload('token-ann', { ...MEAN, machine: machine('a'), copies: CHEAT_COPIES / 2 });
+    const ann = await w.upload('token-ann', {
+      ...MEAN,
+      machine: machine('b'),
+      copies: CHEAT_COPIES / 2,
+    });
+    expect(ann.entry.achievements).toContain(CHEATER);
+  });
+
+  it('catches the entries already on the board with more than half their prompts kind or mean', async () => {
+    const w = world();
+    await w.upload('token-ann', MEAN);
+    await w.upload('token-dan', { name: 'Dan', kind: 100, mean: 200, prompts: 500 });
+    await w.sql('DELETE FROM cheaters');
+    const migration = readFileSync(
+      new URL('../migrations/0015_cheaters.sql', import.meta.url),
+      'utf8',
+    )
+      .split(';')
+      .filter((statement) => /^INSERT/mu.test(statement));
+    for (const statement of [...migration, ...migration]) {
+      await w.sql(statement);
+    }
+    const board = await w.board();
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann', 'Dan']);
+    expect(board.held).toMatchObject({ [CHEATER]: 1 });
   });
 
   it('makes anyone with 10 likes a crowd favorite', async () => {

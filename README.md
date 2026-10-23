@@ -74,7 +74,8 @@ checkout without either tool.
 
 `upload` sends your counts, rank, achievements and how many times you earned
 each, average Claude Code tokens a day, which of Claude Code and Copilot CLI you typed
-into, the name you pick and a random id for the machine. It never sends your prompts. The board tags each name with
+into, how many times you typed the same kind or mean prompt past 10 in a day,
+the name you pick and a random id for the machine. It never sends your prompts. The board tags each name with
 the tools it uses, from every machine that uploads to it.
 Leave the name off to stay Anonymous, and later uploads reuse the last name
 you gave. You show on the board once you have 100 prompts. The board does not
@@ -130,6 +131,12 @@ them:
   who use any, and Fewest badges to whoever has the fewest achievements. Each
   needs at least two on the board to pick from, moves when someone drops
   below the holder, and stays put on a tie.
+- Cheater cheater goes to anyone caught gaming the board: typing the same
+  kind or mean prompt more than 10 times in a day, 50 extra times in all
+  across your machines, or having more than half your prompts kind or mean.
+  It never comes off, not even with a `remove`. You stay on the board, but
+  below everyone who plays fair, with no bunk and none of the awards only
+  one person can hold.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you
@@ -195,7 +202,9 @@ the machines hold grudges.
 
 The counts live in `~/.krascha/reputation.json` (or `KRASCHA_HOME`), so they
 outlive the transcripts Claude Code cleans up after 30 days. Prompt text is
-never stored, only a short excerpt around each kind or mean word. Nothing
+never stored, only a short excerpt around each kind or mean word and a short
+hash of each kind or mean prompt, so Krascha can tell when one is typed over
+and over. Nothing
 leaves your machine unless you run `board` or `upload`.
 
 When an update changes the words Krascha counts, he reads every transcript

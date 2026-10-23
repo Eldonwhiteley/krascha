@@ -2,7 +2,10 @@
 // and which transcript files were already read. It lives in one JSON file in
 // Krascha's own folder, so the counts outlive the transcripts Claude
 // Code deletes after cleanupPeriodDays. Prompt text is never stored, only the
-// short excerpt around a hit.
+// short excerpt around a hit and a hash of each kind or mean prompt, so the
+// same one typed over and over can be counted.
+
+import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
@@ -29,6 +32,8 @@ interface SessionEntry {
 interface PromptEntry {
   readonly sessionId: string;
   readonly at: number;
+  /** A hash of the text, for kind and mean prompts only. Missing for the rest. */
+  readonly print?: string | undefined;
 }
 
 export interface HitEntry {
@@ -77,7 +82,12 @@ const fileSchema = z.object({
     z.string(),
     z.object({ source: z.enum(['transcript', 'history']), title: z.string().nullable() }),
   ),
-  prompts: z.record(z.string(), z.object({ sessionId: z.string(), at: z.number() })),
+  prompts: z.record(
+    z.string(),
+    z.object({ sessionId: z.string(), at: z.number(), print: z.string().optional() }),
+  ),
+  // Indexes from before kind and mean prompts were hashed do not have it.
+  prints: z.literal(true).optional(),
   hits: hitsSchema,
   kind: z
     .record(z.string(), z.object({ terms: z.array(z.string()), excerpt: z.string() }))
@@ -112,10 +122,13 @@ function parseIndex(text: string): ReputationIndex | null {
   const data = parsed.data;
   return {
     // A version 1 index never looked for kind words, one counted with other
-    // words is out of date, and one without tokens never counted them, so
-    // every file is read again.
+    // words is out of date, and one without tokens or prints never counted
+    // them, so every file is read again.
     files: new Map(
-      data.version === 1 || data.detection !== DETECTION_STAMP || data.tokens === undefined
+      data.version === 1 ||
+        data.detection !== DETECTION_STAMP ||
+        data.tokens === undefined ||
+        data.prints !== true
         ? []
         : Object.entries(data.files),
     ),
@@ -153,6 +166,7 @@ export async function saveIndex(file: string, index: ReputationIndex): Promise<v
   const data: z.infer<typeof fileSchema> = {
     version: 2,
     detection: DETECTION_STAMP,
+    prints: true,
     scannedAt: index.scannedAt,
     files: Object.fromEntries(index.files),
     sessions: Object.fromEntries(index.sessions),
@@ -182,15 +196,27 @@ function setOrDelete<V>(map: Map<string, V>, id: string, value: V | null): void 
  */
 export function addPrompt(index: ReputationIndex, prompt: Prompt): boolean {
   const known = index.prompts.has(prompt.id);
-  index.prompts.set(prompt.id, { sessionId: prompt.sessionId, at: prompt.at });
   const found = detectFrustration(prompt.text);
+  const kind = detectKindness(prompt.text);
+  const counts = kind !== null || found?.target === 'agent';
+  index.prompts.set(prompt.id, {
+    sessionId: prompt.sessionId,
+    at: prompt.at,
+    ...(counts ? { print: fingerprint(prompt.text) } : {}),
+  });
   setOrDelete(
     index.hits,
     prompt.id,
     found === null ? null : { terms: found.terms, target: found.target, excerpt: found.excerpt },
   );
-  setOrDelete(index.kind, prompt.id, detectKindness(prompt.text));
+  setOrDelete(index.kind, prompt.id, kind);
   return !known;
+}
+
+/** A short hash of the text, the same whatever the case or spacing. */
+function fingerprint(text: string): string {
+  const squeezed = text.toLowerCase().replaceAll(/\s+/gu, ' ').trim();
+  return createHash('sha256').update(squeezed).digest('hex').slice(0, 16);
 }
 
 /**

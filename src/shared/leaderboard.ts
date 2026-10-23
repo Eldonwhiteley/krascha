@@ -36,17 +36,23 @@ export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
  * What this copy of Krascha knows beyond its achievements. Bump it when he
  * learns something the board shows that is not a new achievement, so older
  * copies see they are behind and update. 1 covers everything up to updating
- * himself, and 2 sends it with each upload.
+ * himself, 2 sends it with each upload and 3 sends copies.
  */
-export const FEATURES = 2;
+export const FEATURES = 3;
 /**
  * The oldest FEATURES the board takes an upload from. Copies older than it
  * get told to update instead, since they count things wrong or miss them.
  * Raise it to make every copy update before its next upload.
  */
-export const MIN_UPLOAD_FEATURES = 2;
+export const MIN_UPLOAD_FEATURES = 3;
 /** The status the board answers a copy older than MIN_UPLOAD_FEATURES with. */
 export const TOO_OLD = 426;
+/** Times a day one kind or mean prompt can be typed before the rest count as copies. */
+export const COPIES_PER_DAY = 10;
+/** Copies it takes to be caught running a script. */
+export const CHEAT_COPIES = 50;
+/** More than this share of prompts kind or mean is past anything a person types. */
+export const CHEAT_SHARE = 0.5;
 /** Shown for anyone who uploads without a name. */
 export const ANONYMOUS = 'Anonymous';
 
@@ -74,6 +80,22 @@ export interface ScoreUpload {
   readonly machine?: string;
   /** This copy's FEATURES. Missing from builds older than 2, which the board turns away. */
   readonly features?: number;
+  /** Kind or mean prompts typed past COPIES_PER_DAY times in a day. Missing from builds older than 3. */
+  readonly copies?: number;
+}
+
+/**
+ * Whether counts look like someone gaming the board: the same kind or mean
+ * prompt over and over, or more of them than a person types. Only counts on
+ * the board, since a short history can lean either way by chance.
+ */
+export function isCheating(
+  counts: Pick<ScoreUpload, 'kind' | 'mean' | 'prompts' | 'copies'>,
+): boolean {
+  return (
+    (counts.copies ?? 0) >= CHEAT_COPIES ||
+    (counts.prompts >= MIN_PROMPTS && counts.kind + counts.mean > counts.prompts * CHEAT_SHARE)
+  );
 }
 
 /** One person on the board. The id is random, not their GitHub id. */
@@ -216,7 +238,8 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     (value['tools'] === undefined || isIdList(value['tools'], MAX_TOOLS)) &&
     (value['machine'] === undefined ||
       (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine']))) &&
-    (value['features'] === undefined || isCount(value['features']))
+    (value['features'] === undefined || isCount(value['features'])) &&
+    (value['copies'] === undefined || isCount(value['copies']))
   );
 }
 

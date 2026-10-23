@@ -82,6 +82,7 @@ describe('copilotUserPrompts', () => {
     expect(index.prompts.get('c:e1')).toStrictEqual({
       sessionId: 's1',
       at: Date.parse('2026-09-24T15:55:50.092Z'),
+      print: expect.stringMatching(/^[0-9a-f]{16}$/),
     });
     expect(index.kind.has('c:e1')).toBe(true);
     expect(index.hits.get('c:e4')?.target).toBe('agent');

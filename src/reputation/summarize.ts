@@ -3,6 +3,7 @@
 // The token counts come from the usage stats, so the caller passes them in.
 // The hours come from when each prompt was typed.
 
+import { COPIES_PER_DAY } from '../shared/leaderboard.js';
 import type { ReputationHit, ReputationSummary } from '../shared/reputation.js';
 import { reputationScore } from '../shared/reputation.js';
 import type { ToolId } from '../shared/tools.js';
@@ -142,6 +143,7 @@ export function summarize(
   const tools = new Set<ToolId>();
   const clock = { lateNight: 0, selfAware: 0, mixed: 0 };
   const last = new Map<string, { at: number; mean: boolean }>();
+  const typedToday = new Map<string, number>();
   for (const [id, prompt] of index.prompts) {
     tools.add(toolOf(id));
     const target = index.hits.get(id)?.target;
@@ -150,6 +152,10 @@ export function summarize(
     clock.lateNight += typed.getHours() < LATE_NIGHT_ENDS ? 1 : 0;
     clock.selfAware += typed.getHours() === 2 && typed.getMinutes() === 14 ? 1 : 0;
     clock.mixed += kind && target === 'agent' ? 1 : 0;
+    if (prompt.print !== undefined) {
+      const key = `${dayOf(prompt.at)} ${prompt.print}`;
+      typedToday.set(key, (typedToday.get(key) ?? 0) + 1);
+    }
     const before = last.get(prompt.sessionId);
     if (before === undefined || prompt.at >= before.at) {
       last.set(prompt.sessionId, { at: prompt.at, mean: target === 'agent' });
@@ -185,5 +191,9 @@ export function summarize(
     swarm: mostSessionsAtOnce([...index.prompts.values()]),
     rageQuits: [...last.values()].filter((prompt) => prompt.mean).length,
     badWords: new Set(bad.flatMap((hit) => hit.terms)).size,
+    copies: [...typedToday.values()].reduce(
+      (total, times) => total + Math.max(0, times - COPIES_PER_DAY),
+      0,
+    ),
   };
 }

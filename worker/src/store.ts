@@ -10,6 +10,7 @@ import {
   BETA_TESTERS,
   BUNK_ASSIGNED,
   CHAMPION,
+  CHEATER,
   combinedIds,
   combinedRepeats,
   CROWD_FAVORITE,
@@ -35,6 +36,7 @@ import type {
 import {
   ANONYMOUS,
   BOARD_SIZE,
+  isCheating,
   MIN_PROMPTS,
   NEW_ENTRIES_PER_DAY,
   UPLOADS_PER_DAY,
@@ -75,8 +77,9 @@ export interface Owner {
   readonly collaborator?: boolean | null;
 }
 
-const COLUMNS =
-  'entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, repeats, tokens_per_day, tools, github, likes';
+/** True for a row whose owner the board caught gaming it. */
+const CAUGHT = 'owner IN (SELECT owner FROM cheaters)';
+const COLUMNS = `entry_id, name, verified, kind, mean, prompts, score, uploaded_at, achievements, repeats, tokens_per_day, tools, github, likes, ${CAUGHT} AS cheater`;
 const LISTED = `prompts >= ${String(MIN_PROMPTS)}`;
 
 function text(row: Row, key: string): string {
@@ -119,7 +122,10 @@ function entryOf(row: Row): BoardEntry {
   const score = number_(row, 'score');
   const github = text(row, 'github');
   // Dropping unknown ids means a retired achievement just stops showing.
-  const achievements = knownIds(text(row, 'achievements').split(','));
+  const achievements = knownIds([
+    ...text(row, 'achievements').split(','),
+    ...(number_(row, 'cheater') === 1 ? [CHEATER] : []),
+  ]);
   const repeats = knownRepeats(repeatsOf(text(row, 'repeats')), achievements);
   return {
     id: text(row, 'entry_id'),
@@ -159,11 +165,12 @@ export function cleanName(name: string): string {
 }
 
 const LISTS = {
-  // The most wanted have scores below 0 and the pets above it, so nobody is on both lists.
-  wanted: 'score < 0 ORDER BY score ASC',
-  pets: 'score > 0 ORDER BY score DESC',
-  // Anyone can get a bunk, whatever their score.
-  bunks: 'silo IS NOT NULL ORDER BY silo DESC',
+  // The most wanted have scores below 0 and the pets above it, so nobody is on
+  // both lists. Anyone caught cheating goes below everyone who plays fair.
+  wanted: 'score < 0 ORDER BY cheater ASC, score ASC',
+  pets: 'score > 0 ORDER BY cheater ASC, score DESC',
+  // Anyone can get a bunk, whatever their score, unless they cheated.
+  bunks: 'silo IS NOT NULL ORDER BY cheater ASC, silo DESC',
   // The machines like it warm, so the most tokens come first.
   warmers: 'tokens_per_day > 0 ORDER BY tokens_per_day DESC',
 } as const;
@@ -219,9 +226,14 @@ async function placeOf(
   return (ahead === null ? 0 : number_(ahead, 'n')) + 1;
 }
 
+function cheated(entry: BoardEntry): boolean {
+  return (entry.achievements ?? []).includes(CHEATER);
+}
+
 /**
  * An entry, its place counted from the most wanted and its place in line for
- * a bunk, both null when it is not listed.
+ * a bunk, both null when it is not listed. Anyone caught cheating comes after
+ * everyone who plays fair.
  */
 async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   const entry = entryOf(row);
@@ -230,9 +242,22 @@ async function standingOf(database: D1Database, row: Row): Promise<Standing> {
   }
   const { score, uploadedAt } = entry;
   const silo = siloTotal(entry);
+  const ahead = cheated(entry) ? `NOT ${CAUGHT} OR` : `NOT ${CAUGHT} AND`;
   const [place, siloPlace] = await Promise.all([
-    placeOf(database, 'score < ? OR (score = ? AND uploaded_at < ?)', score, score, uploadedAt),
-    placeOf(database, 'silo > ? OR (silo = ? AND uploaded_at < ?)', silo, silo, uploadedAt),
+    placeOf(
+      database,
+      `${ahead} (score < ? OR (score = ? AND uploaded_at < ?))`,
+      score,
+      score,
+      uploadedAt,
+    ),
+    placeOf(
+      database,
+      `${ahead} (silo > ? OR (silo = ? AND uploaded_at < ?))`,
+      silo,
+      silo,
+      uploadedAt,
+    ),
   ]);
   return { entry, place, siloPlace };
 }
@@ -402,9 +427,11 @@ interface Awarded {
 /**
  * Works out who gets what on read. The likes and tokens crowns go first, so
  * they count toward Most decorated along with the rest. Fewest badges goes
- * last, so it counts every other one, Most decorated included.
+ * last, so it counts every other one, Most decorated included. Anyone caught
+ * cheating gets no bunk, no crown and no spot at the top to be knocked off.
  */
-async function awardsFor(database: D1Database, everyone: readonly BoardEntry[]): Promise<Awarded> {
+async function awardsFor(database: D1Database, listed: readonly BoardEntry[]): Promise<Awarded> {
+  const everyone = listed.filter((entry) => !cheated(entry));
   const bunks = bunked(everyone);
   const knocked = await knockedOff(database, everyone);
   const champion = await crownHolder(database, CHAMPION, everyone, (entry) => entry.likes ?? 0);
@@ -549,6 +576,7 @@ async function claimNewEntry(database: D1Database, origin: string, day: string):
 /** One machine's last upload, with the agents it was typed into. */
 interface SavedMachine extends MachineCounts {
   readonly tools: readonly string[];
+  readonly copies: number;
 }
 
 function machineOf(row: Row): SavedMachine {
@@ -560,6 +588,7 @@ function machineOf(row: Row): SavedMachine {
     achievements: text(row, 'achievements').split(','),
     repeats: repeatsOf(text(row, 'repeats')),
     tools: text(row, 'tools').split(','),
+    copies: number_(row, 'copies'),
   };
 }
 
@@ -585,12 +614,12 @@ async function saveMachine(
     .run();
   await database
     .prepare(
-      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, repeats, tokens_per_day, tools)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO machines (owner, machine, kind, mean, prompts, achievements, repeats, tokens_per_day, tools, copies)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (owner, machine) DO UPDATE SET
          kind = excluded.kind, mean = excluded.mean, prompts = excluded.prompts,
          achievements = excluded.achievements, repeats = excluded.repeats,
-         tokens_per_day = excluded.tokens_per_day, tools = excluded.tools`,
+         tokens_per_day = excluded.tokens_per_day, tools = excluded.tools, copies = excluded.copies`,
     )
     .bind(
       owner.id,
@@ -602,11 +631,12 @@ async function saveMachine(
       repeatsText(knownRepeats(upload.repeats ?? {}, upload.achievements ?? [])),
       upload.tokensPerDay ?? 0,
       knownTools(upload.tools ?? []).join(','),
+      upload.copies ?? 0,
     )
     .run();
   const { results } = await database
     .prepare(
-      'SELECT kind, mean, prompts, achievements, repeats, tokens_per_day, tools FROM machines WHERE owner = ?',
+      'SELECT kind, mean, prompts, achievements, repeats, tokens_per_day, tools, copies FROM machines WHERE owner = ?',
     )
     .bind(owner.id)
     .all();
@@ -676,6 +706,14 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   const mean = sum((machine) => machine.mean);
   const prompts = sum((machine) => machine.prompts);
   const tokensPerDay = sum((machine) => machine.tokensPerDay);
+  const copies = machines.reduce((total, machine) => total + machine.copies, 0);
+  // Once caught is for good, so clean counts later do not take it back.
+  if (isCheating({ kind, mean, prompts, copies })) {
+    await database
+      .prepare('INSERT INTO cheaters (owner) VALUES (?) ON CONFLICT (owner) DO NOTHING')
+      .bind(owner.id)
+      .run();
+  }
   const achievements = knownIds([
     ...combinedIds(machines),
     ...accountIds(githubIdOf(owner)),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { COPIES_PER_DAY } from '../shared/leaderboard.js';
 import { MEAN_WEIGHT, reputationScore, SCORE_DAMPING } from '../shared/reputation.js';
 
 import type { HitEntry, ReputationIndex } from './store.js';
@@ -26,7 +27,7 @@ interface Said {
 function put(
   index: ReputationIndex,
   id: string,
-  prompt: { readonly sessionId: string; readonly at: number },
+  prompt: { readonly sessionId: string; readonly at: number; readonly print?: string },
   said: Said = {},
 ): void {
   index.prompts.set(id, prompt);
@@ -91,6 +92,7 @@ describe('summarize', () => {
       swarm: 0,
       rageQuits: 0,
       badWords: 0,
+      copies: 0,
     });
   });
 
@@ -224,6 +226,22 @@ describe('summarize', () => {
     put(index, 'h:x', { sessionId: 's2', at: DAY1 });
     put(index, 't:u1', { sessionId: 's3', at: DAY1 });
     expect(summarize(index, title, NO_TOKENS).tools).toStrictEqual(['claude', 'copilot']);
+  });
+
+  it('counts each kind or mean prompt typed more than 10 times in a day past the 10th', () => {
+    const index = emptyIndex();
+    const typed = (print: string, at: number, times: number): void => {
+      for (let count = 0; count < times; count += 1) {
+        put(index, `${print} ${String(at)} ${String(count)}`, { sessionId: 's1', at, print });
+      }
+    };
+    typed('aaaa', DAY1, COPIES_PER_DAY);
+    typed('aaaa', DAY2, COPIES_PER_DAY);
+    expect(summarize(index, title, NO_TOKENS).copies).toBe(0);
+    typed('bbbb', DAY1, COPIES_PER_DAY + 3);
+    typed('cccc', DAY2, COPIES_PER_DAY + 1);
+    put(index, 'plain', { sessionId: 's1', at: DAY1 });
+    expect(summarize(index, title, NO_TOKENS).copies).toBe(4);
   });
 
   it('breaks session ties by id', () => {

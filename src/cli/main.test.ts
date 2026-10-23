@@ -7,7 +7,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import type { FetchFunction } from '../leaderboard/client.js';
 import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
-import { COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
+import { CHEATER, COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
 import { FEATURES, TOO_OLD } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
@@ -220,6 +220,7 @@ describe('krascha', () => {
           tools: ['claude', 'copilot'],
           machine: 'k'.repeat(43),
           features: FEATURES,
+          copies: 0,
         },
       },
     ]);
@@ -237,6 +238,25 @@ describe('krascha', () => {
       boardFeatures: null,
       updateTriedAt: null,
     });
+  });
+
+  it('tells you when the board caught you gaming it', async () => {
+    const home = await makeHome();
+    const caught: FetchFunction = async (url, init) => {
+      const standing: unknown = await (await fakeBoard([], false)(url, init)).json();
+      const entry: unknown = Reflect.get(Object(standing), 'entry');
+      return Response.json({
+        ...Object(standing),
+        entry: { ...Object(entry), achievements: [CHEATER] },
+      });
+    };
+    home.use({ fetch: caught });
+    const { out } = await home.run('upload', 'Kyle');
+    expect(out).toContain(
+      'Krascha caught you gaming the board, so you rank below everyone who plays fair, for good.',
+    );
+    home.use({ fetch: fakeBoard([], false) });
+    expect((await home.run('upload')).out).not.toContain('caught you');
   });
 
   it('reminds you to upload until the board has your latest prompts', async () => {
@@ -632,6 +652,7 @@ describe('wrap', () => {
       swarm: 0,
       rageQuits: 1,
       badWords: 0,
+      copies: 0,
     };
     const out = renderReport(report, PLAIN);
     expect(out).toContain('📜 Regular ×3  ★★ SILVER');

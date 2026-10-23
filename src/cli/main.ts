@@ -13,7 +13,13 @@ import type { ScanResult } from '../reputation/scan.js';
 import { loadIndex, mergeIndex, readIndex, saveIndex } from '../reputation/store.js';
 import { RECENT_HITS, summarize } from '../reputation/summarize.js';
 import { averageTokensPerDay, indexUsage, totalTokens } from '../reputation/tokens.js';
-import { ACHIEVEMENTS, achievementsOf, timesEarned, unlockedIds } from '../shared/achievements.js';
+import {
+  ACHIEVEMENTS,
+  achievementsOf,
+  CHEATER,
+  timesEarned,
+  unlockedIds,
+} from '../shared/achievements.js';
 import type { Board, BoardEntry, KnownAchievement, Standing } from '../shared/leaderboard.js';
 import { FEATURES, LEADERBOARD_URL, MAX_NAME_LENGTH, MIN_PROMPTS } from '../shared/leaderboard.js';
 import { rankFor } from '../shared/ranks.js';
@@ -227,9 +233,7 @@ async function rememberBoard(
 
 function withTips(text: string, tips: readonly string[], paint: Paint): string {
   const shown = tips.filter((tip) => tip !== '');
-  return shown.length === 0
-    ? text
-    : `${text}\n${shown.map((tip) => paint.dim(tip)).join('\n')}\n`;
+  return shown.length === 0 ? text : `${text}\n${shown.map((tip) => paint.dim(tip)).join('\n')}\n`;
 }
 
 async function show(io: CliIo): Promise<number> {
@@ -310,7 +314,10 @@ function uploaded(standing: Standing, verified: boolean, prompts: number): strin
     standing.siloPlace === undefined || standing.siloPlace === null
       ? ''
       : ` You are number ${String(standing.siloPlace)} in line for a Silo 7 bunk.`;
-  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}${silo}\n`;
+  const caught = (standing.entry.achievements ?? []).includes(CHEATER)
+    ? ' Krascha caught you gaming the board, so you rank below everyone who plays fair, for good.'
+    : '';
+  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}${silo}${caught}\n`;
 }
 
 async function upload(io: CliIo, args: readonly string[]): Promise<number> {
@@ -346,6 +353,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
       tools: summary.tools,
       machine,
       features: FEATURES,
+      copies: summary.copies,
     });
   } catch (error) {
     // The board wants a newer copy, so start updating now rather than wait for it to say so on a good upload.

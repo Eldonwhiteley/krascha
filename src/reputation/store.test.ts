@@ -112,6 +112,19 @@ describe('index file', () => {
     expect(index.prompts).toStrictEqual(old.prompts);
   });
 
+  it('reads every file again when the index is from before prints', async () => {
+    const file = await indexFile();
+    const old = filled();
+    await saveIndex(file, old);
+    const saved = z.record(z.string(), z.unknown()).parse(JSON.parse(await readFile(file, 'utf8')));
+    expect(saved['prints']).toBe(true);
+    const before = Object.fromEntries(Object.entries(saved).filter(([key]) => key !== 'prints'));
+    await writeFile(file, JSON.stringify(before));
+    const { index } = await loadIndex(file, 1);
+    expect(index.files.size).toBe(0);
+    expect(index.prompts).toStrictEqual(old.prompts);
+  });
+
   it('reads a hit saved as aimed at claude as aimed at the agent', async () => {
     const file = await indexFile();
     await saveIndex(file, filled());
@@ -169,6 +182,23 @@ describe('addPrompt', () => {
     expect(index.kind.get('t:a')?.terms).toStrictEqual(['please', 'thanks']);
     expect(addPrompt(index, prompt('t:b', 'fine'))).toBe(true);
     expect(index.hits.has('t:b')).toBe(false);
+  });
+
+  it('prints a kind or mean prompt the same whatever its case or spacing, and nothing else', () => {
+    const index = emptyIndex();
+    addPrompt(index, prompt('t:a', 'Please   fix it'));
+    addPrompt(index, prompt('t:b', ' please fix it\n'));
+    addPrompt(index, prompt('t:c', 'please fix that'));
+    addPrompt(index, prompt('t:d', 'you idiot'));
+    addPrompt(index, prompt('t:e', 'this is shit'));
+    addPrompt(index, prompt('t:f', 'fix it'));
+    const print = (id: string): string | undefined => index.prompts.get(id)?.print;
+    expect(print('t:a')).toMatch(/^[0-9a-f]{16}$/u);
+    expect(print('t:b')).toBe(print('t:a'));
+    expect(print('t:c')).not.toBe(print('t:a'));
+    expect(print('t:d')).toMatch(/^[0-9a-f]{16}$/u);
+    expect(print('t:e')).toBeUndefined();
+    expect(print('t:f')).toBeUndefined();
   });
 });
 

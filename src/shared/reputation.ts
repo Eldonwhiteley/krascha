@@ -86,4 +86,9 @@ export interface ReputationSummary extends ReputationTally {
   readonly rageQuits: number;
   /** Different swear words and insults you used, at the agent or the world. */
   readonly badWords: number;
+  /**
+   * Kind or mean prompts past the first COPIES_PER_DAY of the same text in a
+   * day. Nobody types the same thing that often, so these come from a script.
+   */
+  readonly copies: number;
 }

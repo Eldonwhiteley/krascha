@@ -38,6 +38,7 @@ function summary(state: Partial<ReputationSummary> = {}): ReputationSummary {
     swarm: 0,
     rageQuits: 0,
     badWords: 0,
+    copies: 0,
     ...state,
     kind,
     mean,

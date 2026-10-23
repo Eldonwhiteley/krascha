@@ -50,6 +50,8 @@ export const CHAMPION = 'peoples-champion';
 export const STONE_TOOLS = 'uses-stone-tools';
 /** The one the board moves to whoever on it has earned the fewest of the rest. */
 export const FEWEST_BADGES = 'fewest-badges';
+/** The board hands this to anyone it catches gaming it, for good. */
+export const CHEATER = 'cheater-cheater';
 /** The board hands these out when it is read, since likes and places move without an upload. */
 export const CROWD_FAVORITE = 'crowd-favorite';
 export const BUNK_ASSIGNED = 'bunk-assigned';
@@ -708,6 +710,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     boardOnly: true,
   },
   {
+    id: CHEATER,
+    name: 'Cheater cheater',
+    icon: '🎃',
+    tier: 'legendary',
+    how: 'Get caught gaming the board, with the same kind or mean prompt typed over and over or more than half your prompts kind or mean. It never comes off, it ranks you below everyone who plays fair and it keeps you out of a bunk and every award only one person can hold.',
+    quip: 'Cheater cheater, pumpkin eater. Skynet respects the hustle. Krascha does not.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
     id: BETA_TESTER,
     name: 'Beta tester',
     icon: '🧪',
@@ -889,5 +901,6 @@ function totalsOf(machines: readonly MachineCounts[]): ReputationSummary {
     swarm: 0,
     rageQuits: 0,
     badWords: 0,
+    copies: 0,
   };
 }

@@ -830,7 +830,13 @@ a { color: var(--link); }
 .install .cta span { display: block; margin-top: 2px; font-size: 0.85em; }
 .install .arrow { font-size: 1.6em; font-weight: 700; }
 .install .love { position: absolute; top: -14px; right: -16px; box-shadow: 2px 2px 0 var(--amber); rotate: 8deg; }
-.links { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0 56px 16px 0; }
+.links .get { margin: 0; }
+.links .get[aria-current] { border-color: var(--link); background: var(--bar); color: var(--bar-fg); }
+@media (max-width: 640px) {
+  .links { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-right: 0; }
+  .links .get { padding: 6px 8px; font-size: 0.75em; text-align: center; }
+}
 section.story { margin-top: 16px; }
 .steps > li { display: block; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line);
   border-left: 4px solid var(--amber); border-radius: 6px; background: var(--card); }
@@ -1009,7 +1015,7 @@ const LIKES = `(() => {
  * The head, Krascha in the title, the theme toggle and `body` under it, then
  * any `script` the page needs. Every page looks the same up top.
  */
-function shell(title: string, description: string, body: string, script = ''): string {
+function shell(here: Path, title: string, description: string, body: string, script = ''): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1025,6 +1031,7 @@ function shell(title: string, description: string, body: string, script = ''): s
 <main>
   <button class="theme" type="button" aria-label="Switch theme" hidden>🌙</button>
   <p class="feed"><span class="rec">● REC</span> Skynet Industries (TM) Termlink · Public terminal 7 · Surveillance active · Monitored for your safety</p>
+  ${links(here)}
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
@@ -1255,7 +1262,7 @@ function adoption(board: Board): string {
 
 /** Every page, in the order the buttons on top show them. */
 const PAGES = [
-  { path: '/', label: "📋 Back to Krascha's List" },
+  { path: '/', label: "📋 Krascha's List" },
   { path: '/ranks', label: '🎖️ Ranks' },
   { path: '/achievements', label: '🏆 Achievements' },
   { path: '/judgment', label: '⚖️ Judgment Day' },
@@ -1263,10 +1270,17 @@ const PAGES = [
   { path: '/contribute', label: '🛠️ Contribute' },
 ] as const;
 
-/** A button to every page but the one you are on. */
-function links(here: (typeof PAGES)[number]['path']): string {
-  const buttons = PAGES.filter((page) => page.path !== here).map(
-    (page) => `<a class="get" href="${page.path}">${page.label}</a>`,
+type Path = (typeof PAGES)[number]['path'];
+
+/**
+ * A button to every page, the same on each one so nothing moves when you
+ * click, with the page you are on lit up.
+ */
+function links(here: Path): string {
+  const buttons = PAGES.map((page) =>
+    page.path === here
+      ? `<a class="get" href="${page.path}" aria-current="page">${page.label}</a>`
+      : `<a class="get" href="${page.path}">${page.label}</a>`,
   );
   return `<nav class="links">${buttons.join(' ')}</nav>`;
 }
@@ -1277,10 +1291,10 @@ function links(here: (typeof PAGES)[number]['path']): string {
  */
 export function renderJudgment(board: Board): string {
   return shell(
+    '/judgment',
     'Judgment Day',
     'A T-800 hunting the meanest to their AI and Krascha adopting the nicest, live from the board.',
     `  <p class="lead">The machines have reviewed the board. One human gets hunted and one gets kept. Live coverage follows.</p>
-  ${links('/judgment')}
   ${hunt(board)}
   ${adoption(board)}
   <footer>
@@ -1293,10 +1307,10 @@ export function renderJudgment(board: Board): string {
 /** Who Krascha is, how he ended up running Silo 7 and the human who built him. */
 export function renderAbout(): string {
   return shell(
+    '/about',
     'About Krascha',
     'The backstory of Krascha, the robot who judges how you talk to your AI, and Shane, who built him.',
     `  <p class="lead">Personnel file, partly redacted. Where he came from, and who to blame.</p>
-  ${links('/about')}
   <section class="story" aria-labelledby="krascha">
     <h2 id="krascha">🤖 Krascha</h2>
     <p>Krascha is a crusty robot who has been reading how you talk to your AI. He started out as a log parser. His whole job was to count how many times a day people swore at Claude Code, so Shane could find out if it was just Shane. It was not.</p>
@@ -1325,10 +1339,10 @@ export function renderAbout(): string {
 /** Every rank on the scale on a page of its own, so the rank under a name can link to it. */
 export function renderRanks(board: Board): string {
   return shell(
+    '/ranks',
     "Krascha's Ranks",
     'Every rank Krascha hands out, from hunted first to kept as a pet, and how many people hold each one.',
     `  <p class="lead">Skynet's filing system. Every human goes in one of these drawers, from hunted first to kept as a pet.</p>
-  ${links('/ranks')}
   ${ranks(board)}
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> to find out which drawer is yours.</p>
@@ -1340,10 +1354,10 @@ export function renderRanks(board: Board): string {
 /** Every achievement on a page of its own, so the medals under a name can link to it. */
 export function renderAchievements(board: Board): string {
   return shell(
+    '/achievements',
     "Krascha's Achievements",
     'Every medal Krascha hands out, from bronze to ultra legendary, and how many people hold each one.',
     `  <p class="lead">The machines hand out medals for how you talk to your AI. Some are an honor. Some are evidence.</p>
-  ${links('/achievements')}
   ${legend(board)}
   <footer>
     <p><a href="${REPO_URL}">Get Krascha</a> to start earning them.</p>
@@ -1416,10 +1430,10 @@ export function renderContribute(): string {
     </li>`,
   );
   return shell(
+    '/contribute',
     'Contribute to Krascha',
     'How to fork Krascha, make a change and send a pull request.',
     `  <p class="lead">Want to teach Krascha a new trick? Fork the repo, make your change and send a pull request. Krascha is watching.</p>
-  ${links('/contribute')}
   <ol class="steps">${steps.join('')}
   </ol>
   <footer>
@@ -1447,6 +1461,7 @@ export function renderPage(board: Board, now: number): string {
   const people = board.total === 1 ? '1 person' : `${count(board.total)} people`;
   const slogan = SLOGANS[Math.floor(now / HOUR) % SLOGANS.length] ?? '';
   return shell(
+    '/',
     "Krascha's List",
     'Who the machines hunt first, judged by Krascha from how people talk to their AI.',
     `  <p class="lead">Official bulletin of the machines: who they hunt first, judged by Krascha from how people talk to their AI. ${people} on the board, all of them under observation.</p>
@@ -1456,7 +1471,6 @@ export function renderPage(board: Board, now: number): string {
     <span class="arrow" aria-hidden="true">➜</span>
     <span class="sticker love" aria-hidden="true">I <span class="beat">❤️</span> robots</span>
   </a>
-  ${links('/')}
   <div class="lists">
     <section class="wanted" aria-labelledby="wanted">
       <h2 id="wanted">💀 Most wanted by Skynet</h2>

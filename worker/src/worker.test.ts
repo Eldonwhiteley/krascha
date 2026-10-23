@@ -1617,24 +1617,22 @@ describe('leaderboard worker', () => {
     const page = await response.text();
     expect(page).toContain('<title>Judgment Day</title>');
     expect(page).toContain('<a class="get" href="/about">');
-    expect(page).not.toContain('<a class="get" href="/judgment">');
+    expect(page).toContain('<a class="get" href="/judgment" aria-current="page">');
     expect(page).toContain('<p class="remembers">Krascha remembers.</p>');
   });
 
-  it('links every page from every other page', async () => {
+  it('puts the same nav above the title on every page, with the one you are on lit up', async () => {
     const w = world();
     const paths = ['/', '/ranks', '/achievements', '/judgment', '/about', '/contribute'];
     for (const path of paths) {
       const page = await (await w.call('GET', path)).text();
-      const nav = page.slice(page.indexOf('<nav class="links">'), page.indexOf('</nav>'));
-      for (const other of paths) {
-        const link = `<a class="get" href="${other}">`;
-        if (other === path) {
-          expect(nav).not.toContain(link);
-        } else {
-          expect(nav).toContain(link);
-        }
-      }
+      const start = page.indexOf('<nav class="links">');
+      expect(start).toBeLessThan(page.indexOf('<h1>'));
+      const nav = page.slice(start, page.indexOf('</nav>'));
+      const hrefs = [...nav.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
+      expect(hrefs).toStrictEqual(paths);
+      expect(nav).toContain(`<a class="get" href="${path}" aria-current="page">`);
+      expect(nav.match(/aria-current/g)).toHaveLength(1);
     }
   });
 

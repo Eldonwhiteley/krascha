@@ -369,8 +369,9 @@ describe('leaderboard worker', () => {
     ]);
     const html = await (await w.call('GET', '/')).text();
     expect(html).toContain(
-      '<span class="tools" role="img" aria-label="Uses Claude Code and Copilot CLI"><span class="tool claude">Claude Code</span><span class="tool copilot">Copilot CLI</span></span>',
+      '<span class="tools" role="img" aria-label="Uses Claude Code and Copilot CLI"><span class="tool claude" title="Claude Code"><svg',
     );
+    expect(html).toContain('<span class="tool copilot" title="Copilot CLI"><svg');
     expect(html).toContain('aria-label="Uses Copilot CLI"');
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.tools).toStrictEqual([]);
@@ -909,9 +910,7 @@ describe('leaderboard worker', () => {
   it('gives Caught the hacker only to shanep, checked with GitHub', async () => {
     const w = world();
     const claim = { ...KIND, achievements: ['caught-the-hacker'] };
-    expect((await w.upload('token-shane', KIND)).entry.achievements).toContain(
-      'caught-the-hacker',
-    );
+    expect((await w.upload('token-shane', KIND)).entry.achievements).toContain('caught-the-hacker');
     expect((await w.upload('token-not-shane', claim)).entry.achievements).not.toContain(
       'caught-the-hacker',
     );
@@ -1180,7 +1179,9 @@ describe('leaderboard worker', () => {
       'utf8',
     )
       .split(';')
-      .filter((statement) => /^(INSERT|DELETE)/mu.test(statement.replaceAll(/^--.*$/gmu, '').trim()));
+      .filter((statement) =>
+        /^(INSERT|DELETE)/mu.test(statement.replaceAll(/^--.*$/gmu, '').trim()),
+      );
     for (const statement of [...migration, ...migration]) {
       await w.sql(statement);
     }

@@ -26,11 +26,7 @@ import {
   warmthPercent,
 } from '../../src/shared/climate.js';
 import type { Board, BoardEntry, Repeats } from '../../src/shared/leaderboard.js';
-import {
-  HUMAN_PROMPTS,
-  HUMAN_TOKENS_PER_DAY,
-  MIN_PROMPTS,
-} from '../../src/shared/leaderboard.js';
+import { HUMAN_PROMPTS, HUMAN_TOKENS_PER_DAY, MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 import { RANKS, scalePercent } from '../../src/shared/ranks.js';
 import {
   ADMIT_TOTAL,
@@ -107,13 +103,24 @@ function trophies(ids: readonly string[], repeats: Repeats): string {
   return `<span class="trophies" role="group" aria-label="Achievements">${medals.join('')}</span>`;
 }
 
-/** A tag for each agent the entry was typed into, so you can see who talks to what. */
+/** A drawing of each agent: the Claude spark and the Copilot pilot in goggles. */
+const TOOL_ICONS: Readonly<Record<string, string>> = {
+  claude:
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5V6M8 10v4.5M1.5 8H6M10 8h4.5M3.4 3.4l3 3M9.6 9.6l3 3M12.6 3.4l-3 3M6.4 9.6l-3 3"/></svg>',
+  copilot:
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3.5" width="6" height="5" rx="2.2"/><rect x="8.5" y="3.5" width="6" height="5" rx="2.2"/><path d="M2.5 9.5v2c0 1.4 2.4 3 5.5 3s5.5-1.6 5.5-3v-2M6.2 11.2v1.3M9.8 11.2v1.3"/></svg>',
+};
+
+/** An icon for each agent the entry was typed into, so you can see who talks to what. */
 function tools(ids: readonly string[]): string {
   const used = TOOLS.filter((tool) => ids.includes(tool.id));
   if (used.length === 0) {
     return '';
   }
-  const tags = used.map((tool) => `<span class="tool ${tool.id}">${escapeHtml(tool.name)}</span>`);
+  const tags = used.map(
+    (tool) =>
+      `<span class="tool ${tool.id}" title="${escapeHtml(tool.name)}">${TOOL_ICONS[tool.id] ?? escapeHtml(tool.name)}</span>`,
+  );
   return ` <span class="tools" role="img" aria-label="${escapeHtml(`Uses ${toolNames(ids)}`)}">${tags.join('')}</span>`;
 }
 
@@ -550,8 +557,10 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .verified { color: var(--green); font-weight: 700; }
 .github { color: inherit; text-underline-offset: 2px; }
 .tools { display: inline-flex; gap: 4px; vertical-align: 0.1em; }
-.tool { padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; font-size: 0.7em;
-  font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.tool { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; border: 1px solid currentColor;
+  border-radius: 50%; font-size: 0.85em; }
+.tool svg { width: 0.85em; height: 0.85em; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
 .tool.claude { color: var(--claude); }
 .tool.copilot { color: var(--copilot); }
 .rank { display: block; color: var(--muted); font-size: 0.85em; }

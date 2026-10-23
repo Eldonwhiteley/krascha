@@ -209,7 +209,9 @@ export async function selfUpdate(io: UpdateIo, dir: string): Promise<number> {
   }
   let bytes: Uint8Array;
   try {
-    const response = await io.fetch(`${SOURCE}/${latest.commit}/dist/cli.js`, {
+    // KRASCHA_UPDATE_SOURCE is for tests, which serve old and new builds from a fake GitHub.
+    const source = io.env['KRASCHA_UPDATE_SOURCE'] ?? SOURCE;
+    const response = await io.fetch(`${source}/${latest.commit}/dist/cli.js`, {
       method: 'GET',
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
     });

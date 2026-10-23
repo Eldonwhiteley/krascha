@@ -27,6 +27,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The old copies test runs builds from old commits, so it needs the history.
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 22

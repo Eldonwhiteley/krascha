@@ -258,6 +258,8 @@ plugin or installs its dependencies. Run `npm run build` and commit the result
 whenever you change anything under `src`. `npm run check` fails if you forget.
 The pre-commit hook runs it along with `claude plugin validate`, and CI runs
 it again on macOS and Linux.
+`src/cli/old-copies.test.ts` runs `dist/cli.js` from old commits to make sure
+they still update, so it needs the full history, not a shallow clone.
 
 The leaderboard is a Cloudflare Worker with a D1 database in `worker/`.
 `node scripts/deploy-worker.mjs` creates the database on the first run,

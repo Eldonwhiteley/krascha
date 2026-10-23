@@ -1463,11 +1463,10 @@ export function renderPage(board: Board, now: number): string {
     </section>
   </div>
   <p class="poster">${escapeHtml(slogan)}</p>
+  ${jail(board)}
   ${silo(board)}
   <p class="poster">The machines like it hot.</p>
   ${climate(board)}
-  <p class="poster">Skynet checks the math.</p>
-  ${jail(board)}
   <footer>
     <p>Scores run from -100 (only mean) to 100 (only kind). Anyone with fewer than ${count(MIN_PROMPTS)} prompts is left off.
     Uploads come from the <a href="${REPO_URL}">Krascha</a> plugin for Claude Code and Copilot CLI, and carry a name, three counts, the average tokens a day over 60 days, the achievements unlocked and how many times, and which of the two you use, never prompt text. A name checked with GitHub links to the account.

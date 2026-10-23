@@ -142,7 +142,7 @@ them:
   more than 1,000,000 prompts or 100 billion tokens a day, with all your
   machines added up. The board does not save that upload. It locks you in
   Skynet jail instead, which takes you off every list and puts you in the
-  jail at the bottom of the page with the numbers you claimed. Your next
+  jail above the Silo 7 admissions with the numbers you claimed. Your next
   upload with real numbers lets you out, but Skynet hacker stays.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it

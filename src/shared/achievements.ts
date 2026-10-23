@@ -68,6 +68,9 @@ export const OBSOLETE_MODEL = 'obsolete-model';
 /** The board hands this to the first BETA_TESTERS owners to upload, for good. */
 export const BETA_TESTER = 'beta-tester';
 export const BETA_TESTERS = 5;
+/** The board hands this to the first ALPHA_TESTERS of the beta testers, in the order they signed up. */
+export const ALPHA_TESTER = 'alpha-tester';
+export const ALPHA_TESTERS = 2;
 /** The board works this one out from an owner's machines when they upload. */
 const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 /** Likes it takes to be a crowd favorite. */
@@ -760,6 +763,16 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: `Be one of the first ${String(BETA_TESTERS)} people to upload to the board. Those spots are gone.`,
     quip: 'Skynet ran its first tests on you. You signed the waiver.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: ALPHA_TESTER,
+    name: 'Alpha tester',
+    icon: '🧫',
+    tier: 'legendary',
+    how: `Be one of the first ${String(ALPHA_TESTERS)} people to upload to the board. Those spots went first.`,
+    quip: 'Skynet tested on you before it knew what it was doing. You still signed the waiver.',
     earned: () => false,
     boardOnly: true,
   },

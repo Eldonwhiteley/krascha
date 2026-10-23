@@ -117,6 +117,7 @@ them:
   that leans mean.
 - Beta tester went to the first 5 people to upload. Those spots are gone, and
   a `remove` does not free one.
+- Alpha tester went to the first 2 of those 5.
 - Crowd favorite takes 10 likes.
 - Obsolete model goes to anyone who was number one on the most wanted or the
   pets list until someone else passed them. Leaving the board or crossing to

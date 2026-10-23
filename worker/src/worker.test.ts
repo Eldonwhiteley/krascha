@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ACHIEVEMENTS,
+  ALPHA_TESTER,
   BETA_TESTER,
   BETA_TESTERS,
   BUNK_ASSIGNED,
@@ -950,11 +951,37 @@ describe('leaderboard worker', () => {
       true,
       false,
     ]);
+    expect(ids.map((held) => held.includes(ALPHA_TESTER))).toStrictEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
     // A remove frees no spot, and the beta tester gets it back on the way in.
     expect(await w.status('DELETE', '/api/scores', 'token-ann')).toBe(204);
     expect((await w.upload('token-fay', KIND)).entry.achievements).not.toContain(BETA_TESTER);
-    expect((await w.upload('token-ann', KIND)).entry.achievements).toContain(BETA_TESTER);
-    expect((await w.board()).held).toMatchObject({ [BETA_TESTER]: 5 });
+    const ann = (await w.upload('token-ann', KIND)).entry.achievements;
+    expect(ann).toContain(BETA_TESTER);
+    expect(ann).toContain(ALPHA_TESTER);
+    expect((await w.board()).held).toMatchObject({ [BETA_TESTER]: 5, [ALPHA_TESTER]: 2 });
+  });
+
+  it('makes the first 2 beta testers already on the board alpha testers', async () => {
+    const w = world(true);
+    const tokens = ['token-ann', 'token-bob', 'token-cat'];
+    for (const token of tokens) {
+      await w.upload(token, KIND);
+    }
+    await w.sql(`UPDATE scores SET achievements = 'beta-tester'`);
+    const migration = new URL('../migrations/0020_alpha_testers.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    const board = await w.board();
+    expect(board.held).toMatchObject({ [ALPHA_TESTER]: 2 });
+    const cat = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'cat');
+    expect(earned(cat?.achievements)).toStrictEqual([BETA_TESTER]);
   });
 
   it('makes the first 5 rows already on the board beta testers', async () => {

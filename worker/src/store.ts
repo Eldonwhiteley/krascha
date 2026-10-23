@@ -6,6 +6,8 @@
 import type { MachineCounts } from '../../src/shared/achievements.js';
 import {
   accountIds,
+  ALPHA_TESTER,
+  ALPHA_TESTERS,
   BETA_TESTER,
   BETA_TESTERS,
   BUNK_ASSIGNED,
@@ -738,10 +740,11 @@ function githubIds(owner: Owner, found: Row | null): string[] {
 }
 
 /**
- * Whether the owner is one of the first BETA_TESTERS to upload, signing them
- * up while there is room. A spot stays with the owner after a remove.
+ * Where the owner signed up among the first BETA_TESTERS to upload, signing
+ * them up while there is room, or null with no spot. A spot stays with the
+ * owner after a remove.
  */
-async function betaTester(database: D1Database, owner: string): Promise<boolean> {
+async function betaTester(database: D1Database, owner: string): Promise<number | null> {
   await database
     .prepare(
       'INSERT OR IGNORE INTO beta_testers (owner) SELECT ? WHERE (SELECT COUNT(*) FROM beta_testers) < ?',
@@ -749,10 +752,12 @@ async function betaTester(database: D1Database, owner: string): Promise<boolean>
     .bind(owner, BETA_TESTERS)
     .run();
   const signed = await database
-    .prepare('SELECT owner FROM beta_testers WHERE owner = ?')
+    .prepare(
+      'SELECT (SELECT COUNT(*) FROM beta_testers AS earlier WHERE earlier.rowid <= beta_testers.rowid) AS place FROM beta_testers WHERE owner = ?',
+    )
     .bind(owner)
     .first();
-  return signed !== null;
+  return signed === null ? null : number_(signed, 'place');
 }
 
 /** The counts the board checks for cheating. */
@@ -869,7 +874,8 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
     ...accountIds(githubIdOf(owner)),
     ...machineIds(machines),
     ...githubIds(owner, found),
-    ...(beta ? [BETA_TESTER] : []),
+    ...(beta === null ? [] : [BETA_TESTER]),
+    ...(beta !== null && beta <= ALPHA_TESTERS ? [ALPHA_TESTER] : []),
   ]);
   await database
     .prepare(

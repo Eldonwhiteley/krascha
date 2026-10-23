@@ -5,7 +5,7 @@
 import path from 'node:path';
 
 import type { Credential, FetchFunction } from '../leaderboard/client.js';
-import { fetchBoard, removeEntry, uploadScore } from '../leaderboard/client.js';
+import { fetchBoard, isTooOld, removeEntry, uploadScore } from '../leaderboard/client.js';
 import type { SavedEntry } from '../leaderboard/saved.js';
 import { loadMachine, loadSaved, saveSaved } from '../leaderboard/saved.js';
 import { scanInto } from '../reputation/scan.js';
@@ -333,17 +333,28 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
   const machine = await loadMachine(dir, io.newKey);
   const { summary } = await refresh(io);
   const achievements = unlockedIds(summary);
-  const standing = await uploadScore(io.fetch, boardUrl(io), credential, {
-    name,
-    kind: summary.kind,
-    mean: summary.mean,
-    prompts: summary.prompts,
-    achievements,
-    repeats: timesEarned(summary),
-    tokensPerDay: summary.tokensPerDay,
-    tools: summary.tools,
-    machine,
-  });
+  let standing: Standing;
+  try {
+    standing = await uploadScore(io.fetch, boardUrl(io), credential, {
+      name,
+      kind: summary.kind,
+      mean: summary.mean,
+      prompts: summary.prompts,
+      achievements,
+      repeats: timesEarned(summary),
+      tokensPerDay: summary.tokensPerDay,
+      tools: summary.tools,
+      machine,
+      features: FEATURES,
+    });
+  } catch (error) {
+    // The board wants a newer copy, so start updating now rather than wait for it to say so on a good upload.
+    if (isTooOld(error)) {
+      const known = Math.max(saved.boardFeatures ?? 0, FEATURES + 1);
+      await rememberBoard(io, dir, { ...saved, key }, { features: known });
+    }
+    throw error;
+  }
   const next: SavedEntry = {
     ...saved,
     entryId: standing.entry.id,

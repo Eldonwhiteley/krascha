@@ -18,7 +18,9 @@ import {
   GITHUB_LOGIN_PATTERN,
   isScoreUpload,
   KEY_PATTERN,
+  MIN_UPLOAD_FEATURES,
   NEW_ENTRIES_PER_DAY,
+  TOO_OLD,
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 
@@ -214,6 +216,11 @@ async function ownerOf(request: Request, deps: Deps): Promise<Owner | null> {
 const NO_OWNER =
   'Send a GitHub token or a Krascha key. GitHub did not accept the token, if you sent one.';
 
+// Every copy of Krascha prints this word for word, back to the first one, so
+// it is the only way to reach a copy too old to update himself.
+const UPDATE_FIRST =
+  'This copy of Krascha is too old for the board. Run claude plugin update krascha@shanep or copilot plugin update krascha@shanep in a terminal, restart your agent and upload again.';
+
 async function upload(request: Request, env: Env, deps: Deps): Promise<Response> {
   const owner = await ownerOf(request, deps);
   if (owner === null) {
@@ -230,6 +237,9 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       400,
       'The upload needs a short name, whole, non-negative counts, a sane token average, a short list of achievements and how many times each was earned, a short list of agents and a machine id that looks like a Krascha key.',
     );
+  }
+  if ((body.features ?? 0) < MIN_UPLOAD_FEATURES) {
+    return fail(TOO_OLD, UPDATE_FIRST);
   }
   // Only these fields are kept, whatever else the body holds.
   const {

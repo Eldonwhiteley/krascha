@@ -23,6 +23,8 @@ import {
   isStanding,
   MAX_ACHIEVEMENTS,
   MAX_TOKENS_PER_DAY,
+  MIN_UPLOAD_FEATURES,
+  TOO_OLD,
   UPLOADS_PER_DAY,
 } from '../../src/shared/leaderboard.js';
 import { CLIMATE_RANKS } from '../../src/shared/climate.js';
@@ -97,8 +99,13 @@ function world(beta = false): World {
     body?: unknown,
   ): Promise<Response> => {
     const init: RequestInit = { method, headers: new Headers(headers) };
-    if (body !== undefined) {
-      init.body = typeof body === 'string' ? body : JSON.stringify(body);
+    // Uploads come from a current copy unless the test says otherwise.
+    const current =
+      method === 'POST' && path === '/api/scores' && typeof body === 'object' && body !== null
+        ? { features: FEATURES, ...body }
+        : body;
+    if (current !== undefined) {
+      init.body = typeof current === 'string' ? current : JSON.stringify(current);
     }
     return handle(new Request(`https://board.test${path}`, init), env, deps);
   };
@@ -202,6 +209,24 @@ describe('leaderboard worker', () => {
       bad.map(async (body) => await w.status('POST', '/api/scores', 'token-ann', body)),
     );
     expect(statuses).toStrictEqual(bad.map(() => 400));
+  });
+
+  it('tells a copy too old for the board to update and keeps nothing it sent', async () => {
+    const w = world();
+    // JSON leaves out undefined, so this is an upload from before features.
+    for (const features of [undefined, MIN_UPLOAD_FEATURES - 1]) {
+      const response = await w.call('POST', '/api/scores', 'token-ann', { ...MEAN, features });
+      expect(response.status).toBe(TOO_OLD);
+      expect(await response.json()).toStrictEqual({
+        error:
+          'This copy of Krascha is too old for the board. Run claude plugin update krascha@shanep or copilot plugin update krascha@shanep in a terminal, restart your agent and upload again.',
+      });
+    }
+    expect((await w.board()).mostWanted).toStrictEqual([]);
+    expect(await w.status('POST', '/api/scores', 'token-ann', { ...MEAN, features: 1.5 })).toBe(
+      400,
+    );
+    await w.upload('token-ann', { ...MEAN, features: MIN_UPLOAD_FEATURES });
   });
 
   it('works out the score and rank itself and keeps only the upload fields', async () => {

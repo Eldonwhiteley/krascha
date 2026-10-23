@@ -24,6 +24,9 @@ Claude Code only updates a plugin from this marketplace on its own if you turn
 on auto-update for `shanep` under `/plugin`. To update by hand, run
 `claude plugin update krascha@shanep` and restart Claude Code.
 
+The board only takes uploads from a current Krascha. An older copy gets told
+to update instead, and a copy that can update himself starts on it right away.
+
 ## Install in Copilot CLI
 
 ```

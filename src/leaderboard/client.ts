@@ -4,7 +4,7 @@
 // up for you, which the server keeps only as a hash.
 
 import type { Board, ScoreUpload, Standing } from '../shared/leaderboard.js';
-import { isBoard, isStanding } from '../shared/leaderboard.js';
+import { isBoard, isStanding, TOO_OLD } from '../shared/leaderboard.js';
 
 /** The global fetch, or a stand-in for tests. */
 export type FetchFunction = (url: string, init: RequestInit) => Promise<Response>;
@@ -22,6 +22,19 @@ const TIMEOUT_MS = 10_000;
 
 class LeaderboardError extends Error {
   override readonly name = 'LeaderboardError';
+
+  /** The status the server answered with, or null when it could not be reached. */
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+  ) {
+    super(message);
+  }
+}
+
+/** True when the board turned this copy away as too old to upload. */
+export function isTooOld(error: unknown): boolean {
+  return error instanceof LeaderboardError && error.status === TOO_OLD;
 }
 
 function endpoint(base: string, route: string, query?: Readonly<Record<string, string>>): string {
@@ -39,12 +52,15 @@ async function failure(response: Response): Promise<LeaderboardError> {
     const error: unknown =
       typeof body === 'object' && body !== null ? Reflect.get(body, 'error') : undefined;
     if (typeof error === 'string') {
-      return new LeaderboardError(error);
+      return new LeaderboardError(error, response.status);
     }
   } catch {
     // Not JSON, so fall back to the status.
   }
-  return new LeaderboardError(`The leaderboard server answered ${String(response.status)}.`);
+  return new LeaderboardError(
+    `The leaderboard server answered ${String(response.status)}.`,
+    response.status,
+  );
 }
 
 async function call(fetch: FetchFunction, url: string, init: RequestInit): Promise<Response> {

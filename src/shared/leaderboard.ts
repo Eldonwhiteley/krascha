@@ -36,9 +36,17 @@ export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
  * What this copy of Krascha knows beyond its achievements. Bump it when he
  * learns something the board shows that is not a new achievement, so older
  * copies see they are behind and update. 1 covers everything up to updating
- * himself.
+ * himself, and 2 sends it with each upload.
  */
-export const FEATURES = 1;
+export const FEATURES = 2;
+/**
+ * The oldest FEATURES the board takes an upload from. Copies older than it
+ * get told to update instead, since they count things wrong or miss them.
+ * Raise it to make every copy update before its next upload.
+ */
+export const MIN_UPLOAD_FEATURES = 2;
+/** The status the board answers a copy older than MIN_UPLOAD_FEATURES with. */
+export const TOO_OLD = 426;
 /** Shown for anyone who uploads without a name. */
 export const ANONYMOUS = 'Anonymous';
 
@@ -64,6 +72,8 @@ export interface ScoreUpload {
    * machines add up. Missing from older builds, whose upload replaces them all.
    */
   readonly machine?: string;
+  /** This copy's FEATURES. Missing from builds older than 2, which the board turns away. */
+  readonly features?: number;
 }
 
 /** One person on the board. The id is random, not their GitHub id. */
@@ -201,7 +211,8 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     isTokens(value['tokensPerDay'], MAX_TOKENS_PER_DAY) &&
     (value['tools'] === undefined || isIdList(value['tools'], MAX_TOOLS)) &&
     (value['machine'] === undefined ||
-      (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine'])))
+      (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine']))) &&
+    (value['features'] === undefined || isCount(value['features']))
   );
 }
 

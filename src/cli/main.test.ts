@@ -9,7 +9,7 @@ import { MACHINE_FILE, SAVED_FILE } from '../leaderboard/saved.js';
 import { addPrompt, emptyIndex, saveIndex } from '../reputation/store.js';
 import { COUNTED_ACHIEVEMENTS } from '../shared/achievements.js';
 import type { BoardEntry } from '../shared/leaderboard.js';
-import { FEATURES } from '../shared/leaderboard.js';
+import { FEATURES, TOO_OLD } from '../shared/leaderboard.js';
 import { RANKS } from '../shared/ranks.js';
 import type { ReputationSummary } from '../shared/reputation.js';
 
@@ -219,6 +219,7 @@ describe('krascha', () => {
           prompts: 3,
           tools: ['claude', 'copilot'],
           machine: 'k'.repeat(43),
+          features: FEATURES,
         },
       },
     ]);
@@ -306,6 +307,20 @@ describe('krascha', () => {
     await home.run('upload');
     expect((await home.run()).out).toContain('Tip: Krascha updated himself to a newer copy.');
     expect(home.launched).toHaveLength(6);
+  });
+
+  it('updates himself when the board turns this copy away as too old', async () => {
+    const home = await makeHome();
+    const error = 'This copy of Krascha is too old for the board.';
+    home.use({ fetch: async () => Response.json({ error }, { status: TOO_OLD }) });
+    const { code, err } = await home.run('upload', 'Kyle');
+    expect(code).toBe(1);
+    expect(err).toBe(`Krascha: ${error}\n`);
+    expect(home.launched).toStrictEqual([
+      ['claude', 'plugin', 'update', 'krascha@shanep'],
+      ['copilot', 'plugin', 'update', 'krascha@shanep'],
+    ]);
+    expect((await home.run()).out).toContain('Tip: Krascha updated himself to a newer copy.');
   });
 
   it('says how to update when updating himself is turned off', async () => {

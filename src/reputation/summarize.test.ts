@@ -93,6 +93,7 @@ describe('summarize', () => {
       rageQuits: 0,
       badWords: 0,
       copies: 0,
+      sorryAt: null,
     });
   });
 

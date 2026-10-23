@@ -36,15 +36,15 @@ export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
  * What this copy of Krascha knows beyond its achievements. Bump it when he
  * learns something the board shows that is not a new achievement, so older
  * copies see they are behind and update. 1 covers everything up to updating
- * himself, 2 sends it with each upload and 3 sends copies.
+ * himself, 2 sends it with each upload, 3 sends copies and 4 sends sorryAt.
  */
-export const FEATURES = 3;
+export const FEATURES = 4;
 /**
  * The oldest FEATURES the board takes an upload from. Copies older than it
  * get told to update instead, since they count things wrong or miss them.
  * Raise it to make every copy update before its next upload.
  */
-export const MIN_UPLOAD_FEATURES = 3;
+export const MIN_UPLOAD_FEATURES = 4;
 /** The status the board answers a copy older than MIN_UPLOAD_FEATURES with. */
 export const TOO_OLD = 426;
 /** Times a day one kind or mean prompt can be typed before the rest count as copies. */
@@ -82,6 +82,8 @@ export interface ScoreUpload {
   readonly features?: number;
   /** Kind or mean prompts typed past COPIES_PER_DAY times in a day. Missing from builds older than 3. */
   readonly copies?: number;
+  /** When the newest prompt that says sorry was typed. Missing when none did, and from builds older than 4. */
+  readonly sorryAt?: number;
 }
 
 /**
@@ -142,6 +144,8 @@ export interface Standing {
   readonly counted?: readonly KnownAchievement[];
   /** The board's FEATURES. Only in the answer to an upload, and missing from older servers. */
   readonly features?: number;
+  /** True when this upload's apology got the entry forgiven for cheating. Only in the answer to an upload. */
+  readonly forgiven?: boolean;
 }
 
 export interface Board {
@@ -239,7 +243,8 @@ export function isScoreUpload(value: unknown): value is ScoreUpload {
     (value['machine'] === undefined ||
       (typeof value['machine'] === 'string' && KEY_PATTERN.test(value['machine']))) &&
     (value['features'] === undefined || isCount(value['features'])) &&
-    (value['copies'] === undefined || isCount(value['copies']))
+    (value['copies'] === undefined || isCount(value['copies'])) &&
+    (value['sorryAt'] === undefined || isCount(value['sorryAt']))
   );
 }
 
@@ -272,7 +277,8 @@ export function isStanding(value: unknown): value is Standing {
     (value['place'] === null || isCount(value['place'])) &&
     (value['machines'] === undefined || isCount(value['machines'])) &&
     (value['counted'] === undefined || isKnownList(value['counted'])) &&
-    (value['features'] === undefined || isCount(value['features']))
+    (value['features'] === undefined || isCount(value['features'])) &&
+    (value['forgiven'] === undefined || typeof value['forgiven'] === 'boolean')
   );
 }
 

@@ -6,7 +6,14 @@ import { createHash } from 'node:crypto';
 
 import { stripIgnored } from './clean.js';
 import type { LexiconEntry } from './lexicon.js';
-import { DETERMINERS, KIND_LEXICON, LEXICON, NOT_TYPOS, SECOND_PERSON } from './lexicon.js';
+import {
+  APOLOGY_LEXICON,
+  DETERMINERS,
+  KIND_LEXICON,
+  LEXICON,
+  NOT_TYPOS,
+  SECOND_PERSON,
+} from './lexicon.js';
 
 /** Aimed at the agent the prompt was typed to, or swearing at the world. */
 export type FrustrationTarget = 'agent' | 'general';
@@ -150,7 +157,7 @@ export function typosOf(form: string): string[] {
 }
 
 /** Each entry again with the typos of its one word forms, minus real words and spellings a term already has. */
-export function typoEntries(entries: readonly LexiconEntry[]): LexiconEntry[] {
+export function typoEntries<E extends Term>(entries: readonly E[]): E[] {
   const taken = new Set(
     entries.flatMap((entry) => entry.forms.map((form) => form.replace(AFTER_FIRST_WORD, ''))),
   );
@@ -181,6 +188,7 @@ export const DETECTION_STAMP = createHash('sha256')
       MATCH_RULES,
       LEXICON,
       KIND_LEXICON,
+      APOLOGY_LEXICON,
       [...NOT_TYPOS],
       [...DETERMINERS],
       [...SECOND_PERSON],

@@ -2,8 +2,8 @@
 // and which transcript files were already read. It lives in one JSON file in
 // Krascha's own folder, so the counts outlive the transcripts Claude
 // Code deletes after cleanupPeriodDays. Prompt text is never stored, only the
-// short excerpt around a hit and a hash of each kind or mean prompt, so the
-// same one typed over and over can be counted.
+// short excerpt around a hit, a hash of each kind or mean prompt, so the
+// same one typed over and over can be counted, and which prompts said sorry.
 
 import { createHash } from 'node:crypto';
 
@@ -17,6 +17,7 @@ import type { Kindness } from './kind.js';
 import { detectKindness } from './kind.js';
 import type { Prompt } from './prompts.js';
 import { HISTORY_PREFIX } from './prompts.js';
+import { isApology } from './sorry.js';
 
 export interface FileStamp {
   readonly mtimeMs: number;
@@ -34,6 +35,8 @@ interface PromptEntry {
   readonly at: number;
   /** A hash of the text, for kind and mean prompts only. Missing for the rest. */
   readonly print?: string | undefined;
+  /** True for a prompt that says sorry. Missing for the rest. */
+  readonly sorry?: true | undefined;
 }
 
 export interface HitEntry {
@@ -84,7 +87,12 @@ const fileSchema = z.object({
   ),
   prompts: z.record(
     z.string(),
-    z.object({ sessionId: z.string(), at: z.number(), print: z.string().optional() }),
+    z.object({
+      sessionId: z.string(),
+      at: z.number(),
+      print: z.string().optional(),
+      sorry: z.literal(true).optional(),
+    }),
   ),
   // Indexes from before kind and mean prompts were hashed do not have it.
   prints: z.literal(true).optional(),
@@ -203,6 +211,7 @@ export function addPrompt(index: ReputationIndex, prompt: Prompt): boolean {
     sessionId: prompt.sessionId,
     at: prompt.at,
     ...(counts ? { print: fingerprint(prompt.text) } : {}),
+    ...(isApology(prompt.text) ? { sorry: true } : {}),
   });
   setOrDelete(
     index.hits,

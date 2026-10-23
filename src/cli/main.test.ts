@@ -253,10 +253,33 @@ describe('krascha', () => {
     home.use({ fetch: caught });
     const { out } = await home.run('upload', 'Kyle');
     expect(out).toContain(
-      'Krascha caught you gaming the board, so you rank below everyone who plays fair, for good.',
+      'Krascha caught you gaming the board, so you rank below everyone who plays fair. Tell your agent you are sorry, then upload again to be forgiven.',
     );
     home.use({ fetch: fakeBoard([], false) });
     expect((await home.run('upload')).out).not.toContain('caught you');
+  });
+
+  it('sends when you last said sorry and tells you when the board forgave you', async () => {
+    const home = await makeHome();
+    const sent: Sent[] = [];
+    const forgiving: FetchFunction = async (url, init) => {
+      const standing: unknown = await (await fakeBoard(sent, false)(url, init)).json();
+      const sorry = Reflect.get(Object(sent.at(-1)?.body), 'sorryAt') !== undefined;
+      return Response.json({ ...Object(standing), forgiven: sorry });
+    };
+    home.use({ fetch: forgiving });
+    expect((await home.run('upload', 'Kyle')).out).not.toContain('accepted your apology');
+    expect(Reflect.get(Object(sent[0]?.body), 'sorryAt')).toBeUndefined();
+    const project = path.join(home.root, '.claude', 'projects', '-work');
+    await writeFile(
+      path.join(project, 's2.jsonl'),
+      `${prompt('u3', 'I am soooo sorry, plz forgve me')}\n`,
+    );
+    const { out } = await home.run('upload');
+    expect(sent[1]?.body).toMatchObject({ sorryAt: Date.parse('2026-10-01T12:00:00.000Z') });
+    expect(out).toContain(
+      'Krascha accepted your apology and took the cheater mark off. He is still watching.',
+    );
   });
 
   it('reminds you to upload until the board has your latest prompts', async () => {
@@ -653,6 +676,7 @@ describe('wrap', () => {
       rageQuits: 1,
       badWords: 0,
       copies: 0,
+      sorryAt: null,
     };
     const out = renderReport(report, PLAIN);
     expect(out).toContain('📜 Regular ×3  ★★ SILVER');

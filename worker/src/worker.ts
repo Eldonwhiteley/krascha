@@ -253,6 +253,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
     tools = [],
     machine,
     copies = 0,
+    sorryAt,
   } = body;
   const now = deps.now();
   // The address is only hashed with the day, for the cap on new unverified entries.
@@ -270,6 +271,7 @@ async function upload(request: Request, env: Env, deps: Deps): Promise<Response>
       tools,
       copies,
       ...(machine === undefined ? {} : { machine }),
+      ...(sorryAt === undefined ? {} : { sorryAt }),
     },
     now,
     newId: deps.newId,

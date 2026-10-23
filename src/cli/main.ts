@@ -315,9 +315,13 @@ function uploaded(standing: Standing, verified: boolean, prompts: number): strin
       ? ''
       : ` You are number ${String(standing.siloPlace)} in line for a Silo 7 bunk.`;
   const caught = (standing.entry.achievements ?? []).includes(CHEATER)
-    ? ' Krascha caught you gaming the board, so you rank below everyone who plays fair, for good.'
+    ? ' Krascha caught you gaming the board, so you rank below everyone who plays fair. Tell your agent you are sorry, then upload again to be forgiven.'
     : '';
-  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}${silo}${caught}\n`;
+  const forgiven =
+    standing.forgiven === true
+      ? ' Krascha accepted your apology and took the cheater mark off. He is still watching.'
+      : '';
+  return `Uploaded as ${standing.entry.name} (${how}). ${where}${added}${silo}${caught}${forgiven}\n`;
 }
 
 async function upload(io: CliIo, args: readonly string[]): Promise<number> {
@@ -354,6 +358,7 @@ async function upload(io: CliIo, args: readonly string[]): Promise<number> {
       machine,
       features: FEATURES,
       copies: summary.copies,
+      ...(summary.sorryAt === null ? {} : { sorryAt: summary.sorryAt }),
     });
   } catch (error) {
     // The board wants a newer copy, so start updating now rather than wait for it to say so on a good upload.

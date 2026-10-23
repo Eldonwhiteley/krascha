@@ -989,6 +989,56 @@ describe('leaderboard worker', () => {
     expect(ann.entry.achievements).toContain(CHEATER);
   });
 
+  it('forgives a cheater who says sorry after being caught, and starts their counts over', async () => {
+    const w = world();
+    const cheat = { name: 'Dan', kind: 0, mean: 300, prompts: 500 };
+    await w.upload('token-ann', MEAN);
+    expect((await w.upload('token-dan', cheat)).entry.achievements).toContain(CHEATER);
+    // An apology from before they were caught does not count.
+    const early = await w.upload('token-dan', { ...cheat, sorryAt: START - 1 });
+    expect(early.entry.achievements).toContain(CHEATER);
+    expect(early.forgiven).toBeUndefined();
+    w.setNow(START + 60_000);
+    const sorry = await w.upload('token-dan', { ...cheat, sorryAt: START + 1 });
+    expect(sorry.forgiven).toBe(true);
+    expect(sorry.entry.achievements).not.toContain(CHEATER);
+    expect(sorry).toMatchObject({ place: 1 });
+    let board = await w.board();
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Dan', 'Ann']);
+    expect(board.held?.[CHEATER]).toBeUndefined();
+    // The counts that got them caught do not catch them again, but new cheating does.
+    const same = await w.upload('token-dan', { ...cheat, sorryAt: START + 1 });
+    expect(same.entry.achievements).not.toContain(CHEATER);
+    expect(same.forgiven).toBeUndefined();
+    const again = { ...cheat, mean: 360, prompts: 600, copies: CHEAT_COPIES };
+    expect((await w.upload('token-dan', again)).entry.achievements).toContain(CHEATER);
+    board = await w.board();
+    expect(board.mostWanted.map((entry) => entry.name)).toStrictEqual(['Ann', 'Dan']);
+  });
+
+  it('counts the cheaters already caught as caught when the migration runs', async () => {
+    const w = world();
+    await w.upload('token-dan', { name: 'Dan', kind: 0, mean: 300, prompts: 500 });
+    await w.sql('UPDATE cheaters SET caught_at = 0');
+    const migration = readFileSync(
+      new URL('../migrations/0017_forgiven.sql', import.meta.url),
+      'utf8',
+    )
+      .split(';')
+      .filter((statement) => /^UPDATE/mu.test(statement));
+    for (const statement of [...migration, ...migration]) {
+      await w.sql(statement);
+    }
+    const dan = await w.upload('token-dan', {
+      name: 'Dan',
+      kind: 0,
+      mean: 300,
+      prompts: 500,
+      sorryAt: START,
+    });
+    expect(dan.entry.achievements).toContain(CHEATER);
+  });
+
   it('catches the entries already on the board with more than half their prompts kind or mean', async () => {
     const w = world();
     await w.upload('token-ann', MEAN);

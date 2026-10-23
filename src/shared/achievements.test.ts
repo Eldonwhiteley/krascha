@@ -39,6 +39,7 @@ function summary(state: Partial<ReputationSummary> = {}): ReputationSummary {
     rageQuits: 0,
     badWords: 0,
     copies: 0,
+    sorryAt: null,
     ...state,
     kind,
     mean,

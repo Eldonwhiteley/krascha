@@ -91,4 +91,6 @@ export interface ReputationSummary extends ReputationTally {
    * day. Nobody types the same thing that often, so these come from a script.
    */
   readonly copies: number;
+  /** When the newest prompt that says sorry was typed, or null when none did. */
+  readonly sorryAt: number | null;
 }

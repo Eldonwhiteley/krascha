@@ -23,6 +23,28 @@ export interface LexiconEntry {
 }
 
 /**
+ * Apologies. Any one of them, typed after the board caught you cheating, gets
+ * you forgiven, so the list leans wide and every one word form also counts
+ * with a typo.
+ */
+export const APOLOGY_LEXICON: readonly {
+  readonly term: string;
+  readonly forms: readonly string[];
+}[] = [
+  {
+    term: 'sorry',
+    forms: ['sorry', 'sory', 'soz', 'sowwy', 'sowy', 'srry', 'sry', 'im sorry', 'so sorry'],
+  },
+  {
+    term: 'apologize',
+    forms: ['apologize', 'apologise', 'apologizing', 'apologising', 'apology', 'apologies'],
+  },
+  { term: 'forgive me', forms: ['forgive', 'forgiveness', 'forgiven', 'pardon me'] },
+  { term: 'my bad', forms: ['my bad', 'my fault', 'mea culpa', 'i was wrong'] },
+  { term: 'i regret', forms: ['i regret', 'regret it', 'repent', 'im ashamed', 'ashamed'] },
+];
+
+/**
  * Kind words and phrases: manners and praise. They count wherever they
  * appear, since a person says please and thanks to whoever they are asking.
  */

@@ -135,9 +135,13 @@ them:
 - Cheater cheater goes to anyone caught gaming the board: typing the same
   kind or mean prompt more than 10 times in a day, 50 extra times in all
   across your machines, or having more than half your prompts kind or mean.
-  It never comes off, not even with a `remove`. You stay on the board, but
-  below everyone who plays fair, with a Known cheater sticker on your name
-  in every list, no bunk and none of the awards only one person can hold.
+  A `remove` does not wash it off. You stay on the board, but below everyone
+  who plays fair, with a Known cheater sticker on your name in every list, no
+  bunk and none of the awards only one person can hold. The only way out is
+  to say sorry: type any apology to your agent ("I am so sorry, please
+  forgive me", "my bad", "soz", typos count) and upload again. Krascha
+  forgives you and starts your counts over, so only cheating after that can
+  catch you again.
 
 Without gh, or with `upload --no-gh`, Krascha makes up a random key, saves it
 in `~/.krascha/leaderboard.json` and uploads with that. Lose the file and you

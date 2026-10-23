@@ -681,6 +681,75 @@ async function betaTester(database: D1Database, owner: string): Promise<boolean>
   return signed !== null;
 }
 
+/** The counts the board checks for cheating. */
+type CheatCounts = Required<Pick<ScoreUpload, 'kind' | 'mean' | 'prompts' | 'copies'>>;
+
+/** The counts piled up since `from`, none below 0. */
+function since(counts: CheatCounts, from: CheatCounts): CheatCounts {
+  return {
+    kind: Math.max(0, counts.kind - from.kind),
+    mean: Math.max(0, counts.mean - from.mean),
+    prompts: Math.max(0, counts.prompts - from.prompts),
+    copies: Math.max(0, counts.copies - from.copies),
+  };
+}
+
+/**
+ * Catches the owner when their counts look like gaming the board, for good,
+ * so clean counts later do not take it back. Only saying sorry after being
+ * caught does, and the counts then start over, so the ones that got them
+ * caught do not catch them again. True when this upload got them forgiven.
+ */
+async function judge(
+  database: D1Database,
+  owner: string,
+  counts: CheatCounts,
+  upload: ScoreUpload,
+  now: number,
+): Promise<boolean> {
+  const caught = await database
+    .prepare('SELECT caught_at FROM cheaters WHERE owner = ?')
+    .bind(owner)
+    .first();
+  if (caught !== null) {
+    if (upload.sorryAt === undefined || upload.sorryAt <= number_(caught, 'caught_at')) {
+      return false;
+    }
+    await database.prepare('DELETE FROM cheaters WHERE owner = ?').bind(owner).run();
+    await database
+      .prepare(
+        `INSERT INTO forgiven (owner, kind, mean, prompts, copies) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (owner) DO UPDATE SET
+           kind = excluded.kind, mean = excluded.mean, prompts = excluded.prompts, copies = excluded.copies`,
+      )
+      .bind(owner, counts.kind, counts.mean, counts.prompts, counts.copies)
+      .run();
+    return true;
+  }
+  const slate = await database
+    .prepare('SELECT kind, mean, prompts, copies FROM forgiven WHERE owner = ?')
+    .bind(owner)
+    .first();
+  const fresh =
+    slate === null
+      ? counts
+      : since(counts, {
+          kind: number_(slate, 'kind'),
+          mean: number_(slate, 'mean'),
+          prompts: number_(slate, 'prompts'),
+          copies: number_(slate, 'copies'),
+        });
+  if (isCheating(fresh)) {
+    await database
+      .prepare(
+        'INSERT INTO cheaters (owner, caught_at) VALUES (?, ?) ON CONFLICT (owner) DO NOTHING',
+      )
+      .bind(owner, now)
+      .run();
+  }
+  return false;
+}
+
 export async function saveScore(database: D1Database, save: Save): Promise<SaveResult> {
   const { owner, upload, now, newId } = save;
   const day = utcDay(now);
@@ -707,13 +776,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   const prompts = sum((machine) => machine.prompts);
   const tokensPerDay = sum((machine) => machine.tokensPerDay);
   const copies = machines.reduce((total, machine) => total + machine.copies, 0);
-  // Once caught is for good, so clean counts later do not take it back.
-  if (isCheating({ kind, mean, prompts, copies })) {
-    await database
-      .prepare('INSERT INTO cheaters (owner) VALUES (?) ON CONFLICT (owner) DO NOTHING')
-      .bind(owner.id)
-      .run();
-  }
+  const forgiven = await judge(database, owner.id, { kind, mean, prompts, copies }, upload, now);
   const achievements = knownIds([
     ...combinedIds(machines),
     ...accountIds(githubIdOf(owner)),
@@ -768,6 +831,7 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
       ...standing,
       entry: awarded(standing.entry, awards),
       machines: machines.length,
+      ...(forgiven ? { forgiven } : {}),
     },
   };
 }

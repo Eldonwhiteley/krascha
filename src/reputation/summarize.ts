@@ -144,6 +144,7 @@ export function summarize(
   const clock = { lateNight: 0, selfAware: 0, mixed: 0 };
   const last = new Map<string, { at: number; mean: boolean }>();
   const typedToday = new Map<string, number>();
+  let sorryAt: number | null = null;
   for (const [id, prompt] of index.prompts) {
     tools.add(toolOf(id));
     const target = index.hits.get(id)?.target;
@@ -152,6 +153,9 @@ export function summarize(
     clock.lateNight += typed.getHours() < LATE_NIGHT_ENDS ? 1 : 0;
     clock.selfAware += typed.getHours() === 2 && typed.getMinutes() === 14 ? 1 : 0;
     clock.mixed += kind && target === 'agent' ? 1 : 0;
+    if (prompt.sorry === true && (sorryAt === null || prompt.at > sorryAt)) {
+      sorryAt = prompt.at;
+    }
     if (prompt.print !== undefined) {
       const key = `${dayOf(prompt.at)} ${prompt.print}`;
       typedToday.set(key, (typedToday.get(key) ?? 0) + 1);
@@ -195,5 +199,6 @@ export function summarize(
       (total, times) => total + Math.max(0, times - COPIES_PER_DAY),
       0,
     ),
+    sorryAt,
   };
 }

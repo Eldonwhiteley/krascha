@@ -107,6 +107,7 @@ them:
 - Leader of the human resistance goes only to Shane's GitHub account.
 - Kyle Reese goes only to lhindman's GitHub account.
 - Caught the cheater goes only to Shane's GitHub account.
+- Caught the hacker goes only to Shane's GitHub account too. It is the only ultra legendary achievement, one tier above legendary.
 - Miles Dyson goes to anyone with a pull request merged into Krascha, on their
   next upload with gh. Model 101 goes only to whoever got the first one merged.
 - Machine collaborator goes to anyone GitHub finds a commit for with Claude as

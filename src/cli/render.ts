@@ -140,10 +140,10 @@ function details(summary: ReputationSummary, paint: Paint): string[] {
 
 const SHORT = new Intl.NumberFormat('en-US', { notation: 'compact' });
 
-/** Stars for the tier, one for bronze up to four for legendary, in its color. */
+/** Stars for the tier, one for bronze up to five for ultra legendary, in its color. */
 function medal(tier: Tier, paint: Paint): string {
   const stars = '★'.repeat(TIERS.indexOf(tier) + 1);
-  const label = `${stars} ${tier.toUpperCase()}`;
+  const label = `${stars} ${tier.replaceAll('-', ' ').toUpperCase()}`;
   switch (tier) {
     case 'bronze':
       return paint.red(label);
@@ -153,6 +153,8 @@ function medal(tier: Tier, paint: Paint): string {
       return paint.yellow(label);
     case 'legendary':
       return paint.bold(paint.magenta(label));
+    case 'ultra-legendary':
+      return paint.bold(paint.yellow(label));
   }
 }
 

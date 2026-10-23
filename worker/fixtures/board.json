@@ -11,6 +11,7 @@
       "prompts": 3100,
       "uploadedAt": 1792515600000,
       "achievements": [
+        "caught-the-hacker",
         "first-strike",
         "meltdown",
         "grudge-match",
@@ -679,6 +680,7 @@
   ],
   "total": 12,
   "held": {
+    "caught-the-hacker": 1,
     "first-strike": 7,
     "meltdown": 2,
     "grudge-match": 2,

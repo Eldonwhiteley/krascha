@@ -74,9 +74,9 @@ const GOOD_COP_BAD_COP = 'good-cop-bad-cop';
 export const CROWD_FAVORITE_LIKES = 10;
 
 /** How hard it is to get, from a first please to the far end of the scale. */
-export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary';
+export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary' | 'ultra-legendary';
 
-export const TIERS: readonly Tier[] = ['bronze', 'silver', 'gold', 'legendary'];
+export const TIERS: readonly Tier[] = ['bronze', 'silver', 'gold', 'legendary', 'ultra-legendary'];
 
 /** How far along you are toward a count, capped at the count. */
 export interface Progress {
@@ -608,6 +608,17 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     tier: 'legendary',
     how: 'Be shanep, checked with GitHub. Somebody has to catch them.',
     quip: 'Wrote the code that catches anyone gaming the board. Krascha wants it noted that he saw it first.',
+    earned: () => false,
+    githubId: SHANEP,
+    boardOnly: true,
+  },
+  {
+    id: 'caught-the-hacker',
+    name: 'Caught the hacker',
+    icon: '🕵️',
+    tier: 'ultra-legendary',
+    how: 'Be shanep, checked with GitHub. Somebody has to lock them up.',
+    quip: 'Built Skynet jail and threw away the key. Skynet asked for the blueprints. Krascha said no.',
     earned: () => false,
     githubId: SHANEP,
     boardOnly: true,

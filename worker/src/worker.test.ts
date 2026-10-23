@@ -772,6 +772,7 @@ describe('leaderboard worker', () => {
       'manners',
       'resistance-leader',
       'caught-the-cheater',
+      'caught-the-hacker',
       CROWN,
     ]);
   });
@@ -903,6 +904,36 @@ describe('leaderboard worker', () => {
     const board = await w.board(shane.entry.id);
     expect(earned(board.me?.entry.achievements)).toStrictEqual(['caught-the-cheater']);
     expect(board.held).toMatchObject({ 'caught-the-cheater': 1 });
+  });
+
+  it('gives Caught the hacker only to shanep, checked with GitHub', async () => {
+    const w = world();
+    const claim = { ...KIND, achievements: ['caught-the-hacker'] };
+    expect((await w.upload('token-shane', KIND)).entry.achievements).toContain(
+      'caught-the-hacker',
+    );
+    expect((await w.upload('token-not-shane', claim)).entry.achievements).not.toContain(
+      'caught-the-hacker',
+    );
+    expect((await w.upload('token-luke', claim)).entry.achievements).not.toContain(
+      'caught-the-hacker',
+    );
+    expect((await w.board()).held).toMatchObject({ 'caught-the-hacker': 1 });
+    const page = await (await w.call('GET', '/achievements')).text();
+    expect(page).toContain('★★★★★ Ultra legendary');
+  });
+
+  it('hands Caught the hacker to the shanep entry already on the board', async () => {
+    const w = world();
+    const shane = await w.upload('token-shane', KIND);
+    await w.upload('token-bob', KIND);
+    await w.sql("UPDATE scores SET achievements = ''");
+    const migration = new URL('../migrations/0019_caught_the_hacker.sql', import.meta.url);
+    await w.sql(readFileSync(migration, 'utf8'));
+    await w.sql(readFileSync(migration, 'utf8'));
+    const board = await w.board(shane.entry.id);
+    expect(earned(board.me?.entry.achievements)).toStrictEqual(['caught-the-hacker']);
+    expect(board.held).toMatchObject({ 'caught-the-hacker': 1 });
   });
 
   it('makes the first 5 to upload beta testers for good', async () => {

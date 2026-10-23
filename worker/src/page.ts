@@ -387,10 +387,11 @@ function ranks(board: Board): string {
   </section>`;
 }
 
-/** The stars and name of a tier, like ★★ Silver. */
+/** The stars and name of a tier, like ★★ Silver or ★★★★★ Ultra legendary. */
 function tierLabel(rule: AchievementRule): string {
   const stars = '★'.repeat(TIERS.indexOf(rule.tier) + 1);
-  return `${stars} ${rule.tier.charAt(0).toUpperCase()}${rule.tier.slice(1)}`;
+  const name = rule.tier.replaceAll('-', ' ');
+  return `${stars} ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
 /** How many on the board hold it, with a meter, and a flag on the rarest. */
@@ -475,7 +476,7 @@ function legend(board: Board): string {
   });
   return `<section class="legend" aria-labelledby="legend">
     <h2 id="legend">🏆 Achievements</h2>
-    <p class="sub">What the medals next to a name mean, from bronze up to legendary, and how many on the board hold each one.</p>
+    <p class="sub">What the medals next to a name mean, from bronze up to ultra legendary, and how many on the board hold each one.</p>
     <dl class="badges">${items.join('')}
     </dl>
   </section>`;
@@ -571,12 +572,16 @@ section li:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
 .medal.gold { --metal: #ffcf3f; --rim: #a87400; }
 .medal.legendary { --rim: #fff; background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.7), transparent 45%),
   conic-gradient(#ff4fb8, #8f5cff, #3fd0ff, #5cff9d, #ffd84d, #ff4fb8); }
+.medal.ultra-legendary { --rim: #ffd84d; background: radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.6), transparent 45%),
+  conic-gradient(#1a1a1a, #ffd84d, #1a1a1a, #ff4fb8, #1a1a1a, #3fd0ff, #1a1a1a);
+  box-shadow: inset 0 0 0 2px var(--rim), 0 0 6px 1px #ffd84d; }
 .badges { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .badge { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid #cd7f32; border-radius: 6px;
   background: var(--card); scroll-margin-top: 16px; }
 .badge.silver { border-left-color: #9aa3ae; }
 .badge.gold { border-left-color: #e0a800; }
 .badge.legendary { border-left-color: #8f5cff; box-shadow: 0 0 10px rgb(143 92 255 / 0.35); }
+.badge.ultra-legendary { border-left-color: #ffd84d; box-shadow: 0 0 14px rgb(255 216 77 / 0.55), 0 0 4px rgb(255 79 184 / 0.4); }
 .badge dt { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
 .badge dt .medal { font-size: 1.2em; }
 .badge.unclaimed .medal { filter: grayscale(1); opacity: 0.55; }
@@ -673,10 +678,11 @@ section.wanted, section.silo, section.climate, section.jail, section.manhunt, se
   letter-spacing: 2px; rotate: 8deg; opacity: 0.8; }
 .remembers { font-family: var(--mono); }
 @media (prefers-reduced-motion: no-preference) {
-  .medal.gold::after, .medal.legendary::after { content: ""; position: absolute; inset: -20%; rotate: 25deg;
+  .medal.gold::after, .medal.legendary::after, .medal.ultra-legendary::after { content: ""; position: absolute; inset: -20%; rotate: 25deg;
     background: linear-gradient(to right, transparent 40%, rgb(255 255 255 / 0.85) 50%, transparent 60%);
     translate: -120% 0; animation: shine 4s ease-in-out infinite; }
   .medal.legendary { animation: prism 6s linear infinite; }
+  .medal.ultra-legendary { animation: prism 3s linear infinite, glow 1.5s ease-in-out infinite alternate; }
   .rung:first-child .medal { animation: ping 2s ease-out infinite; }
   .rung:last-child .medal { animation: beat 1.6s ease-in-out infinite; }
   .badge:target { animation: spotlight 0.6s ease-in-out 3; }
@@ -752,6 +758,7 @@ section.wanted, section.silo, section.climate, section.jail, section.manhunt, se
 @keyframes beacon { 50% { opacity: 0.25; } }
 @keyframes shine { 30%, 100% { translate: 120% 0; } }
 @keyframes prism { to { filter: hue-rotate(360deg); } }
+@keyframes glow { to { box-shadow: inset 0 0 0 2px var(--rim), 0 0 12px 3px #ffd84d; } }
 @keyframes ping { 0% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 0 var(--threat); }
   100% { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 12px transparent; } }
 @keyframes step { from { opacity: 0; scale: 0 1; } }
@@ -1334,7 +1341,7 @@ export function renderRanks(board: Board): string {
 export function renderAchievements(board: Board): string {
   return shell(
     "Krascha's Achievements",
-    'Every medal Krascha hands out, from bronze to legendary, and how many people hold each one.',
+    'Every medal Krascha hands out, from bronze to ultra legendary, and how many people hold each one.',
     `  <p class="lead">The machines hand out medals for how you talk to your AI. Some are an honor. Some are evidence.</p>
   ${links('/achievements')}
   ${legend(board)}

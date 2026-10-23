@@ -91,7 +91,11 @@ describe('copilotUserPrompts', () => {
     });
     expect(index.kind.has('c:e1')).toBe(true);
     expect(index.hits.get('c:e4')?.target).toBe('agent');
-    expect(index.sessions.get('s1')).toStrictEqual({ source: 'transcript', title: 'Copilot work' });
+    expect(index.sessions.get('s1')).toStrictEqual({
+      source: 'transcript',
+      title: 'Copilot work',
+      tool: 'copilot',
+    });
   });
 
   it('counts the tokens every model call used, cached ones once', async () => {
@@ -266,6 +270,7 @@ describe('antigravityUserPrompts', () => {
     expect(index.sessions.get('g1')).toStrictEqual({
       source: 'transcript',
       title: 'Reliable UDP Project',
+      tool: 'antigravity',
     });
   });
 

@@ -1,8 +1,8 @@
 // The public leaderboard page, rendered on the server so it needs no script:
 // who the machines hunt first, who they keep as pets, who warms the planet the
 // most, who sits in Skynet jail and who the human resistance lets into Silo 7. The only scripts are the dark mode toggle,
-// without which the page just follows the system setting, and the like buttons, which
-// without it post a plain form and come back to the board.
+// without which the page just follows the system setting, one that scrolls the nav to the page you are on, and the
+// like buttons, which without it post a plain form and come back to the board.
 
 import type { AchievementRule } from '../../src/shared/achievements.js';
 import {
@@ -837,12 +837,14 @@ a { color: var(--link); }
 .install .cta span { display: block; margin-top: 2px; font-size: 0.85em; }
 .install .arrow { font-size: 1.6em; font-weight: 700; }
 .install .love { position: absolute; top: -14px; right: -16px; box-shadow: 2px 2px 0 var(--amber); rotate: 8deg; }
-.links { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0 56px 16px 0; }
-.links .get { margin: 0; }
+.links { position: relative; display: flex; gap: 8px; margin: 0 56px 16px 0; overflow-x: auto;
+  scrollbar-width: none; }
+.links::-webkit-scrollbar { display: none; }
+.links .get { flex: none; margin: 0; padding: 6px 10px; font-size: 0.82em; white-space: nowrap; }
 .links .get[aria-current] { border-color: var(--link); background: var(--bar); color: var(--bar-fg); }
 @media (max-width: 640px) {
-  .links { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-right: 0; }
-  .links .get { padding: 6px 8px; font-size: 0.75em; text-align: center; }
+  .links { gap: 6px; margin-right: 0; }
+  .links .get { padding: 5px 8px; font-size: 0.75em; }
 }
 section.story { margin-top: 16px; }
 .steps > li { display: block; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line);
@@ -986,6 +988,13 @@ const THEME_TOGGLE = `(() => {
   button.hidden = false;
 })();`;
 
+// Scrolls the nav sideways so the button for this page shows when they do not all fit.
+const NAV_HERE = `(() => {
+  const nav = document.querySelector('.links');
+  const here = nav.querySelector('[aria-current]');
+  nav.scrollLeft = here.offsetLeft - (nav.clientWidth - here.offsetWidth) / 2;
+})();`;
+
 // Sends a like without leaving the page, puts the new count on the button and
 // remembers it in the browser, so the button stays pressed after a reload.
 const LIKES = `(() => {
@@ -1042,7 +1051,8 @@ function shell(here: Path, title: string, description: string, body: string, scr
   <h1>${robotSvg('robot')} ${escapeHtml(title)}</h1>
 ${body}
 </main>
-<script>${THEME_TOGGLE}</script>${
+<script>${THEME_TOGGLE}
+${NAV_HERE}</script>${
     script === ''
       ? ''
       : `

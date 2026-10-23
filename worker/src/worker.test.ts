@@ -1634,6 +1634,7 @@ describe('leaderboard worker', () => {
       expect(hrefs).toStrictEqual(paths);
       expect(nav).toContain(`<a class="get" href="${path}" aria-current="page">`);
       expect(nav.match(/aria-current/g)).toHaveLength(1);
+      expect(page).toContain("nav.querySelector('[aria-current]')");
     }
   });
 

@@ -10,6 +10,7 @@ import { dayOf } from '../reputation/summarize.js';
 
 import { claudeDir, claudeTitle } from './claude.js';
 import { copilotDir, copilotTitle, copilotUserPrompts } from './copilot.js';
+import { vscodeDirs, vscodeUserPrompts } from './vscode.js';
 
 async function tempDir(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), 'krascha-sources-'));
@@ -115,5 +116,75 @@ describe('copilotUserPrompts', () => {
       now: 1,
     });
     expect(result.filesRead).toBe(0);
+  });
+});
+
+describe('vscodeDirs', () => {
+  it('finds each VS Code build on macOS and Linux', () => {
+    const mac = path.join('/home/me', 'Library', 'Application Support');
+    expect(vscodeDirs('/home/me', {}, 'darwin')).toStrictEqual([
+      path.join(mac, 'Code', 'User'),
+      path.join(mac, 'Code - Insiders', 'User'),
+    ]);
+    expect(vscodeDirs('/home/me', {}, 'linux')[0]).toBe(
+      path.join('/home/me', '.config', 'Code', 'User'),
+    );
+    expect(vscodeDirs('/home/me', { XDG_CONFIG_HOME: '/x' }, 'linux')[0]).toBe(
+      path.join('/x', 'Code', 'User'),
+    );
+  });
+});
+
+describe('vscodeUserPrompts', () => {
+  function request(requestId: string, text: string, timestamp = 1_000): object {
+    return { requestId, timestamp, message: { text, parts: [] }, response: [] };
+  }
+
+  it('reads whole sessions, session logs and empty window chats', async () => {
+    const user = await tempDir();
+    const folder = path.join(user, 'workspaceStorage', 'w1', 'chatSessions');
+    const empty = path.join(user, 'globalStorage', 'emptyWindowChatSessions');
+    await mkdir(folder, { recursive: true });
+    await mkdir(empty, { recursive: true });
+    await writeFile(path.join(user, 'workspaceStorage', 'stray.txt'), 'x');
+    await writeFile(
+      path.join(folder, 's1.json'),
+      JSON.stringify({
+        version: 3,
+        customTitle: 'Fix   the build',
+        requests: [
+          request('r1', 'thanks, you rock'),
+          request('r2', '/explain'),
+          { requestId: 'bad' },
+        ],
+      }),
+    );
+    const log = [
+      { kind: 0, v: { version: 3, requests: [request('r3', 'please fix it')] } },
+      { kind: 1, k: ['customTitle'], v: 'Logged chat' },
+      { kind: 2, k: ['requests'], v: [request('r4', 'what is wrong with you', 2_000)] },
+      { kind: 2, k: ['requests', 1, 'response'], v: [{ kind: 'markdown', value: 'you idiot' }] },
+    ];
+    await writeFile(
+      path.join(folder, 's2.jsonl'),
+      `${log.map((line) => JSON.stringify(line)).join('\n')}\nnot json\n`,
+    );
+    await writeFile(
+      path.join(empty, 's3.json'),
+      JSON.stringify({ requests: [request('r5', 'hello')] }),
+    );
+    await writeFile(path.join(empty, 'notes.txt'), 'x');
+    const index = emptyIndex();
+    const result = await scanInto(index, { sources: [vscodeUserPrompts([user, '/nope'])], now: 1 });
+    expect(result.filesRead).toBe(3);
+    expect([...index.prompts.keys()].sort()).toStrictEqual(['c:r1', 'c:r3', 'c:r4', 'c:r5']);
+    expect(index.prompts.get('c:r4')).toMatchObject({ sessionId: 's2', at: 2_000 });
+    expect(index.kind.has('c:r1')).toBe(true);
+    expect(index.hits.get('c:r4')?.target).toBe('agent');
+    expect(index.sessions.get('s1')).toStrictEqual({
+      source: 'transcript',
+      title: 'Fix the build',
+    });
+    expect(index.sessions.get('s2')).toStrictEqual({ source: 'transcript', title: 'Logged chat' });
   });
 });

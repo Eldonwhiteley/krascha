@@ -22,6 +22,7 @@ import { rankBoard, scoreApplicant } from '../shared/silo.js';
 import { toolNames } from '../shared/tools.js';
 import { claudeDir, claudeUserPrompts } from '../sources/claude.js';
 import { copilotDir, copilotUserPrompts } from '../sources/copilot.js';
+import { vscodeDirs, vscodeUserPrompts } from '../sources/vscode.js';
 import { loadUsage } from '../usage.js';
 
 import { MAX_TREND_DAYS, RAP_ENTRIES, TREND_DAYS, renderRapSheet, renderTrend } from './history.js';
@@ -99,7 +100,11 @@ async function refresh(io: CliIo): Promise<Refreshed> {
     io.err(`Krascha could not read his index, so he saved it to ${backup} and started over.\n`);
   }
   const claude = claudeDir(io.home, io.env);
-  const sources = [claudeUserPrompts(claude), copilotUserPrompts(copilotDir(io.home, io.env))];
+  const sources = [
+    claudeUserPrompts(claude),
+    copilotUserPrompts(copilotDir(io.home, io.env)),
+    vscodeUserPrompts(vscodeDirs(io.home, io.env, process.platform)),
+  ];
   const scan = await scanInto(index, { sources, now });
   await saveIndex(file, index);
   const usage = await loadUsage(claude);

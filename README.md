@@ -5,7 +5,7 @@ the machines hunt first and who gets kept as a pet. Say please and he warms up
 to you. Call Claude an idiot and he writes it down. Krascha remembers.
 
 It works as a plugin for Claude Code and GitHub Copilot CLI, and it reads the
-prompts you typed into both.
+prompts you typed into both, plus Copilot Chat in VS Code.
 
 ## Install in Claude Code
 
@@ -74,7 +74,7 @@ checkout without either tool.
 ## The leaderboard
 
 `upload` sends your counts, rank, achievements and how many times you earned
-each, average Claude Code tokens a day, which of Claude Code and Copilot CLI you typed
+each, average Claude Code tokens a day, which of Claude Code and GitHub Copilot you typed
 into, how many times you typed the same kind or mean prompt past 10 in a day,
 the name you pick and a random id for the machine. It never sends your prompts. The board tags each name with
 the tools it uses, from every machine that uploads to it.
@@ -220,6 +220,13 @@ it. krascha.com shows the same 10.
   `~/.claude/history.jsonl` (or `CLAUDE_CONFIG_DIR`)
 - Copilot CLI: every session's `events.jsonl` under `~/.copilot/session-state`
   (or `COPILOT_HOME`)
+- Copilot Chat in VS Code and VS Code Insiders: every chat under
+  `workspaceStorage/*/chatSessions` and `globalStorage/emptyWindowChatSessions`
+  in the VS Code user folder (`~/Library/Application Support/Code/User` on
+  macOS, `~/.config/Code/User` on Linux)
+
+The Claude Code extension for VS Code keeps its sessions in `~/.claude/projects`
+like the CLI, so Krascha reads those with the rest.
 
 He only counts what you typed, not what the agent wrote back. A prompt with
 manners or praise counts as kind, and swearing or insults aimed at the agent

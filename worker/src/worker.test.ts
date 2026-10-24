@@ -384,10 +384,10 @@ describe('leaderboard worker', () => {
     ]);
     const html = await (await w.call('GET', '/')).text();
     expect(html).toContain(
-      '<span class="tools" role="img" aria-label="Uses Claude Code and Copilot CLI"><span class="tool claude" title="Claude Code"><svg',
+      '<span class="tools" role="img" aria-label="Uses Claude Code and GitHub Copilot"><span class="tool claude" title="Claude Code"><svg',
     );
-    expect(html).toContain('<span class="tool copilot" title="Copilot CLI"><svg');
-    expect(html).toContain('aria-label="Uses Copilot CLI"');
+    expect(html).toContain('<span class="tool copilot" title="GitHub Copilot"><svg');
+    expect(html).toContain('aria-label="Uses GitHub Copilot"');
     const again = await w.upload('token-ann', MEAN);
     expect(again.entry.tools).toStrictEqual([]);
     expect(await w.status('POST', '/api/scores', 'token-ann', { ...MEAN, tools: 'claude' })).toBe(

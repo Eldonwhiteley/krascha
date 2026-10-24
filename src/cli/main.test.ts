@@ -554,8 +554,8 @@ describe('krascha', () => {
     });
     const { code, out } = await home.run('board');
     expect(code).toBe(0);
-    expect(out).toContain('Ann (Sarah Connor, Claude Code and Copilot CLI)');
-    expect(out).toContain('Bob (Sarah Connor, Copilot CLI)');
+    expect(out).toContain('Ann (Sarah Connor, Claude Code and GitHub Copilot)');
+    expect(out).toContain('Bob (Sarah Connor, GitHub Copilot)');
     expect(out).toContain('Cat (Sarah Connor)\n');
   });
 

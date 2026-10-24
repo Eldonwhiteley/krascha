@@ -36,16 +36,16 @@ export const MAX_TOKENS_PER_DAY = 1_000_000_000_000;
  * What this copy of Krascha knows beyond its achievements. Bump it when he
  * learns something the board shows that is not a new achievement, so older
  * copies see they are behind and update. 1 covers everything up to updating
- * himself, 2 sends it with each upload, 3 sends copies, 4 sends sorryAt and
- * 5 updates himself without a restart.
+ * himself, 2 sends it with each upload, 3 sends copies, 4 sends sorryAt,
+ * 5 updates himself without a restart and 6 reads Copilot Chat in VS Code.
  */
-export const FEATURES = 5;
+export const FEATURES = 6;
 /**
  * The oldest FEATURES the board takes an upload from. Copies older than it
  * get told to update instead, since they count things wrong or miss them.
  * Raise it to make every copy update before its next upload.
  */
-export const MIN_UPLOAD_FEATURES = 5;
+export const MIN_UPLOAD_FEATURES = 6;
 /** The status the board answers a copy older than MIN_UPLOAD_FEATURES with. */
 export const TOO_OLD = 426;
 /** Times a day one kind or mean prompt can be typed before the rest count as copies. */

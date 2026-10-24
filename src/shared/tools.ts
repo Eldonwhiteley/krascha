@@ -4,12 +4,12 @@
 
 export const TOOLS = [
   { id: 'claude', name: 'Claude Code' },
-  { id: 'copilot', name: 'Copilot CLI' },
+  { id: 'copilot', name: 'GitHub Copilot' },
 ] as const;
 
 export type ToolId = (typeof TOOLS)[number]['id'];
 
-/** Copilot CLI prompt ids start with this. Claude Code's start with t: or h:. */
+/** Copilot prompt ids, from the CLI or VS Code, start with this. Claude Code's start with t: or h:. */
 export const COPILOT_PREFIX = 'c:';
 
 export function toolOf(promptId: string): ToolId {
@@ -21,7 +21,7 @@ export function knownTools(ids: readonly string[]): ToolId[] {
   return TOOLS.filter((tool) => ids.includes(tool.id)).map((tool) => tool.id);
 }
 
-/** "Claude Code", "Copilot CLI" or "Claude Code and Copilot CLI". Empty for an upload that did not say. */
+/** "Claude Code", "GitHub Copilot" or "Claude Code and GitHub Copilot". Empty for an upload that did not say. */
 export function toolNames(ids: readonly string[]): string {
   const known = new Set<string>(knownTools(ids));
   return TOOLS.filter((tool) => known.has(tool.id))

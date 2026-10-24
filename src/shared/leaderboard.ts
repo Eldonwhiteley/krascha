@@ -138,6 +138,8 @@ export interface BoardEntry {
   readonly tools?: readonly string[];
   /** How many likes visitors to the board gave it. Missing from a server older than likes on the board. */
   readonly likes?: number;
+  /** When the board first saw each achievement on the entry, by id, in ms. Missing for the ones held before the board kept dates, and from older servers. */
+  readonly earned?: Readonly<Record<string, number>>;
 }
 
 /** An achievement counts can earn, as the server names it, so an older CLI can say what it is missing. */
@@ -245,6 +247,11 @@ function isRepeats(value: unknown, max: number): value is Repeats {
   );
 }
 
+/** Times in ms by achievement id, like BoardEntry's earned. */
+function isEarned(value: unknown): value is Readonly<Record<string, number>> {
+  return isRecord(value) && Object.values(value).every((at) => isCount(at));
+}
+
 function isKnownList(value: unknown): value is readonly KnownAchievement[] {
   return (
     isList(value) &&
@@ -294,7 +301,8 @@ function isBoardEntry(value: unknown): value is BoardEntry {
     (value['repeats'] === undefined || isRepeats(value['repeats'], Infinity)) &&
     isTokens(value['tokensPerDay'], Infinity) &&
     (value['tools'] === undefined || isIdList(value['tools'], Infinity)) &&
-    (value['likes'] === undefined || isCount(value['likes']))
+    (value['likes'] === undefined || isCount(value['likes'])) &&
+    (value['earned'] === undefined || isEarned(value['earned']))
   );
 }
 

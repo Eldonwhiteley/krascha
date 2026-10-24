@@ -270,6 +270,7 @@ describe('leaderboard worker', () => {
         tokensPerDay: 0,
         tools: [],
         likes: 0,
+        earned: { [CROWN]: START, [BUNK_ASSIGNED]: START },
       },
       place: 1,
       siloPlace: 1,
@@ -1529,6 +1530,44 @@ describe('leaderboard worker', () => {
     // Each medal is its own link, so none hide inside one big image for screen readers.
     expect(lists).not.toContain('class="trophies" role="img"');
     expect(page).toContain('.badge:target {');
+  });
+
+  it('shows the medals in the order they were earned, and keeps the first date', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, achievements: ['meltdown'] });
+    w.setNow(START + 60_000);
+    await w.upload('token-ann', { ...MEAN, achievements: ['first-strike', 'meltdown'] });
+    const board = await w.board();
+    const ann = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'ann');
+    expect(ann?.earned).toMatchObject({ meltdown: START, 'first-strike': START + 60_000 });
+    const page = await (await w.call('GET', '/')).text();
+    const row = page.slice(page.indexOf('<span class="who">'));
+    expect(row.indexOf('achievement-meltdown')).toBeLessThan(
+      row.indexOf('achievement-first-strike'),
+    );
+  });
+
+  it('dates the achievements already on the board as earned before dates, and the catches when caught', async () => {
+    const w = world();
+    await w.upload('token-ann', { ...MEAN, achievements: ['meltdown', 'first-strike'] });
+    await w.sql('DELETE FROM earned');
+    await w.sql(`INSERT INTO cheaters (owner, caught_at) SELECT owner, 5 FROM scores`);
+    // Everything but the CREATE TABLE, twice, to show a second run changes nothing.
+    const migration = readFileSync(
+      new URL('../migrations/0021_earned.sql', import.meta.url),
+      'utf8',
+    )
+      .split(';')
+      .filter((statement) => /^(WITH|INSERT)/mu.test(statement));
+    for (const statement of [...migration, ...migration]) {
+      await w.sql(statement);
+    }
+    w.setNow(START + 60_000);
+    const board = await w.board();
+    const ann = [...board.mostWanted, ...board.pets].find((entry) => entry.github === 'ann');
+    // A cheater gets no crown or bunk, so only the catch has a date.
+    expect(ann?.achievements).toStrictEqual(['first-strike', 'meltdown', CHEATER]);
+    expect(ann?.earned).toStrictEqual({ [CHEATER]: 5 });
   });
 
   it('ranks everyone on the board for Silo 7, like krascha silo board', async () => {

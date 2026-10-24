@@ -25,7 +25,7 @@ import {
   GRAMS_PER_TOKEN,
   warmthPercent,
 } from '../../src/shared/climate.js';
-import type { Board, BoardEntry, Repeats } from '../../src/shared/leaderboard.js';
+import type { Board, BoardEntry } from '../../src/shared/leaderboard.js';
 import { HUMAN_PROMPTS, HUMAN_TOKENS_PER_DAY, MIN_PROMPTS } from '../../src/shared/leaderboard.js';
 import { RANKS, scalePercent } from '../../src/shared/ranks.js';
 import {
@@ -83,8 +83,14 @@ function achievementAnchor(id: string): string {
  * The medals under a name, each a link to what it means on the achievements
  * page, with a count in the corner of the ones earned more than once.
  */
-function trophies(ids: readonly string[], repeats: Repeats): string {
-  const earned = achievementsOf(ids);
+function trophies(entry: BoardEntry): string {
+  const repeats = entry.repeats ?? {};
+  const dates = entry.earned ?? {};
+  // In the order they were earned. The ones from before the board kept dates
+  // come first, in list order, since the sort keeps ties where they were.
+  const earned = achievementsOf(entry.achievements ?? []).toSorted(
+    (a, b) => (dates[a.id] ?? 0) - (dates[b.id] ?? 0),
+  );
   if (earned.length === 0) {
     return '';
   }
@@ -208,7 +214,7 @@ function rows(entries: readonly BoardEntry[], empty: string, top: keyof typeof T
         <span class="who">
           ${name(entry)}${index === 0 ? TOP[top] : ''}
           <span class="rank"><a href="/ranks#${rankAnchor(entry.rank)}">${escapeHtml(entry.rank)}</a></span>
-          ${trophies(entry.achievements ?? [], entry.repeats ?? {})}
+          ${trophies(entry)}
         </span>
         <span class="counts">${counts(entry)}</span>
         <span class="score">${String(Math.round(entry.score * 100))}</span>
@@ -275,7 +281,7 @@ function jail(board: Board): string {
         <span class="who">
           ${name(entry)}
           <span class="rank">Caught ${escapeHtml(new Date(caughtAt).toUTCString())}</span>
-          ${trophies(entry.achievements ?? [], entry.repeats ?? {})}
+          ${trophies(entry)}
         </span>
         <span class="counts">Claimed ${count(prompts)} prompts and ${COMPACT.format(tokensPerDay)} tokens a day</span>
         <span class="score" role="img" aria-label="Locked up">🔒</span>

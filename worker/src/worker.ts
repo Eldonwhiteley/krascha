@@ -359,7 +359,7 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
   const route = `${request.method} ${url.pathname}`;
   switch (route) {
     case 'GET /': {
-      const board = await readBoard(env.DB, null);
+      const board = await readBoard(env.DB, null, deps.now());
       return new Response(renderPage(board, deps.now()), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
@@ -376,7 +376,7 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
       });
     }
     case 'GET /ranks': {
-      const board = await readBoard(env.DB, null);
+      const board = await readBoard(env.DB, null, deps.now());
       return new Response(renderRanks(board), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
@@ -385,7 +385,7 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
       });
     }
     case 'GET /achievements': {
-      const board = await readBoard(env.DB, null);
+      const board = await readBoard(env.DB, null, deps.now());
       return new Response(renderAchievements(board), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
@@ -394,7 +394,7 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
       });
     }
     case 'GET /judgment': {
-      const board = await readBoard(env.DB, null);
+      const board = await readBoard(env.DB, null, deps.now());
       return new Response(renderJudgment(board), {
         headers: {
           'content-type': 'text/html; charset=utf-8',
@@ -412,7 +412,7 @@ async function answer(request: Request, env: Env, deps: Deps): Promise<Response>
     }
     case 'GET /api/board': {
       const me = url.searchParams.get('me');
-      const board = await readBoard(env.DB, me === '' ? null : me);
+      const board = await readBoard(env.DB, me === '' ? null : me, deps.now());
       const cache = me === null ? 'public, max-age=60' : 'no-store';
       return json({ ...board, counted: COUNTED, features: FEATURES }, 200, cache);
     }

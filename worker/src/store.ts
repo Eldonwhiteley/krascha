@@ -508,6 +508,57 @@ async function awardsFor(database: D1Database, listed: readonly BoardEntry[]): P
   };
 }
 
+/**
+ * Notes each achievement the board has not seen on an entry before as earned
+ * now, and hands the entries back with when they earned what they hold.
+ */
+async function dated(
+  database: D1Database,
+  entries: readonly BoardEntry[],
+  now: number,
+): Promise<Map<string, Readonly<Record<string, number>>>> {
+  const { results } = await database
+    .prepare('SELECT entry, achievement, earned_at FROM earned')
+    .all();
+  const seen = new Map<string, Record<string, number>>();
+  for (const row of results) {
+    const entry = text(row, 'entry');
+    seen.set(entry, { ...seen.get(entry), [text(row, 'achievement')]: number_(row, 'earned_at') });
+  }
+  const dates = new Map<string, Readonly<Record<string, number>>>();
+  for (const entry of entries) {
+    const had = seen.get(entry.id) ?? {};
+    const fresh = (entry.achievements ?? []).filter((id) => !(id in had));
+    await Promise.all(
+      fresh.map(async (id) =>
+        database
+          .prepare('INSERT OR IGNORE INTO earned (entry, achievement, earned_at) VALUES (?, ?, ?)')
+          .bind(entry.id, id, now)
+          .run(),
+      ),
+    );
+    // 0 is a date from before the board kept them, so it is left out.
+    dates.set(
+      entry.id,
+      Object.fromEntries(
+        [...Object.entries(had), ...fresh.map((id) => [id, now] as const)].filter(
+          ([id, at]) => at > 0 && (entry.achievements ?? []).includes(id),
+        ),
+      ),
+    );
+  }
+  return dates;
+}
+
+/** The entry with when it earned what it holds, from what dated found. */
+function withDates(
+  entry: BoardEntry,
+  dates: ReadonlyMap<string, Readonly<Record<string, number>>>,
+): BoardEntry {
+  const earned = dates.get(entry.id) ?? {};
+  return Object.keys(earned).length === 0 ? entry : { ...entry, earned };
+}
+
 /** How many listed entries hold each achievement, by id. */
 function held(everyone: readonly BoardEntry[], awards: Awards): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -530,7 +581,11 @@ async function ranked(database: D1Database): Promise<Record<string, number>> {
   return counts;
 }
 
-export async function readBoard(database: D1Database, me: string | null): Promise<Board> {
+export async function readBoard(
+  database: D1Database,
+  me: string | null,
+  now: number,
+): Promise<Board> {
   await fillSilo(database);
   const [mostWanted, pets, bunks, warmers, count, everyone, ranks, jail] = await Promise.all([
     list(database, 'wanted'),
@@ -550,20 +605,36 @@ export async function readBoard(database: D1Database, me: string | null): Promis
       ? null
       : await database.prepare(`SELECT ${COLUMNS} FROM scores WHERE entry_id = ?`).bind(me).first();
   const standing = mine === null ? null : await standingOf(database, mine);
+  const dates = await dated(
+    database,
+    [
+      ...award(everyone),
+      ...jail.map(({ entry }) => entry),
+      ...(standing === null ? [] : [awarded(standing.entry, awards)]),
+    ],
+    now,
+  );
+  const show = (entries: readonly BoardEntry[]): BoardEntry[] =>
+    award(entries).map((entry) => withDates(entry, dates));
+  const one = (entry: BoardEntry | null): BoardEntry | null =>
+    entry === null ? null : withDates(entry, dates);
   return {
-    mostWanted: award(mostWanted),
-    pets: award(pets),
-    bunks: award(bunks),
-    warmers: award(warmers),
+    mostWanted: show(mostWanted),
+    pets: show(pets),
+    bunks: show(bunks),
+    warmers: show(warmers),
     total: count,
     held: held(everyone, awards),
     ranks,
-    crown,
-    champion,
-    stoneTools,
-    fewestBadges,
-    jail,
-    me: standing === null ? null : { ...standing, entry: awarded(standing.entry, awards) },
+    crown: one(crown),
+    champion: one(champion),
+    stoneTools: one(stoneTools),
+    fewestBadges: one(fewestBadges),
+    jail: jail.map((inmate) => ({ ...inmate, entry: withDates(inmate.entry, dates) })),
+    me:
+      standing === null
+        ? null
+        : { ...standing, entry: withDates(awarded(standing.entry, awards), dates) },
   };
 }
 
@@ -918,11 +989,12 @@ export async function saveScore(database: D1Database, save: Save): Promise<SaveR
   }
   const standing = await standingOf(database, row);
   const { awards } = await awardsFor(database, await listed(database));
+  const entry = awarded(standing.entry, awards);
   return {
     ok: true,
     standing: {
       ...standing,
-      entry: awarded(standing.entry, awards),
+      entry: withDates(entry, await dated(database, [entry], now)),
       machines: machines.length,
       ...(forgiven ? { forgiven } : {}),
     },
@@ -971,6 +1043,10 @@ export async function likeEntry(database: D1Database, like: Like): Promise<numbe
 }
 
 export async function removeScore(database: D1Database, owner: Owner): Promise<void> {
+  await database
+    .prepare('DELETE FROM earned WHERE entry IN (SELECT entry_id FROM scores WHERE owner = ?)')
+    .bind(owner.id)
+    .run();
   await database.prepare('DELETE FROM machines WHERE owner = ?').bind(owner.id).run();
   await database.prepare('DELETE FROM scores WHERE owner = ?').bind(owner.id).run();
 }

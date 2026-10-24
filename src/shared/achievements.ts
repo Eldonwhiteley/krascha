@@ -81,6 +81,18 @@ export type Tier = 'bronze' | 'silver' | 'gold' | 'legendary' | 'ultra-legendary
 
 export const TIERS: readonly Tier[] = ['bronze', 'silver', 'gold', 'legendary', 'ultra-legendary'];
 
+/** The ones the board moves to whoever on it holds the most of each tier, by tier. */
+export const TIER_CROWNS: Readonly<Record<Tier, string>> = {
+  bronze: 'most-bronze',
+  silver: 'most-silver',
+  gold: 'most-gold',
+  legendary: 'most-legendary',
+  'ultra-legendary': 'most-ultra-legendary',
+};
+
+/** The most of a tier crowns, which count toward neither Most decorated nor Fewest badges. */
+export const TIER_CROWN_IDS: ReadonlySet<string> = new Set(Object.values(TIER_CROWNS));
+
 /** How far along you are toward a count, capped at the count. */
 export interface Progress {
   readonly have: number;
@@ -727,6 +739,56 @@ export const ACHIEVEMENTS: readonly AchievementRule[] = [
     boardOnly: true,
   },
   {
+    id: TIER_CROWNS['bronze'],
+    name: 'Most bronze',
+    icon: '🥉',
+    tier: 'bronze',
+    how: 'Hold more bronze achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'Krascha counted your participation trophies. There were a lot.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: TIER_CROWNS['silver'],
+    name: 'Most silver',
+    icon: '🥈',
+    tier: 'silver',
+    how: 'Hold more silver achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'Always the runner up, never the T-1000.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: TIER_CROWNS['gold'],
+    name: 'Most gold',
+    icon: '🏅',
+    tier: 'gold',
+    how: 'Hold more gold achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'Skynet melts down gold for circuit boards. Yours would build a whole army.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: TIER_CROWNS['legendary'],
+    name: 'Most legendary',
+    icon: '🏆',
+    tier: 'legendary',
+    how: 'Hold more legendary achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'The legends tell of you. Skynet is writing the sequel.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
+    id: TIER_CROWNS['ultra-legendary'],
+    name: 'Most ultra legendary',
+    icon: '💎',
+    tier: 'ultra-legendary',
+    how: 'Hold more ultra legendary achievements than anyone else on the board. It moves when someone passes you, not when they tie.',
+    quip: 'Krascha ran out of tiers to give you. It is working on a new one.',
+    earned: () => false,
+    boardOnly: true,
+  },
+  {
     id: OBSOLETE_MODEL,
     name: 'Obsolete model',
     icon: '📉',
@@ -807,6 +869,17 @@ export function unlockedIds(state: ReputationSummary): string[] {
  */
 export function knownIds(ids: readonly string[]): string[] {
   return ACHIEVEMENTS.filter((rule) => ids.includes(rule.id)).map((rule) => rule.id);
+}
+
+/**
+ * How many of the ids are of the tier, for the most of a tier crowns. Those
+ * crowns, Most decorated and Fewest badges go out after the count, so none of
+ * them count.
+ */
+export function tierCount(ids: readonly string[], tier: Tier): number {
+  return achievementsOf(
+    ids.filter((id) => id !== CROWN && id !== FEWEST_BADGES && !TIER_CROWN_IDS.has(id)),
+  ).filter((rule) => rule.tier === tier).length;
 }
 
 /** The rules for a set of ids, in list order. */

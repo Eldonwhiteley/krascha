@@ -3,7 +3,7 @@
 // network started today and the likes each network gave today. The D1 types here are the few calls this file makes, so the Worker needs no
 // Cloudflare type package.
 
-import type { MachineCounts } from '../../src/shared/achievements.js';
+import type { MachineCounts, Tier } from '../../src/shared/achievements.js';
 import {
   accountIds,
   ALPHA_TESTER,
@@ -28,6 +28,10 @@ import {
   OBSOLETE_MODEL,
   SKYNET_HACKER,
   STONE_TOOLS,
+  TIER_CROWN_IDS,
+  TIER_CROWNS,
+  tierCount,
+  TIERS,
 } from '../../src/shared/achievements.js';
 import type {
   Board,
@@ -300,16 +304,19 @@ async function listed(database: D1Database): Promise<BoardEntry[]> {
 }
 
 /**
- * How many achievements an entry holds, not counting the crown itself or
- * Fewest badges, which goes out after it.
+ * How many achievements an entry holds, not counting the crown itself,
+ * Fewest badges, which goes out after it, or the most of a tier crowns.
  */
 function decorations(entry: BoardEntry): number {
-  return (entry.achievements ?? []).filter((id) => id !== CROWN && id !== FEWEST_BADGES).length;
+  return (entry.achievements ?? []).filter(
+    (id) => id !== CROWN && id !== FEWEST_BADGES && !TIER_CROWN_IDS.has(id),
+  ).length;
 }
 
-/** How many achievements an entry holds, not counting Fewest badges itself. */
+/** How many achievements an entry holds, not counting Fewest badges itself or the most of a tier crowns. */
 function badges(entry: BoardEntry): number {
-  return (entry.achievements ?? []).filter((id) => id !== FEWEST_BADGES).length;
+  return (entry.achievements ?? []).filter((id) => id !== FEWEST_BADGES && !TIER_CROWN_IDS.has(id))
+    .length;
 }
 
 /**
@@ -415,6 +422,8 @@ interface Awards {
   readonly stoneTools: string | undefined;
   readonly decorated: string | undefined;
   readonly fewestBadges: string | undefined;
+  /** The entry with the most of each tier, by tier. */
+  readonly mostOfTier: Readonly<Partial<Record<Tier, string>>>;
 }
 
 /** The entry with what the board hands out on read added. */
@@ -427,6 +436,9 @@ function awarded(entry: BoardEntry, awards: Awards): BoardEntry {
     ...(entry.id === awards.stoneTools ? [STONE_TOOLS] : []),
     ...(entry.id === awards.decorated ? [CROWN] : []),
     ...(entry.id === awards.fewestBadges ? [FEWEST_BADGES] : []),
+    ...TIERS.filter((tier) => entry.id === awards.mostOfTier[tier]).map(
+      (tier) => TIER_CROWNS[tier],
+    ),
   ];
   return extra.length === 0
     ? entry
@@ -453,6 +465,7 @@ interface Awarded {
   readonly stoneTools: BoardEntry | null;
   readonly crown: BoardEntry | null;
   readonly fewestBadges: BoardEntry | null;
+  readonly mostOfTier: Readonly<Record<string, BoardEntry | null>>;
 }
 
 /**
@@ -474,13 +487,30 @@ async function awardsFor(database: D1Database, listed: readonly BoardEntry[]): P
     (entry) => entry.tokensPerDay ?? 0,
     'least',
   );
-  const before: Awards = {
+  const early: Awards = {
     bunks,
     knockedOff: knocked,
     champion: champion?.id,
     stoneTools: stoneTools?.id,
     decorated: undefined,
     fewestBadges: undefined,
+    mostOfTier: {},
+  };
+  const tiered = everyone.map((entry) => awarded(entry, early));
+  const tierHolders = await Promise.all(
+    TIERS.map(async (tier) =>
+      crownHolder(database, TIER_CROWNS[tier], tiered, (entry) =>
+        tierCount(entry.achievements ?? [], tier),
+      ),
+    ),
+  );
+  const before: Awards = {
+    ...early,
+    mostOfTier: Object.fromEntries(
+      TIERS.map((tier, at) => [tier, tierHolders[at]?.id] as const).filter(
+        ([, id]) => id !== undefined,
+      ),
+    ),
   };
   const crown = await crownHolder(
     database,
@@ -505,6 +535,9 @@ async function awardsFor(database: D1Database, listed: readonly BoardEntry[]): P
     stoneTools: shown(stoneTools),
     crown: shown(crown),
     fewestBadges: shown(fewestBadges),
+    mostOfTier: Object.fromEntries(
+      TIERS.map((tier, at) => [tier, shown(tierHolders[at] ?? null)] as const),
+    ),
   };
 }
 
@@ -597,7 +630,10 @@ export async function readBoard(
     ranked(database),
     jailed(database),
   ]);
-  const { awards, champion, stoneTools, crown, fewestBadges } = await awardsFor(database, everyone);
+  const { awards, champion, stoneTools, crown, fewestBadges, mostOfTier } = await awardsFor(
+    database,
+    everyone,
+  );
   const award = (entries: readonly BoardEntry[]): BoardEntry[] =>
     entries.map((entry) => awarded(entry, awards));
   const mine =
@@ -630,6 +666,9 @@ export async function readBoard(
     champion: one(champion),
     stoneTools: one(stoneTools),
     fewestBadges: one(fewestBadges),
+    mostOfTier: Object.fromEntries(
+      Object.entries(mostOfTier).map(([tier, holder]) => [tier, one(holder)] as const),
+    ),
     jail: jail.map((inmate) => ({ ...inmate, entry: withDates(inmate.entry, dates) })),
     me:
       standing === null

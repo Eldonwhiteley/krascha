@@ -14,8 +14,11 @@ import {
   FEWEST_BADGES,
   SKYNET_HACKER,
   STONE_TOOLS,
+  TIER_CROWN_IDS,
+  TIER_CROWNS,
   TIERS,
   achievementsOf,
+  tierCount,
 } from '../../src/shared/achievements.js';
 import {
   CLIMATE_RANKS,
@@ -435,7 +438,9 @@ function crownLine(rule: AchievementRule, board: Board): string | null {
   if (rule.id === CROWN && board.crown !== undefined) {
     return holderLine(board.crown, (holder) =>
       plural(
-        (holder.achievements ?? []).filter((id) => id !== CROWN && id !== FEWEST_BADGES).length,
+        (holder.achievements ?? []).filter(
+          (id) => id !== CROWN && id !== FEWEST_BADGES && !TIER_CROWN_IDS.has(id),
+        ).length,
         'achievement',
       ),
     );
@@ -452,9 +457,16 @@ function crownLine(rule: AchievementRule, board: Board): string | null {
   if (rule.id === FEWEST_BADGES && board.fewestBadges !== undefined) {
     return holderLine(board.fewestBadges, (holder) =>
       plural(
-        (holder.achievements ?? []).filter((id) => id !== FEWEST_BADGES).length,
+        (holder.achievements ?? []).filter((id) => id !== FEWEST_BADGES && !TIER_CROWN_IDS.has(id))
+          .length,
         'achievement',
       ),
+    );
+  }
+  const tier = TIERS.find((each) => TIER_CROWNS[each] === rule.id);
+  if (tier !== undefined && board.mostOfTier !== undefined) {
+    return holderLine(board.mostOfTier[tier] ?? null, (holder) =>
+      plural(tierCount(holder.achievements ?? [], tier), `${tier.replace('-', ' ')} achievement`),
     );
   }
   return null;

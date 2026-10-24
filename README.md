@@ -126,6 +126,10 @@ them:
 - Most decorated goes to whoever has the most achievements, and People's
   champion to whoever has the most likes. Each moves when someone passes the
   holder, and a tie leaves it where it is.
+- Most bronze, Most silver, Most gold, Most legendary and Most ultra legendary
+  go to whoever holds the most achievements of that tier, and move the same
+  way. Each is in the tier it counts, and none of them count toward Most
+  decorated or Fewest badges.
 - Uses stone tools goes to whoever uses the fewest tokens a day, out of those
   who use any, and Fewest badges to whoever has the fewest achievements. Each
   needs at least two on the board to pick from, moves when someone drops

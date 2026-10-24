@@ -199,6 +199,8 @@ export interface Board {
   readonly stoneTools?: BoardEntry | null;
   /** Who holds Fewest badges, or null when nobody does. Missing from a server older than it. */
   readonly fewestBadges?: BoardEntry | null;
+  /** Who holds the most of each tier, by tier, or null when nobody does. Missing from a server older than them. */
+  readonly mostOfTier?: Readonly<Record<string, BoardEntry | null>>;
   /** Everyone caught making their numbers up, off every other list, the latest caught first. Missing from a server older than the jail. */
   readonly jail?: readonly Jailed[];
   /** The caller's own entry, when the request named one. */
@@ -355,6 +357,11 @@ export function isBoard(value: unknown): value is Board {
     (value['fewestBadges'] === undefined ||
       value['fewestBadges'] === null ||
       isBoardEntry(value['fewestBadges'])) &&
+    (value['mostOfTier'] === undefined ||
+      (isRecord(value['mostOfTier']) &&
+        Object.values(value['mostOfTier']).every(
+          (holder) => holder === null || isBoardEntry(holder),
+        ))) &&
     (value['jail'] === undefined ||
       (Array.isArray(value['jail']) && value['jail'].every(isJailed))) &&
     (value['me'] === null || isStanding(value['me'])) &&

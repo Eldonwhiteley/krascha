@@ -20,6 +20,8 @@ import {
   OBSOLETE_MODEL,
   SKYNET_HACKER,
   STONE_TOOLS,
+  TIER_CROWNS,
+  TIERS,
 } from '../../src/shared/achievements.js';
 import type { Board, Standing } from '../../src/shared/leaderboard.js';
 import {
@@ -172,6 +174,7 @@ function earned(achievements: readonly string[] | undefined): string[] {
     BUNK_ASSIGNED,
     CROWD_FAVORITE,
     OBSOLETE_MODEL,
+    ...Object.values(TIER_CROWNS),
   ]);
   return (achievements ?? []).filter((id) => !onRead.has(id));
 }
@@ -191,6 +194,7 @@ describe('leaderboard worker', () => {
       champion: null,
       stoneTools: null,
       fewestBadges: null,
+      mostOfTier: Object.fromEntries(TIERS.map((tier) => [tier, null])),
       jail: [],
       me: null,
       counted: COUNTED_ACHIEVEMENTS.map(({ id, name }) => ({ id, name })),
@@ -265,12 +269,13 @@ describe('leaderboard worker', () => {
         mean: 30,
         prompts: 400,
         uploadedAt: START,
-        // Ann is admitted to the silo alone, and the bunk alone is enough for the crown.
-        achievements: [CROWN, BUNK_ASSIGNED],
+        // Ann is admitted to the silo alone, and the bunk alone is enough for
+        // the crown and the most gold.
+        achievements: [CROWN, BUNK_ASSIGNED, TIER_CROWNS.gold],
         tokensPerDay: 0,
         tools: [],
         likes: 0,
-        earned: { [CROWN]: START, [BUNK_ASSIGNED]: START },
+        earned: { [CROWN]: START, [BUNK_ASSIGNED]: START, [TIER_CROWNS.gold]: START },
       },
       place: 1,
       siloPlace: 1,
@@ -286,8 +291,16 @@ describe('leaderboard worker', () => {
       ...MEAN,
       achievements: ['meltdown', 'made-up', 'first-strike', 'meltdown'],
     });
-    // Alone on the board, Ann has the most and a bunk, so the board adds both.
-    const shown = ['first-strike', 'meltdown', CROWN, BUNK_ASSIGNED];
+    // Alone on the board, Ann has the most of everything and a bunk, so the board adds them.
+    const shown = [
+      'first-strike',
+      'meltdown',
+      CROWN,
+      BUNK_ASSIGNED,
+      TIER_CROWNS.bronze,
+      TIER_CROWNS.silver,
+      TIER_CROWNS.gold,
+    ];
     expect(standing.entry.achievements).toStrictEqual(shown);
     const board = await w.board();
     expect(board.mostWanted[0]?.achievements).toStrictEqual(shown);
@@ -299,7 +312,7 @@ describe('leaderboard worker', () => {
     );
     // With none earned, the bunk is still one more than nobody.
     const again = await w.upload('token-ann', MEAN);
-    expect(again.entry.achievements).toStrictEqual([CROWN, BUNK_ASSIGNED]);
+    expect(again.entry.achievements).toStrictEqual([CROWN, BUNK_ASSIGNED, TIER_CROWNS.gold]);
   });
 
   it('keeps how many times each was earned, shows it on the medal and leaves the crown to distinct ones', async () => {
@@ -414,6 +427,9 @@ describe('leaderboard worker', () => {
       'meltdown',
       'hunted-first',
       CROWN,
+      TIER_CROWNS.bronze,
+      TIER_CROWNS.silver,
+      TIER_CROWNS.legendary,
     ]);
     const both = await w.upload('token-ann', {
       ...KIND,
@@ -447,6 +463,9 @@ describe('leaderboard worker', () => {
       CROWN,
       // The Copilot laptop leans mean and the Claude desktop leans nice.
       'good-cop-bad-cop',
+      TIER_CROWNS.bronze,
+      TIER_CROWNS.silver,
+      TIER_CROWNS.gold,
     ]);
     const again = await w.upload('token-ann', { ...MEAN, prompts: 500, machine: laptop });
     expect(again).toMatchObject({ machines: 2, entry: { prompts: 800, tools: ['claude'] } });
@@ -766,6 +785,27 @@ describe('leaderboard worker', () => {
     );
   });
 
+  it('gives the most of each tier to whoever holds the most of it, and moves it only when someone passes', async () => {
+    const w = world();
+    const silver = TIER_CROWNS.silver;
+    expect(
+      (await w.upload('token-ann', { ...MEAN, achievements: ['meltdown'] })).entry.achievements,
+    ).toContain(silver);
+    // A tie leaves it with Ann.
+    await w.upload('token-bob', { ...KIND, achievements: ['charm'] });
+    expect((await w.board()).mostOfTier?.['silver']?.name).toBe('Ann');
+    await w.upload('token-bob', { ...KIND, achievements: ['charm', 'saint'] });
+    const board = await w.board();
+    expect(board.mostOfTier?.['silver']?.name).toBe('Bob');
+    expect(board.mostOfTier?.['ultra-legendary']).toBeNull();
+    expect(board.held).toMatchObject({ [silver]: 1 });
+    const page = await (await w.call('GET', '/achievements')).text();
+    const crown = page.slice(page.indexOf(`id="achievement-${silver}"`));
+    expect(crown.slice(0, crown.indexOf('</div>'))).toContain(
+      '<strong>Bob</strong></a> <span class="verified" title="Checked with GitHub">✓</span>, with 2 silver achievements.</span></dd>',
+    );
+  });
+
   it("counts shanep's account achievements toward Most decorated", async () => {
     const w = world();
     await w.upload('token-ann', { ...MEAN, achievements: ['first-strike'] });
@@ -777,6 +817,7 @@ describe('leaderboard worker', () => {
       'caught-the-cheater',
       'caught-the-hacker',
       CROWN,
+      TIER_CROWNS['ultra-legendary'],
     ]);
   });
 
@@ -1447,6 +1488,9 @@ describe('leaderboard worker', () => {
       [CROWN]: 1,
       [BUNK_ASSIGNED]: 1,
       [FEWEST_BADGES]: 1,
+      [TIER_CROWNS.bronze]: 1,
+      [TIER_CROWNS.silver]: 1,
+      [TIER_CROWNS.gold]: 1,
     });
     const page = await (await w.call('GET', '/achievements')).text();
     expect(page).toContain('2 of 2 hold it (100%)');
@@ -1525,8 +1569,8 @@ describe('leaderboard worker', () => {
       expect(lists).toContain(`href="/achievements#achievement-${id}"`);
       expect(achievements).toContain(`id="achievement-${id}"`);
     }
-    // Three earned, Ann's crown and bunk, and Bob's Fewest badges.
-    expect(lists.split('<a class="medal ')).toHaveLength(7);
+    // Three earned, Ann's crown, bunk and most bronze, silver and gold, and Bob's Fewest badges.
+    expect(lists.split('<a class="medal ')).toHaveLength(10);
     // Each medal is its own link, so none hide inside one big image for screen readers.
     expect(lists).not.toContain('class="trophies" role="img"');
     expect(page).toContain('.badge:target {');
